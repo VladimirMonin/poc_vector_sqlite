@@ -3,6 +3,7 @@
 ## 📌 Философия: SOLID + DRY + YAGNI
 
 Проект построен по принципам:
+
 - **SRP** (Single Responsibility) — каждый модуль отвечает за одно
 - **DRY** (Don't Repeat Yourself) — переиспользуемое ядро
 - **YAGNI** (You Aren't Gonna Need It) — только необходимое
@@ -271,7 +272,7 @@ class Article(HybridSearchMixin, BaseModel):
         return f"{self.title}\n{self.body}\nАвтор: {self.author.name}"
 ```
 
-### Шаг 3: Готово!
+### Шаг 3: Готово
 
 ```python
 # Сразу работает!
