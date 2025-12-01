@@ -1,10 +1,14 @@
 """
 Модели предметной области для системы заметок.
 
-Демонстрирует:
-- Один-ко-многим (Category -> Note)
-- Многие-ко-многим (Note <-> Tag)
-- Использование HybridSearchMixin для семантического поиска
+Архитектура Parent-Child для работы с большими документами:
+- Note (родитель) — хранит полный текст, используется для FTS и людей
+- NoteChunk (ребенок) — фрагменты текста для векторного поиска
+- Category → Note (один-ко-многим)
+- Note ← Tag (многие-ко-многим)
+
+Векторы хранятся ТОЛЬКО в чанках, что позволяет обрабатывать
+документы размером >2000 токенов (лимит Gemini).
 """
 
 from datetime import datetime
@@ -16,9 +20,10 @@ from peewee import (
     TextField,
     ForeignKeyField,
     DateTimeField,
+    IntegerField,
 )
 
-from semantic_core import db, HybridSearchMixin
+from semantic_core import db
 
 
 class BaseModel(Model):
@@ -74,24 +79,26 @@ class Tag(BaseModel):
         return f"Tag({self.name})"
 
 
-class Note(HybridSearchMixin, BaseModel):
+class Note(BaseModel):
     """
-    Заметка с поддержкой семантического поиска.
+    Заметка (родительский документ).
 
-    Наследует HybridSearchMixin для получения методов:
-    - vector_search()
-    - fulltext_search()
-    - hybrid_search()
-    - update_vector_index()
+    Хранит полный текст для:
+    - Полнотекстового поиска (FTS5)
+    - Отображения пользователю
+    - Метаданных (категория, теги)
+
+    Векторы хранятся в связанных NoteChunk.
 
     Связи:
     - Многие-к-одному с Category
+    - Один-ко-многим с NoteChunk (CASCADE DELETE)
     - Многие-ко-многим с Tag
 
     Attributes:
         id: Автоинкремент ID
         title: Заголовок заметки
-        content: Содержимое заметки
+        content: ПОЛНЫЙ текст заметки (может быть >2000 токенов)
         category: Ссылка на категорию
         created_at: Дата создания
         updated_at: Дата последнего обновления
@@ -99,34 +106,29 @@ class Note(HybridSearchMixin, BaseModel):
 
     id = AutoField(primary_key=True)
     title = CharField(max_length=255, index=True)
-    content = TextField()
+    content = TextField()  # Полный текст БЕЗ ограничений
     category = ForeignKeyField(
         Category,
         backref="notes",
         on_delete="CASCADE",
-        null=True,  # Категория опциональна
+        null=True,
     )
     created_at = DateTimeField(default=datetime.now)
     updated_at = DateTimeField(default=datetime.now)
 
-    # Конфигурация для HybridSearchMixin
-    _vector_column = "embedding"
-    _fts_columns = ["title", "content"]
-
     class Meta:
         table_name = "notes"
-        indexes = (
-            (("category", "created_at"), False),  # Составной индекс
-        )
+        indexes = ((("category", "created_at"), False),)
 
-    def get_search_text(self) -> str:
+    def get_context_text(self) -> str:
         """
-        Формирует текст для индексации и векторизации.
+        Возвращает контекст для добавления к чанкам при векторизации.
 
-        Включает контекст категории для улучшения семантического поиска.
+        Этот текст будет добавлен к каждому чанку при генерации эмбеддингов,
+        чтобы сохранить смысловой контекст документа.
 
         Returns:
-            str: Объединенный текст заметки с метаданными
+            str: Контекст (заголовок + категория)
         """
         parts = []
 
@@ -136,9 +138,7 @@ class Note(HybridSearchMixin, BaseModel):
         if self.title:
             parts.append(f"Заголовок: {self.title}")
 
-        parts.append(self.content)
-
-        return "\n".join(parts)
+        return "\n".join(parts) if parts else ""
 
     def save(self, *args, **kwargs):
         """
@@ -156,6 +156,54 @@ class Note(HybridSearchMixin, BaseModel):
 
     def __str__(self) -> str:
         return f"Note({self.title[:30]}...)"
+
+
+class NoteChunk(BaseModel):
+    """
+    Фрагмент заметки (дочерний документ) для векторного поиска.
+
+    Каждая заметка разбивается на чанки фиксированного размера.
+    Векторы (эмбеддинги) хранятся ТОЛЬКО здесь, в связанной
+    виртуальной таблице note_chunks_vec.
+
+    Это позволяет:
+    1. Обрабатывать документы >2000 токенов (лимит Gemini)
+    2. Находить релевантную ЧАСТЬ документа, а не весь документ целиком
+    3. Возвращать пользователю полную заметку (parent)
+
+    Связи:
+    - Многие-к-одному с Note (CASCADE DELETE)
+
+    Attributes:
+        id: Автоинкремент ID
+        note: Ссылка на родительскую заметку
+        chunk_index: Порядковый номер чанка (0, 1, 2...)
+        content: Текст этого фрагмента
+        created_at: Дата создания чанка
+    """
+
+    id = AutoField(primary_key=True)
+    note = ForeignKeyField(
+        Note,
+        backref="chunks",  # Обратная связь: note.chunks
+        on_delete="CASCADE",  # При удалении заметки удаляются все чанки
+        index=True,
+    )
+    chunk_index = IntegerField()  # Позиция в документе
+    content = TextField()  # Текст фрагмента
+    created_at = DateTimeField(default=datetime.now)
+
+    class Meta:
+        table_name = "note_chunks"
+        indexes = (
+            (("note", "chunk_index"), True),  # Уникальная пара (note_id, index)
+        )
+
+    def __str__(self) -> str:
+        preview = self.content[:40] + "..." if len(self.content) > 40 else self.content
+        return (
+            f"NoteChunk(note={self.note_id}, idx={self.chunk_index}, text='{preview}')"
+        )
 
 
 class NoteTag(BaseModel):
