@@ -82,14 +82,14 @@ class Tag(BaseModel):
 class Note(BaseModel):
     """
     Заметка (родительский документ).
-    
+
     Хранит полный текст для:
     - Полнотекстового поиска (FTS5)
     - Отображения пользователю
     - Метаданных (категория, теги)
-    
+
     Векторы хранятся в связанных NoteChunk.
-    
+
     Связи:
     - Многие-к-одному с Category
     - Один-ко-многим с NoteChunk (CASCADE DELETE)
@@ -118,28 +118,26 @@ class Note(BaseModel):
 
     class Meta:
         table_name = "notes"
-        indexes = (
-            (("category", "created_at"), False),
-        )
+        indexes = ((("category", "created_at"), False),)
 
     def get_context_text(self) -> str:
         """
         Возвращает контекст для добавления к чанкам при векторизации.
-        
+
         Этот текст будет добавлен к каждому чанку при генерации эмбеддингов,
         чтобы сохранить смысловой контекст документа.
-        
+
         Returns:
             str: Контекст (заголовок + категория)
         """
         parts = []
-        
+
         if self.category:
             parts.append(f"Категория: {self.category.name}")
-        
+
         if self.title:
             parts.append(f"Заголовок: {self.title}")
-        
+
         return "\n".join(parts) if parts else ""
 
     def save(self, *args, **kwargs):
@@ -163,19 +161,19 @@ class Note(BaseModel):
 class NoteChunk(BaseModel):
     """
     Фрагмент заметки (дочерний документ) для векторного поиска.
-    
+
     Каждая заметка разбивается на чанки фиксированного размера.
     Векторы (эмбеддинги) хранятся ТОЛЬКО здесь, в связанной
     виртуальной таблице note_chunks_vec.
-    
+
     Это позволяет:
     1. Обрабатывать документы >2000 токенов (лимит Gemini)
     2. Находить релевантную ЧАСТЬ документа, а не весь документ целиком
     3. Возвращать пользователю полную заметку (parent)
-    
+
     Связи:
     - Многие-к-одному с Note (CASCADE DELETE)
-    
+
     Attributes:
         id: Автоинкремент ID
         note: Ссылка на родительскую заметку
@@ -183,7 +181,7 @@ class NoteChunk(BaseModel):
         content: Текст этого фрагмента
         created_at: Дата создания чанка
     """
-    
+
     id = AutoField(primary_key=True)
     note = ForeignKeyField(
         Note,
@@ -194,16 +192,18 @@ class NoteChunk(BaseModel):
     chunk_index = IntegerField()  # Позиция в документе
     content = TextField()  # Текст фрагмента
     created_at = DateTimeField(default=datetime.now)
-    
+
     class Meta:
         table_name = "note_chunks"
         indexes = (
             (("note", "chunk_index"), True),  # Уникальная пара (note_id, index)
         )
-    
+
     def __str__(self) -> str:
         preview = self.content[:40] + "..." if len(self.content) > 40 else self.content
-        return f"NoteChunk(note={self.note_id}, idx={self.chunk_index}, text='{preview}')"
+        return (
+            f"NoteChunk(note={self.note_id}, idx={self.chunk_index}, text='{preview}')"
+        )
 
 
 class NoteTag(BaseModel):

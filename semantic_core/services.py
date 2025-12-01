@@ -128,10 +128,11 @@ def save_note_with_chunks(
             embeddings.append(vector)
 
         # 5. Массовая вставка чанков (INSERT INTO note_chunks ...)
-        # Важно: bulk_create возвращает список созданных объектов с ID
-        created_chunks = chunk_model.bulk_create(
-            [chunk_model(**data) for data in chunks_to_insert]
-        )
+        # Создаем объекты и сохраняем их по одному, чтобы получить ID
+        created_chunks = []
+        for data in chunks_to_insert:
+            chunk = chunk_model.create(**data)
+            created_chunks.append(chunk)
 
         # 6. Массовая вставка векторов в виртуальную таблицу vec0
         # note_chunks_vec(id, embedding)

@@ -59,8 +59,8 @@ def seed_data():
     generator = EmbeddingGenerator()
     splitter = SimpleTextSplitter(
         chunk_size=1000,  # ~250 токенов
-        overlap=200,      # Перекрытие для контекста
-        threshold=100     # Окно поиска переноса строки
+        overlap=200,  # Перекрытие для контекста
+        threshold=100,  # Окно поиска переноса строки
     )
 
     # Загружаем все markdown файлы
@@ -92,11 +92,15 @@ def seed_data():
 
         chunks_count = note.chunks.count()
         total_chunks += chunks_count
-        
-        print(f"  ✓ {note.title[:40]:40} | {len(content):>6} символов | {chunks_count:>2} чанков")
+
+        print(
+            f"  ✓ {note.title[:40]:40} | {len(content):>6} символов | {chunks_count:>2} чанков"
+        )
 
     print(f"\n✅ Загружено {len(md_files)} документов, создано {total_chunks} чанков")
-    print(f"   Средний размер документа: {sum(len(f.read_text()) for f in md_files) / len(md_files):.0f} символов")
+    print(
+        f"   Средний размер документа: {sum(len(f.read_text()) for f in md_files) / len(md_files):.0f} символов"
+    )
     print(f"   Среднее количество чанков: {total_chunks / len(md_files):.1f}\n")
 
 
@@ -109,13 +113,15 @@ def test_vector_search():
         parent_model=Note,
         chunk_model=NoteChunk,
         query="Как работает векторный поиск?",
-        limit=3
+        limit=3,
     )
 
     print(f"Найдено: {len(results)} уникальных документов")
     for i, (note, distance) in enumerate(results, 1):
         chunks_count = note.chunks.count()
-        print(f"  {i}. {note.title[:50]:50} | {chunks_count:>2} чанков | distance: {distance:.4f}")
+        print(
+            f"  {i}. {note.title[:50]:50} | {chunks_count:>2} чанков | distance: {distance:.4f}"
+        )
     print()
 
 
@@ -124,11 +130,7 @@ def test_fulltext_search():
     print("🔎 Тест 2: Полнотекстовый поиск (по полным документам)")
     print("Запрос: 'Gemini API'\n")
 
-    results = fulltext_search_parents(
-        parent_model=Note,
-        query="Gemini API",
-        limit=3
-    )
+    results = fulltext_search_parents(parent_model=Note, query="Gemini API", limit=3)
 
     print(f"Найдено: {len(results)} документов")
     for i, (note, rank) in enumerate(results, 1):
@@ -139,18 +141,18 @@ def test_fulltext_search():
 def test_chunk_details():
     """Тест 3: Просмотр чанков конкретного документа."""
     print("📄 Тест 3: Детали нарезки документа")
-    
+
     # Берем первый документ
     note = Note.select().first()
-    
+
     if not note:
         print("Нет документов для отображения\n")
         return
-    
+
     print(f"Документ: {note.title}")
     print(f"Размер: {len(note.content)} символов")
     print(f"Чанков: {note.chunks.count()}\n")
-    
+
     if note.chunks.count() > 0:
         print("Первые 3 чанка:")
         for chunk in note.chunks.order_by(NoteChunk.chunk_index).limit(3):
@@ -167,16 +169,15 @@ def test_hybrid_search():
     print("Запрос: 'эмбеддинги модель'\n")
 
     results = hybrid_search_rrf(
-        parent_model=Note,
-        chunk_model=NoteChunk,
-        query="эмбеддинги модель",
-        limit=5
+        parent_model=Note, chunk_model=NoteChunk, query="эмбеддинги модель", limit=5
     )
 
     print(f"Найдено: {len(results)} документов (ранжировано по RRF)")
     for i, (note, rrf_score) in enumerate(results, 1):
         chunks_count = note.chunks.count()
-        print(f"  {i}. {note.title[:45]:45} | {chunks_count:>2} чанков | RRF: {rrf_score:.4f}")
+        print(
+            f"  {i}. {note.title[:45]:45} | {chunks_count:>2} чанков | RRF: {rrf_score:.4f}"
+        )
     print()
 
 
@@ -201,7 +202,7 @@ def main():
             Note.delete().execute()
             Tag.delete().execute()
             Category.delete().execute()
-        
+
         seed_data()
     else:
         notes_count = Note.select().count()
@@ -220,7 +221,7 @@ def main():
     total_notes = Note.select().count()
     total_chunks = NoteChunk.select().count()
     avg_chunks = total_chunks / total_notes if total_notes > 0 else 0
-    
+
     print(f"   Документов: {total_notes}")
     print(f"   Чанков: {total_chunks}")
     print(f"   Среднее чанков/документ: {avg_chunks:.1f}")
