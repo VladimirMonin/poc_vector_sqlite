@@ -96,7 +96,7 @@ def init_database(db_path: Optional[Path] = None) -> VectorDatabase:
             "synchronous": 0,  # Быстрее, но менее безопасно для crash
         },
     )
-    
+
     # Инициализируем прокси реальной базой данных
     db.initialize(database)
 

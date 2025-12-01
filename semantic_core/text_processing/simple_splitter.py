@@ -19,28 +19,25 @@ from .base import TextSplitter, Chunk
 class SimpleTextSplitter(TextSplitter):
     """
     Сплиттер с фиксированным размером и перекрытием.
-    
+
     Attributes:
         chunk_size: Целевой размер одного чанка в символах
         overlap: Размер перекрытия между соседними чанками
         threshold: Радиус поиска переноса строки от целевой позиции
     """
-    
+
     def __init__(
-        self,
-        chunk_size: int = 1000,
-        overlap: int = 200,
-        threshold: int = 100
+        self, chunk_size: int = 1000, overlap: int = 200, threshold: int = 100
     ):
         """
         Инициализирует сплиттер с параметрами нарезки.
-        
+
         Args:
             chunk_size: Целевой размер куска (по умолчанию 1000 символов)
             overlap: Размер перекрытия между чанками (по умолчанию 200)
             threshold: Окно поиска переноса строки ±threshold от target
                       (по умолчанию 100, т.е. ищем в диапазоне 200 символов)
-                      
+
         Raises:
             ValueError: Если параметры некорректны
         """
@@ -54,21 +51,21 @@ class SimpleTextSplitter(TextSplitter):
             )
         if threshold < 0:
             raise ValueError(f"threshold не может быть отрицательным: {threshold}")
-            
+
         self.chunk_size = chunk_size
         self.overlap = overlap
         self.threshold = threshold
-    
+
     def split_text(self, text: str) -> List[Chunk]:
         """
         Разбивает текст на чанки с умной нарезкой по переносам.
-        
+
         Args:
             text: Исходный текст для нарезки
-            
+
         Returns:
             Список Chunk с индексами и текстом
-            
+
         Example:
             >>> splitter = SimpleTextSplitter(chunk_size=100, overlap=20)
             >>> chunks = splitter.split_text("Длинный текст...")
@@ -79,7 +76,7 @@ class SimpleTextSplitter(TextSplitter):
         """
         if not text:
             return []
-        
+
         chunks = []
         start = 0
         text_len = len(text)
@@ -88,7 +85,7 @@ class SimpleTextSplitter(TextSplitter):
         while start < text_len:
             # 1. Вычисляем идеальную позицию разреза
             target_end = start + self.chunk_size
-            
+
             # Если это последний чанк (дошли до конца)
             if target_end >= text_len:
                 chunk_content = text[start:]
@@ -96,11 +93,7 @@ class SimpleTextSplitter(TextSplitter):
                     Chunk(
                         text=chunk_content,
                         index=chunk_idx,
-                        metadata={
-                            "start": start,
-                            "end": text_len,
-                            "is_last": True
-                        }
+                        metadata={"start": start, "end": text_len, "is_last": True},
                     )
                 )
                 break
@@ -109,13 +102,13 @@ class SimpleTextSplitter(TextSplitter):
             # Окно поиска: [target_end - threshold, target_end + threshold]
             search_start = max(start, target_end - self.threshold)
             search_end = min(text_len, target_end + self.threshold)
-            
+
             search_window = text[search_start:search_end]
-            
+
             # Ищем ПОСЛЕДНИЙ перенос строки в окне (rfind = reverse find)
             # Нам выгодно резать как можно позже (ближе к target_end)
-            newline_pos = search_window.rfind('\n')
-            
+            newline_pos = search_window.rfind("\n")
+
             if newline_pos != -1:
                 # Нашли перенос! Режем после него
                 cut_point = search_start + newline_pos + 1  # +1 включаем \n в чанк
@@ -135,20 +128,20 @@ class SimpleTextSplitter(TextSplitter):
                         "start": start,
                         "end": cut_point,
                         "cut_type": cut_type,
-                        "is_last": False
-                    }
+                        "is_last": False,
+                    },
                 )
             )
-            
+
             # 4. Вычисляем начало следующего чанка с учетом overlap
             # Важно: не уходим назад за границу текущего чанка
             next_start = max(start + 1, cut_point - self.overlap)
-            
+
             start = next_start
             chunk_idx += 1
 
         return chunks
-    
+
     def __repr__(self) -> str:
         return (
             f"SimpleTextSplitter("

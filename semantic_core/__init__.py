@@ -26,6 +26,11 @@ from semantic_core.services import (
     save_note_with_chunks,
     delete_note_with_chunks,
 )
+from semantic_core.search import (
+    vector_search_chunks,
+    fulltext_search_parents,
+    hybrid_search_rrf,
+)
 
 __all__ = [
     # Database
@@ -33,18 +38,18 @@ __all__ = [
     "init_database",
     "create_vector_table",
     "create_fts_table",
-    
     # Embeddings
     "EmbeddingGenerator",
-    
-    # Search
+    # Search (legacy mixin)
     "HybridSearchMixin",
-    
+    # Search (Parent-Child functions)
+    "vector_search_chunks",
+    "fulltext_search_parents",
+    "hybrid_search_rrf",
     # Text processing
     "TextSplitter",
     "Chunk",
     "SimpleTextSplitter",
-    
     # Services
     "save_note_with_chunks",
     "delete_note_with_chunks",
