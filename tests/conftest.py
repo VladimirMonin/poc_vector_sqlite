@@ -59,6 +59,13 @@ def test_db(temp_db_path):
     yield database
 
     # Cleanup: удаляем все таблицы после теста
+    # Сначала удаляем виртуальные таблицы
+    try:
+        database.execute_sql("DROP TABLE IF EXISTS note_chunks_vec")
+        database.execute_sql("DROP TABLE IF EXISTS notes_fts")
+    except Exception:
+        pass  # Игнорируем ошибки при удалении виртуальных таблиц
+    
     database.drop_tables([NoteTag, NoteChunk, Note, Tag, Category], safe=True)
     database.close()
 
