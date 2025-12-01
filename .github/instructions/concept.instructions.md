@@ -29,3 +29,22 @@ POC - Proof of Concept
 | `sqlite-vec` | Векторное расширение для SQLite (чистый C) | `/asg017/sqlite-vec` |
 | `google-generativeai` | Простое API Gemini через AI Studio | `/googleapis/python-genai` |
 | `numpy` | Операции с векторами, сериализация float32 | - |
+
+## Структура проекта
+
+```
+core/
+│
+├── semantic_core/              # <--- ТОТ САМЫЙ РЕЮЗАБЕЛЬНЫЙ ПАКЕТ
+│   ├── __init__.py
+│   ├── database.py             # Инициализация Peewee, загрузка sqlite-vec, создание FTS/Vec таблиц
+│   ├── embeddings.py           # Обертка над Google API (Task Types, MRL)
+│   └── search_mixin.py         # "Инъекция логики": Класс-примесь с методами .search(), .hybrid_search()
+│
+├── domain/                     # Твоя конкретная реализация (Заметки)
+│   ├── __init__.py
+│   └── models.py               # Описание моделей (Note, Category, Tag) использующих Mixin
+│
+├── config.py                   # Настройки (API ключи)
+└── main.py                     # Скрипт-песочница: наполняем базу и тестируем поиск
+```
