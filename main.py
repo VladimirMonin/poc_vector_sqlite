@@ -143,7 +143,7 @@ def test_faceted_search():
     print("Запрос: 'вкусный рецепт' в категории 'Рецепты'")
 
     cat_recipes = Category.get(Category.name == "Рецепты")
-    results = Note.hybrid_search("вкусный рецепт", limit=3, category=cat_recipes.id)
+    results = Note.hybrid_search("вкусный рецепт", limit=3, category_id=cat_recipes.id)
 
     print(f"Найдено: {len(results)} результатов")
     for i, note in enumerate(results, 1):

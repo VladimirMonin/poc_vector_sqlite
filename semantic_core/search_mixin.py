@@ -83,7 +83,7 @@ class HybridSearchMixin:
         table_name = self._meta.table_name
         vector_table = f"{table_name}_vec"
 
-        db.execute_sql(
+        db.obj.execute_sql(
             f"""
             INSERT OR REPLACE INTO {vector_table} (id, {self._vector_column})
             VALUES (?, ?)
@@ -130,7 +130,7 @@ class HybridSearchMixin:
             LIMIT ?
         """
 
-        cursor = db.execute_sql(sql, (query_blob, limit))
+        cursor = db.obj.execute_sql(sql, (query_blob, limit))
         ids = [row[0] for row in cursor.fetchall()]
 
         # Возвращаем объекты в порядке релевантности
@@ -166,7 +166,7 @@ class HybridSearchMixin:
             LIMIT ?
         """
 
-        cursor = db.execute_sql(sql, (query, limit))
+        cursor = db.obj.execute_sql(sql, (query, limit))
         ids = [row[0] for row in cursor.fetchall()]
 
         # Возвращаем объекты в порядке релевантности
@@ -264,7 +264,7 @@ class HybridSearchMixin:
 
         params = [query_blob] + where_params + [query] + where_params + [k, k, limit]
 
-        cursor = db.execute_sql(sql, params)
+        cursor = db.obj.execute_sql(sql, params)
         ids = [row[0] for row in cursor.fetchall()]
 
         # Возвращаем объекты в порядке RRF

@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from peewee import SqliteDatabase
+from peewee import DatabaseProxy
 from playhouse.sqlite_ext import SqliteExtDatabase
 
 from config import settings
@@ -60,8 +60,8 @@ class VectorDatabase(SqliteExtDatabase):
                 conn.enable_load_extension(False)
 
 
-# Глобальный экземпляр базы данных
-db: Optional[VectorDatabase] = None
+# Глобальный прокси для отложенной инициализации БД
+db = DatabaseProxy()
 
 
 def init_database(db_path: Optional[Path] = None) -> VectorDatabase:
@@ -76,15 +76,13 @@ def init_database(db_path: Optional[Path] = None) -> VectorDatabase:
 
     Examples:
         >>> from semantic_core import init_database
-        >>> db = init_database()
-        >>> db.connect()
+        >>> database = init_database()
+        >>> database.connect()
     """
-    global db
-
     if db_path is None:
         db_path = settings.sqlite_db_path
 
-    db = VectorDatabase(
+    database = VectorDatabase(
         str(db_path),
         pragmas={
             "journal_mode": "wal",  # Write-Ahead Logging для производительности
@@ -94,8 +92,11 @@ def init_database(db_path: Optional[Path] = None) -> VectorDatabase:
             "synchronous": 0,  # Быстрее, но менее безопасно для crash
         },
     )
+    
+    # Инициализируем прокси реальной базой данных
+    db.initialize(database)
 
-    return db
+    return database
 
 
 def create_vector_table(model_class, vector_column: str = "embedding") -> None:
@@ -114,7 +115,7 @@ def create_vector_table(model_class, vector_column: str = "embedding") -> None:
     vector_table_name = f"{table_name}_vec"
 
     # Создаем виртуальную таблицу для векторного поиска
-    db.execute_sql(f"""
+    db.obj.execute_sql(f"""
         CREATE VIRTUAL TABLE IF NOT EXISTS {vector_table_name} 
         USING vec0(
             id INTEGER PRIMARY KEY,
@@ -137,11 +138,10 @@ def create_fts_table(model_class, text_columns: list[str]) -> None:
     """
     table_name = model_class._meta.table_name
     fts_table_name = f"{table_name}_fts"
-
     columns_str = ", ".join(text_columns)
 
     # Создаем виртуальную таблицу для полнотекстового поиска
-    db.execute_sql(f"""
+    db.obj.execute_sql(f"""
         CREATE VIRTUAL TABLE IF NOT EXISTS {fts_table_name} 
         USING fts5(
             id UNINDEXED,
@@ -152,7 +152,7 @@ def create_fts_table(model_class, text_columns: list[str]) -> None:
     """)
 
     # Создаем триггеры для автоматического обновления FTS индекса
-    db.execute_sql(f"""
+    db.obj.execute_sql(f"""
         CREATE TRIGGER IF NOT EXISTS {table_name}_fts_insert 
         AFTER INSERT ON {table_name} BEGIN
             INSERT INTO {fts_table_name}(rowid, {columns_str})
@@ -160,14 +160,14 @@ def create_fts_table(model_class, text_columns: list[str]) -> None:
         END
     """)
 
-    db.execute_sql(f"""
+    db.obj.execute_sql(f"""
         CREATE TRIGGER IF NOT EXISTS {table_name}_fts_delete 
         AFTER DELETE ON {table_name} BEGIN
             DELETE FROM {fts_table_name} WHERE rowid = old.id;
         END
     """)
 
-    db.execute_sql(f"""
+    db.obj.execute_sql(f"""
         CREATE TRIGGER IF NOT EXISTS {table_name}_fts_update 
         AFTER UPDATE ON {table_name} BEGIN
             UPDATE {fts_table_name} 
