@@ -84,6 +84,12 @@ class PeeweeVectorStore(BaseVectorStore):
             )
         """)
 
+        # Составной индекс для быстрой фильтрации chunk_type + language
+        self.db.execute_sql("""
+            CREATE INDEX IF NOT EXISTS idx_chunks_type_lang
+            ON chunks(chunk_type, language)
+        """)
+
         # Триггеры для автоматического обновления FTS
         self.db.execute_sql("""
             CREATE TRIGGER IF NOT EXISTS documents_fts_insert
@@ -520,6 +526,7 @@ class PeeweeVectorStore(BaseVectorStore):
         mode: str = "hybrid",
         k: int = 60,
         chunk_type_filter: Optional[str] = None,
+        language_filter: Optional[str] = None,
     ) -> list[ChunkResult]:
         """Выполняет гранулярный поиск отдельных чанков.
 
@@ -531,13 +538,14 @@ class PeeweeVectorStore(BaseVectorStore):
             mode: Режим поиска ('vector', 'fts', 'hybrid').
             k: Константа для RRF алгоритма.
             chunk_type_filter: Фильтр по типу чанка.
+            language_filter: Фильтр по языку программирования.
 
         Returns:
             Список ChunkResult.
         """
         if mode == "vector":
             return self._vector_search_chunks(
-                query_vector, filters, limit, chunk_type_filter
+                query_vector, filters, limit, chunk_type_filter, language_filter
             )
         elif mode == "fts":
             # FTS для чанков пока не реализован, возвращаем пустой список
@@ -545,7 +553,7 @@ class PeeweeVectorStore(BaseVectorStore):
         elif mode == "hybrid":
             # Для гибридного используем только векторный поиск чанков
             return self._vector_search_chunks(
-                query_vector, filters, limit, chunk_type_filter
+                query_vector, filters, limit, chunk_type_filter, language_filter
             )
         else:
             raise ValueError(f"Неизвестный режим поиска: {mode}")
@@ -556,6 +564,7 @@ class PeeweeVectorStore(BaseVectorStore):
         filters: Optional[dict],
         limit: int,
         chunk_type_filter: Optional[str],
+        language_filter: Optional[str],
     ) -> list[ChunkResult]:
         """Векторный поиск чанков.
 
@@ -564,6 +573,7 @@ class PeeweeVectorStore(BaseVectorStore):
             filters: Фильтры по метаданным документа.
             limit: Количество результатов.
             chunk_type_filter: Фильтр по типу чанка.
+            language_filter: Фильтр по языку программирования.
 
         Returns:
             Список ChunkResult.
@@ -608,6 +618,11 @@ class PeeweeVectorStore(BaseVectorStore):
             # Конвертируем ChunkType enum в строку для SQL
             chunk_type_value = chunk_type_filter.value if hasattr(chunk_type_filter, 'value') else chunk_type_filter
             params.append(chunk_type_value)
+
+        # Фильтр по языку
+        if language_filter:
+            filter_conditions.append("c.language = ?")
+            params.append(language_filter)
 
         # Фильтры по метаданным документа
         if filters:
