@@ -214,6 +214,7 @@ Token Bucket **не накапливает** токены. Если прилож
 ### 3. Несколько Rate Limiter'ов
 
 Если приложение делает запросы к разным эндпоинтам Gemini:
+
 - Embeddings
 - Vision
 - Generation
