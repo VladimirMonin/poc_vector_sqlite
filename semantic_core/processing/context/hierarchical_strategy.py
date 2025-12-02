@@ -58,8 +58,9 @@ class HierarchicalContextStrategy(BaseContextStrategy):
         parts: list[str] = []
 
         # Добавляем название документа
-        if self.include_doc_title and document.title:
-            parts.append(f"Document: {document.title}")
+        doc_title = document.metadata.get("title")
+        if self.include_doc_title and doc_title:
+            parts.append(f"Document: {doc_title}")
 
         # Извлекаем иерархию заголовков из метаданных
         headers = chunk.metadata.get("headers", [])
