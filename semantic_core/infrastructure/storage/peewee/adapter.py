@@ -153,8 +153,8 @@ class PeeweeVectorStore(BaseVectorStore):
                 chunk.id = chunk_model.id
 
                 # Сохраняем вектор
-                if chunk.embedding is not None:
-                    blob = chunk.embedding.tobytes()
+                if chunk.vector is not None:
+                    blob = chunk.vector.tobytes()
                     self.db.execute_sql(
                         "INSERT INTO chunks_vec(id, embedding) VALUES (?, ?)",
                         (chunk_model.id, blob),
@@ -570,10 +570,10 @@ class PeeweeVectorStore(BaseVectorStore):
         query_blob = query_vector.tobytes()
 
         # SQL для векторного поиска с JOIN к документу
+        # Используем тот же подход, что в _vector_search: только distance, без MATCH
         sql = """
             SELECT 
-                cv.id,
-                cv.distance,
+                c.id,
                 c.chunk_index,
                 c.content,
                 c.chunk_type,
@@ -584,37 +584,44 @@ class PeeweeVectorStore(BaseVectorStore):
                 d.content as doc_content,
                 d.metadata as doc_metadata,
                 d.media_type,
-                d.created_at as doc_created_at
+                d.created_at as doc_created_at,
+                vec_distance_cosine(cv.embedding, ?) as distance
             FROM chunks_vec cv
-            JOIN chunks c ON cv.id = c.id
-            JOIN documents d ON c.document_id = d.id
+            JOIN chunks c ON c.id = cv.id
+            JOIN documents d ON d.id = c.document_id
+            WHERE 1=1
         """
 
-        conditions = []
-        params = []
+        # Параметры в порядке появления плейсхолдеров
+        params = [query_blob]  # Для vec_distance_cosine
+
+        # Дополнительные фильтры
+        filter_conditions = []
 
         # Фильтр по типу чанка
         if chunk_type_filter:
-            conditions.append("c.chunk_type = ?")
-            params.append(chunk_type_filter)
+            filter_conditions.append("c.chunk_type = ?")
+            # Конвертируем ChunkType enum в строку для SQL
+            chunk_type_value = chunk_type_filter.value if hasattr(chunk_type_filter, 'value') else chunk_type_filter
+            params.append(chunk_type_value)
 
         # Фильтры по метаданным документа
         if filters:
             for key, value in filters.items():
-                conditions.append(f"json_extract(d.metadata, '$.{key}') = ?")
+                filter_conditions.append(f"json_extract(d.metadata, '$.{key}') = ?")
                 params.append(value)
 
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
+        if filter_conditions:
+            sql += " AND " + " AND ".join(filter_conditions)
 
         sql += f"""
-            ORDER BY cv.distance
+            ORDER BY distance
             LIMIT ?
         """
         params.append(limit)
 
         # Выполняем запрос
-        cursor = self.db.execute_sql(sql, params + [query_blob])
+        cursor = self.db.execute_sql(sql, params)
         rows = cursor.fetchall()
 
         # Преобразуем результаты в ChunkResult
@@ -622,7 +629,6 @@ class PeeweeVectorStore(BaseVectorStore):
         for row in rows:
             (
                 chunk_id,
-                distance,
                 chunk_index,
                 content,
                 chunk_type,
@@ -634,6 +640,7 @@ class PeeweeVectorStore(BaseVectorStore):
                 doc_metadata,
                 media_type,
                 doc_created_at,
+                distance,  # distance теперь в конце
             ) = row
 
             # Создаём Chunk DTO

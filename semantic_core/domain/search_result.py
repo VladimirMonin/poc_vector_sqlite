@@ -86,6 +86,32 @@ class ChunkResult:
     parent_metadata: dict[str, Any] = None
     highlight: Optional[str] = None
 
+    # Convenience properties для прямого доступа к атрибутам чанка
+    @property
+    def chunk_id(self) -> Optional[int]:
+        """ID чанка."""
+        return self.chunk.id
+
+    @property
+    def chunk_index(self) -> int:
+        """Индекс чанка в документе."""
+        return self.chunk.chunk_index
+
+    @property
+    def chunk_type(self) -> ChunkType:
+        """Тип чанка."""
+        return self.chunk.chunk_type
+
+    @property
+    def language(self) -> Optional[str]:
+        """Язык программирования (для CODE чанков)."""
+        return self.chunk.language
+
+    @property
+    def content(self) -> str:
+        """Содержимое чанка."""
+        return self.chunk.content
+
     def __repr__(self) -> str:
         chunk_type = self.chunk.chunk_type.value
         lang = f"[{self.chunk.language}]" if self.chunk.language else ""
