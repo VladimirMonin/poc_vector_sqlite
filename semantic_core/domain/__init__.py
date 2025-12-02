@@ -27,6 +27,8 @@
         Запрос на анализ медиа.
     MediaAnalysisResult
         Результат анализа.
+    VideoAnalysisConfig
+        Конфигурация анализа видео (Phase 6.2).
 """
 
 from semantic_core.domain.document import Document, MediaType
@@ -39,6 +41,7 @@ from semantic_core.domain.media import (
     MediaResource,
     MediaRequest,
     MediaAnalysisResult,
+    VideoAnalysisConfig,
 )
 
 __all__ = [
@@ -55,4 +58,5 @@ __all__ = [
     "MediaResource",
     "MediaRequest",
     "MediaAnalysisResult",
+    "VideoAnalysisConfig",
 ]
