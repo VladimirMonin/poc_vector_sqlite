@@ -58,6 +58,10 @@ class DocumentBuilder:
         # Извлекаем основной контент
         content = getattr(instance, self.content_field, "")
 
+        # Обрабатываем None как пустую строку
+        if content is None:
+            content = ""
+
         # Собираем метаданные из context_fields
         metadata: dict[str, Any] = {}
         for field_name in self.context_fields:
@@ -111,8 +115,8 @@ class InstanceManager:
         doc = self.descriptor.builder.build(self.instance)
 
         # Удаляем старые чанки если есть source_id
-        if hasattr(self.instance, "id"):
-            source_id = str(getattr(self.instance, "id"))
+        if hasattr(self.instance, "id") and self.instance.id is not None:
+            source_id = self.instance.id  # Используем напрямую, без str()
             self.descriptor.core.delete_by_metadata({"source_id": source_id})
 
         # Индексируем заново
@@ -120,8 +124,8 @@ class InstanceManager:
 
     def delete(self) -> None:
         """Удаляет индекс для текущего инстанса."""
-        if hasattr(self.instance, "id"):
-            source_id = str(getattr(self.instance, "id"))
+        if hasattr(self.instance, "id") and self.instance.id is not None:
+            source_id = self.instance.id  # Используем напрямую, без str()
             self.descriptor.core.delete_by_metadata({"source_id": source_id})
 
 
@@ -228,3 +232,31 @@ class SemanticIndex:
             AttributeError: Всегда.
         """
         raise AttributeError(f"Cannot set attribute '{self.name}'")
+
+    def _handle_save(self, instance: Any, created: bool) -> None:
+        """Обработчик сохранения инстанса (вызывается из PeeweeAdapter).
+
+        Args:
+            instance: Сохраненный инстанс модели.
+            created: True если объект создан, False если обновлен.
+        """
+        # Строим документ
+        doc = self.builder.build(instance)
+
+        # Если это обновление, удаляем старые чанки
+        if not created and hasattr(instance, "id") and instance.id is not None:
+            source_id = instance.id  # Используем напрямую, без str()
+            self.core.delete_by_metadata({"source_id": source_id})
+
+        # Индексируем
+        self.core.ingest(doc)
+
+    def _handle_delete(self, instance: Any) -> None:
+        """Обработчик удаления инстанса (вызывается из PeeweeAdapter).
+
+        Args:
+            instance: Удаляемый инстанс модели.
+        """
+        if hasattr(instance, "id") and instance.id is not None:
+            source_id = instance.id  # Используем напрямую, без str()
+            self.core.delete_by_metadata({"source_id": source_id})

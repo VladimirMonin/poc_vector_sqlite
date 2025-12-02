@@ -1,29 +1,32 @@
 """Адаптер для интеграции с Peewee ORM.
 
+Использует паттерн "Explicit Hook Injection" - внедряет хуки в методы
+save() и delete_instance() модели через обертки. Это позволяет работать
+с обычной peewee.Model без требования наследования от SignalModel.
+
 Классы:
     PeeweeAdapter
-        Адаптер для подписки на события Peewee и управления схемой.
+        Адаптер для автоматической индексации при изменениях ORM.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Callable, Any
 from peewee import Model
-
-try:
-    from playhouse.signals import post_save, pre_delete
-
-    SIGNALS_AVAILABLE = True
-except ImportError:
-    SIGNALS_AVAILABLE = False
 
 if TYPE_CHECKING:
     from semantic_core.integrations.base import SemanticIndex
 
 
+# Class-level registry для отслеживания множественных дескрипторов
+_MODEL_HOOKS: dict[type[Model], list["SemanticIndex"]] = {}
+
+
 class PeeweeAdapter:
     """Адаптер для интеграции семантического поиска с Peewee.
 
-    Подписывается на события Peewee (post_save, pre_delete) и
-    автоматически синхронизирует изменения с векторным хранилищем.
+    Внедряет хуки в методы save() и delete_instance() модели,
+    обеспечивая автоматическую синхронизацию с векторным хранилищем.
+
+    Работает с любой peewee.Model - наследование от SignalModel не требуется.
 
     Attributes:
         descriptor: Дескриптор SemanticIndex.
@@ -34,70 +37,95 @@ class PeeweeAdapter:
         self.model = model
         self.descriptor = descriptor
 
-        if not SIGNALS_AVAILABLE:
-            raise ImportError(
-                "playhouse.signals не установлен. "
-                "Установите: pip install peewee[signals]"
-            )
+    def _apply_hooks(self) -> None:
+        """Внедряет триггеры автоматической индексации в методы модели.
 
-    def register_hooks(self) -> None:
-        """Регистрирует хуки на события Peewee.
+        Оборачивает save() и delete_instance() в декораторы, которые
+        вызывают соответствующие обработчики для всех зарегистрированных
+        на модели дескрипторов SemanticIndex.
 
-        Подписывается на post_save и pre_delete для автоматической
-        синхронизации данных с векторным хранилищем.
+        Патчинг выполняется только один раз для модели, даже если на ней
+        несколько дескрипторов. Все дескрипторы регистрируются в реестре
+        _MODEL_HOOKS и вызываются из единого wrapper.
         """
-        # Генерируем уникальные имена для обработчиков на основе дескриптора
-        descriptor_id = id(self.descriptor)
-        save_handler_name = f"on_save_{descriptor_id}"
-        delete_handler_name = f"on_delete_{descriptor_id}"
+        # Регистрируем дескриптор в реестре
+        if self.model not in _MODEL_HOOKS:
+            _MODEL_HOOKS[self.model] = []
+        _MODEL_HOOKS[self.model].append(self.descriptor)
 
-        @post_save(sender=self.model, name=save_handler_name)
-        def on_save(model_class: type[Model], instance: Model, created: bool) -> None:
-            """Обработчик события сохранения.
+        # Патчим методы только при первом дескрипторе
+        if len(_MODEL_HOOKS[self.model]) == 1:
+            self._patch_save()
+            self._patch_delete()
 
-            Args:
-                model_class: Класс модели.
-                instance: Сохраненный инстанс.
-                created: True если объект создан, False если обновлен.
-            """
-            # Строим документ
-            doc = self.descriptor.builder.build(instance)
+    def _patch_save(self) -> None:
+        """Патчит метод save() модели для автоиндексации."""
+        original_save = self.model.save
+        model_class = self.model  # Сохраняем ссылку для использования в замыкании
 
-            # Если это обновление, удаляем старые чанки
-            if not created and hasattr(instance, "id"):
-                source_id = str(getattr(instance, "id"))
-                # Используем метод delete из store
-                # Фильтруем по source_id в метаданных
-                # Пока используем простое удаление и пересоздание
-                # TODO: добавить delete_by_metadata в VectorStore
-                pass
-
-            # Индексируем
-            self.descriptor.core.ingest(doc)
-
-        @pre_delete(sender=self.model, name=delete_handler_name)
-        def on_delete(model_class: type[Model], instance: Model) -> None:
-            """Обработчик события удаления.
+        def save_wrapper(instance: Model, *args: Any, **kwargs: Any) -> int:
+            """Обертка над save() - вызывает индексацию после сохранения.
 
             Args:
-                model_class: Класс модели.
-                instance: Удаляемый инстанс.
+                instance: Инстанс модели для сохранения.
+                *args: Позиционные аргументы для save().
+                **kwargs: Именованные аргументы для save().
+
+            Returns:
+                Результат оригинального save() (количество измененных строк).
             """
-            if hasattr(instance, "id"):
-                source_id = str(getattr(instance, "id"))
-                # TODO: добавить delete_by_metadata в VectorStore
-                pass
+            # Проверяем, создается или обновляется объект
+            is_new = not bool(instance.get_id())
+
+            # 1. Вызываем оригинальный save
+            result = original_save(instance, *args, **kwargs)
+
+            # 2. Если успешно - триггерим индексацию для всех дескрипторов
+            if result:
+                for desc in _MODEL_HOOKS.get(model_class, []):
+                    desc._handle_save(instance, created=is_new)
+
+            return result
+
+        # Подменяем метод на классе модели
+        self.model.save = save_wrapper
+
+    def _patch_delete(self) -> None:
+        """Патчит метод delete_instance() модели для автоудаления из индекса."""
+        original_delete = self.model.delete_instance
+        model_class = self.model  # Сохраняем ссылку для использования в замыкании
+
+        def delete_wrapper(instance: Model, *args: Any, **kwargs: Any) -> int:
+            """Обертка над delete_instance() - удаляет из индекса перед удалением.
+
+            Args:
+                instance: Инстанс модели для удаления.
+                *args: Позиционные аргументы для delete_instance().
+                **kwargs: Именованные аргументы для delete_instance().
+
+            Returns:
+                Результат оригинального delete_instance() (количество удаленных строк).
+            """
+            # 1. Сначала удаляем из индекса (пока есть ID и метаданные)
+            for desc in _MODEL_HOOKS.get(model_class, []):
+                desc._handle_delete(instance)
+
+            # 2. Вызываем оригинальное удаление
+            return original_delete(instance, *args, **kwargs)
+
+        # Подменяем метод на классе модели
+        self.model.delete_instance = delete_wrapper
 
 
 def register_model(model: type[Model], descriptor: "SemanticIndex") -> None:
     """Регистрирует модель Peewee для автоматической индексации.
 
+    Внедряет хуки в методы save() и delete_instance() через method patching.
+    Работает с любой peewee.Model - SignalModel не требуется.
+
     Args:
         model: Класс Peewee модели.
         descriptor: Дескриптор SemanticIndex.
-
-    Raises:
-        ImportError: Если playhouse.signals не установлен.
     """
     adapter = PeeweeAdapter(model=model, descriptor=descriptor)
-    adapter.register_hooks()
+    adapter._apply_hooks()

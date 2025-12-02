@@ -471,8 +471,10 @@ class PeeweeVectorStore(BaseVectorStore):
 
         for key, value in filters.items():
             # Используем JSON функции SQLite для фильтрации по метаданным
+            # json_extract может вернуть число, строку или null
+            # Сравниваем без приведения типов - SQLite сам справится
             query = query.where(
-                fn.json_extract(ChunkModel.metadata, f"$.{key}") == str(value)
+                fn.json_extract(ChunkModel.metadata, f"$.{key}") == value
             )
 
         chunk_ids = [chunk.id for chunk in query]

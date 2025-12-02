@@ -313,6 +313,11 @@ def create_test_model(in_memory_db, semantic_core):
         # Создаем класс
         TestModel = type(model_name, (Model,), class_dict)
 
+        # ВАЖНО: При создании класса через type() дескрипторный протокол
+        # __set_name__ не вызывается автоматически. Вызываем вручную.
+        if hasattr(TestModel.search, "__set_name__"):
+            TestModel.search.__set_name__(TestModel, "search")
+
         # Создаем таблицы
         in_memory_db.create_tables([TestModel])
 

@@ -89,16 +89,21 @@ class SimpleSplitter(BaseSplitter):
 
             if target_end >= text_len:
                 chunk_content = text[start:]
+                # Копируем метаданные документа и добавляем технические поля
+                chunk_metadata = document.metadata.copy() if document.metadata else {}
+                chunk_metadata.update(
+                    {
+                        "start": start,
+                        "end": text_len,
+                        "is_last": True,
+                    }
+                )
                 chunks.append(
                     Chunk(
                         content=chunk_content,
                         chunk_index=chunk_idx,
                         parent_doc_id=document.id,
-                        metadata={
-                            "start": start,
-                            "end": text_len,
-                            "is_last": True,
-                        },
+                        metadata=chunk_metadata,
                     )
                 )
                 break
@@ -117,17 +122,22 @@ class SimpleSplitter(BaseSplitter):
                 cut_type = "hard"
 
             chunk_content = text[start:cut_point]
+            # Копируем метаданные документа и добавляем технические поля
+            chunk_metadata = document.metadata.copy() if document.metadata else {}
+            chunk_metadata.update(
+                {
+                    "start": start,
+                    "end": cut_point,
+                    "cut_type": cut_type,
+                    "is_last": False,
+                }
+            )
             chunks.append(
                 Chunk(
                     content=chunk_content,
                     chunk_index=chunk_idx,
                     parent_doc_id=document.id,
-                    metadata={
-                        "start": start,
-                        "end": cut_point,
-                        "cut_type": cut_type,
-                        "is_last": False,
-                    },
+                    metadata=chunk_metadata,
                 )
             )
 

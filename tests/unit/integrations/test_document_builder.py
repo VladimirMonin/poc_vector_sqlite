@@ -137,7 +137,10 @@ def test_document_builder_none_values():
 
     doc = builder.build(obj)
 
-    assert doc.content is None
+    # None в контенте преобразуется в пустую строку
+    assert doc.content == ""
+    # None в метаданных сохраняется как None
+    assert doc.metadata["title"] is None
     assert doc.metadata["title"] is None
     assert doc.metadata["source_id"] == 1
 
