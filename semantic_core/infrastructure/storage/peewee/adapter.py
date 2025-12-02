@@ -457,6 +457,46 @@ class PeeweeVectorStore(BaseVectorStore):
             # Удаляем документ (чанки удалятся каскадно)
             return doc_model.delete_instance()
 
+    def delete_by_metadata(self, filters: dict) -> int:
+        """Удаляет чанки по фильтрам метаданных.
+
+        Args:
+            filters: Словарь фильтров по метаданным (например, {"source_id": "123"}).
+
+        Returns:
+            Количество удалённых чанков.
+        """
+        # Находим все чанки, которые соответствуют фильтрам
+        query = ChunkModel.select()
+
+        for key, value in filters.items():
+            # Используем JSON функции SQLite для фильтрации по метаданным
+            # json_extract может вернуть число, строку или null
+            # Сравниваем без приведения типов - SQLite сам справится
+            query = query.where(
+                fn.json_extract(ChunkModel.metadata, f"$.{key}") == value
+            )
+
+        chunk_ids = [chunk.id for chunk in query]
+
+        if not chunk_ids:
+            return 0
+
+        with self.db.atomic():
+            # Удаляем векторы из vec0
+            placeholders = ", ".join("?" * len(chunk_ids))
+            self.db.execute_sql(
+                f"DELETE FROM chunks_vec WHERE id IN ({placeholders})",
+                chunk_ids,
+            )
+
+            # Удаляем сами чанки
+            deleted_count = (
+                ChunkModel.delete().where(ChunkModel.id.in_(chunk_ids)).execute()
+            )
+
+            return deleted_count
+
     def _model_to_document(self, doc_model: DocumentModel) -> Document:
         """Конвертирует ORM модель в DTO.
 

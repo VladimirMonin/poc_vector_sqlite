@@ -203,3 +203,130 @@ myenv\\Scripts\\activate  # Windows
 
 Менеджеры пакетов pip и poetry упрощают управление зависимостями.
     """.strip()
+
+
+# ============================================================================
+# Новые фикстуры для Phase 3 (Integration Layer)
+# ============================================================================
+
+
+@pytest.fixture
+def mock_embedder():
+    """Фейковый embedder для быстрых тестов без API вызовов.
+
+    Возвращает детерминированные векторы на основе хеша текста.
+    """
+    from semantic_core.interfaces import BaseEmbedder
+
+    class MockEmbedder(BaseEmbedder):
+        def __init__(self, dim: int = 768):
+            self.dim = dim
+
+        def embed_query(self, text: str) -> list[float]:
+            # Детерминированный вектор на основе хеша
+            import hashlib
+            import numpy as np
+
+            hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
+            # Генерируем псевдослучайный вектор
+            vector = []
+            for i in range(self.dim):
+                vector.append(((hash_val + i) % 1000) / 1000.0 - 0.5)
+            return np.array(vector, dtype=np.float32)
+
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [self.embed_query(text) for text in texts]
+
+    return MockEmbedder()
+
+
+@pytest.fixture
+def in_memory_db():
+    """In-memory SQLite база с sqlite-vec для тестов.
+
+    Создает чистую БД для каждого теста.
+    """
+    db = init_peewee_database(":memory:")
+    yield db
+    db.close()
+
+
+@pytest.fixture
+def semantic_core(mock_embedder, in_memory_db):
+    """Полностью настроенный SemanticCore для тестов.
+
+    Использует mock embedder и in-memory DB.
+    """
+    store = PeeweeVectorStore(in_memory_db)
+    splitter = SimpleSplitter(chunk_size=500, overlap=100)
+    context_strategy = BasicContextStrategy()
+
+    core = SemanticCore(
+        embedder=mock_embedder,
+        store=store,
+        splitter=splitter,
+        context_strategy=context_strategy,
+    )
+
+    return core
+
+
+@pytest.fixture
+def create_test_model(in_memory_db, semantic_core):
+    """Фабрика для создания тестовых Peewee моделей с SemanticIndex.
+
+    Использование:
+        >>> TestModel = create_test_model(
+        ...     fields={'title': CharField(), 'body': TextField()},
+        ...     index_config={'content_field': 'body', 'context_fields': ['title']}
+        ... )
+    """
+    from peewee import Model, CharField, TextField
+    from semantic_core import SemanticIndex
+
+    created_models = []
+
+    def factory(fields: dict, index_config: dict, model_name: str = "TestModel"):
+        """Создает динамическую модель Peewee с SemanticIndex.
+
+        Args:
+            fields: Словарь {имя_поля: Field()}.
+            index_config: Конфигурация для SemanticIndex.
+            model_name: Имя класса модели.
+
+        Returns:
+            Класс модели с дескриптором SemanticIndex.
+        """
+        # Создаем класс модели динамически
+        class_dict = {"__module__": __name__}
+        class_dict.update(fields)
+
+        # Добавляем Meta
+        class Meta:
+            database = in_memory_db
+
+        class_dict["Meta"] = Meta
+
+        # Добавляем SemanticIndex
+        class_dict["search"] = SemanticIndex(core=semantic_core, **index_config)
+
+        # Создаем класс
+        TestModel = type(model_name, (Model,), class_dict)
+
+        # ВАЖНО: При создании класса через type() дескрипторный протокол
+        # __set_name__ не вызывается автоматически. Вызываем вручную.
+        if hasattr(TestModel.search, "__set_name__"):
+            TestModel.search.__set_name__(TestModel, "search")
+
+        # Создаем таблицы
+        in_memory_db.create_tables([TestModel])
+
+        created_models.append(TestModel)
+
+        return TestModel
+
+    yield factory
+
+    # Cleanup: удаляем все созданные таблицы
+    if created_models:
+        in_memory_db.drop_tables(created_models, safe=True)

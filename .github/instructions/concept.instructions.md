@@ -31,8 +31,8 @@ Production-ready библиотека для локального семанти
 | `peewee`         | ORM, адаптеры, расширения SQLite  | `/coleifer/peewee`                |
 | `sqlite-vec`     | Векторный движок (C-extension)    | `/asg017/sqlite-vec`              |
 | `google-genai`   | SDK для Embeddings, Vision, Batch | `/googleapis/python-genai`        |
-| `markdown-it-py` | AST-парсинг Markdown              | `/executablebooks/markdown-it-py` |
 | `pydantic`       | Валидация DTO и настроек          | `/pydantic/pydantic`              |
+| `markdown-it-py` | AST-парсинг Markdown              | `/executablebooks/markdown-it-py` |
 
 ### 🗺 Дорожная Карта
 
@@ -43,9 +43,9 @@ Production-ready библиотека для локального семанти
 
 - **Phase 1: Core & Contracts** (`plan_phase_1.md`) — DTO, Интерфейсы, Базовая структура. {DONE}
 - **Phase 2: Storage Layer** (`plan_phase_2.md`) — Peewee Adapter, Parent-Child схема. {DONE}
-- **Phase 3: Integration API** (`plan_phase_3.md`) — Дескрипторы `SemanticIndex`, DocumentBuilder. {WE ARE HERE}
-- **Phase 3.1: Testing** (`plan_phase_3.1.md`) — Моки, Фикстуры, Unit/Integration тесты. {PLANNED}
-- **Phase 4: Smart Markdown** (`plan_phase_4.md`) — AST парсинг, Иерархический контекст. {PLANNED}
+- **Phase 3: Integration API** (`plan_phase_3.md`) — Дескрипторы `SemanticIndex`, DocumentBuilder. {DONE}
+- **Phase 3.1: Testing** (`plan_phase_3.1.md`) — Моки, Фикстуры, Unit/Integration тесты. {DONE}
+- **Phase 4: Smart Markdown** (`plan_phase_4.md`) — AST парсинг, Иерархический контекст. {WE ARE HERE}
 - **Phase 5: Async Batching** (`plan_phase_5.md`) — Очереди `BatchJob`, отложенная обработка. {PLANNED}
 - **Phase 6: Multimodality** (`plan_phase_6.md`) — Vision стратегии, OCR, Media Processing. {PLANNED}
 
@@ -54,17 +54,25 @@ Production-ready библиотека для локального семанти
 ```text
 semantic_core/
 ├── __init__.py               # Фасад (SemanticFactory)
-├── domain/                   # DTO (Document, Chunk, MediaResource)
-├── interfaces/               # Контракты (VectorStore, Embedder, Splitter)
-├── integrations/             # Дескрипторы для ORM (SemanticIndex)
+├── domain/                   # DTO (Document, Chunk, SearchResult)
+├── interfaces/               # Контракты (VectorStore, Embedder, Splitter, Context)
+├── integrations/             # Интеграции с ORM
+│   ├── base.py               # SemanticIndex (descriptor), DocumentBuilder
+│   ├── peewee/               # PeeweeAdapter (method patching)
+│   └── search_proxy.py       # SearchProxy для семантического поиска
 ├── infrastructure/           # Реализация (Adapters)
-│   ├── google/               # Gemini Client, Batching
-│   ├── storage/              # Peewee Adapter
-│   └── media/                # Vision Wrappers
-├── processing/               # Логика (Business Logic)
+│   ├── gemini/               # GeminiEmbedder, Batch API
+│   ├── storage/peewee/       # PeeweeVectorStore, Models
+│   └── text_processing/      # SimpleSplitter, BasicContext
+├── processing/               # Логика (Business Logic) [PLANNED]
 │   ├── parsers/              # MarkdownNodeParser (AST)
 │   └── context/              # ContextStrategies
 └── pipeline.py               # Orchestrator
+
+tests/
+├── conftest.py               # Fixtures (in-memory БД, моки)
+├── unit/                     # Юнит-тесты (изолированные компоненты)
+└── integration/              # Интеграционные тесты (end-to-end)
 
 ### 📚 Документация и Тестирование
 
