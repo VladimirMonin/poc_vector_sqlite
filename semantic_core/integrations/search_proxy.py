@@ -144,10 +144,10 @@ class SearchProxy:
         if not results:
             return []
 
-        # Извлекаем source_id из метаданных
+        # Извлекаем source_id из метаданных документа
         source_ids = []
         for result in results:
-            source_id = result.metadata.get("source_id")
+            source_id = result.document.metadata.get("source_id")
             if source_id is not None:
                 source_ids.append(source_id)
 
@@ -166,7 +166,7 @@ class SearchProxy:
         # Склеиваем объекты со скорами
         result_tuples = []
         for result in results:
-            source_id = result.metadata.get("source_id")
+            source_id = result.document.metadata.get("source_id")
             if source_id in objects_dict:
                 result_tuples.append((objects_dict[source_id], result.score))
 

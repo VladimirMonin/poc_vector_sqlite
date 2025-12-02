@@ -18,8 +18,10 @@ def test_descriptor_set_name(create_test_model):
     )
 
     # Дескриптор должен знать свое имя и владельца
-    assert TestModel.search.name == "search"
-    assert TestModel.search.owner == TestModel
+    # Доступ к дескриптору через __dict__
+    descriptor = TestModel.__dict__["search"]
+    assert descriptor.name == "search"
+    assert descriptor.owner == TestModel
 
 
 def test_descriptor_class_access(create_test_model):
@@ -48,7 +50,9 @@ def test_descriptor_instance_access(create_test_model):
     manager = obj.search
     assert isinstance(manager, InstanceManager)
     assert manager.instance == obj
-    assert manager.descriptor == TestModel.search
+    # Проверяем, что descriptor ссылается на правильный объект
+    descriptor = TestModel.__dict__["search"]
+    assert manager.descriptor == descriptor
 
 
 def test_descriptor_cannot_set(create_test_model):
@@ -89,8 +93,11 @@ def test_multiple_descriptors_on_same_model(create_test_model, semantic_core):
     semantic_core.store.db.create_tables([Article])
 
     # Оба дескриптора должны быть зарегистрированы
-    assert Article.search_ru.name == "search_ru"
-    assert Article.search_en.name == "search_en"
+    descriptor_ru = Article.__dict__["search_ru"]
+    descriptor_en = Article.__dict__["search_en"]
+
+    assert descriptor_ru.name == "search_ru"
+    assert descriptor_en.name == "search_en"
 
     # Class access на обоих должен работать
     assert isinstance(Article.search_ru, SearchProxy)
@@ -129,8 +136,9 @@ def test_descriptor_builder_configuration(create_test_model):
         },
     )
 
-    # Проверяем конфигурацию builder
-    builder = TestModel.search.builder
+    # Проверяем конфигурацию builder через дескриптор
+    descriptor = TestModel.__dict__["search"]
+    builder = descriptor.builder
     assert builder.content_field == "body"
     assert builder.context_fields == ["title"]
     assert builder.filter_fields == ["category"]

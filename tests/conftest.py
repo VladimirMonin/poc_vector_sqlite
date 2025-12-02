@@ -225,13 +225,14 @@ def mock_embedder():
         def embed_query(self, text: str) -> list[float]:
             # Детерминированный вектор на основе хеша
             import hashlib
+            import numpy as np
 
             hash_val = int(hashlib.md5(text.encode()).hexdigest(), 16)
             # Генерируем псевдослучайный вектор
             vector = []
             for i in range(self.dim):
                 vector.append(((hash_val + i) % 1000) / 1000.0 - 0.5)
-            return vector
+            return np.array(vector, dtype=np.float32)
 
         def embed_documents(self, texts: list[str]) -> list[list[float]]:
             return [self.embed_query(text) for text in texts]

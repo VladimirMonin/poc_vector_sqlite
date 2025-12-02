@@ -74,3 +74,18 @@ class BaseVectorStore(ABC):
             Количество удалённых строк.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def delete_by_metadata(self, filters: dict) -> int:
+        """Удаляет чанки по фильтрам метаданных.
+
+        Используется для удаления всех чанков, связанных с объектом
+        перед переиндексацией (например, при обновлении).
+
+        Args:
+            filters: Словарь фильтров по метаданным (например, {"source_id": "123"}).
+
+        Returns:
+            Количество удалённых чанков.
+        """
+        raise NotImplementedError

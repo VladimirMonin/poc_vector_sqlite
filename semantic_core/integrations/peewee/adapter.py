@@ -46,8 +46,12 @@ class PeeweeAdapter:
         Подписывается на post_save и pre_delete для автоматической
         синхронизации данных с векторным хранилищем.
         """
+        # Генерируем уникальные имена для обработчиков на основе дескриптора
+        descriptor_id = id(self.descriptor)
+        save_handler_name = f"on_save_{descriptor_id}"
+        delete_handler_name = f"on_delete_{descriptor_id}"
 
-        @post_save(sender=self.model)
+        @post_save(sender=self.model, name=save_handler_name)
         def on_save(model_class: type[Model], instance: Model, created: bool) -> None:
             """Обработчик события сохранения.
 
@@ -71,7 +75,7 @@ class PeeweeAdapter:
             # Индексируем
             self.descriptor.core.ingest(doc)
 
-        @pre_delete(sender=self.model)
+        @pre_delete(sender=self.model, name=delete_handler_name)
         def on_delete(model_class: type[Model], instance: Model) -> None:
             """Обработчик события удаления.
 

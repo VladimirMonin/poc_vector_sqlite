@@ -68,8 +68,16 @@ class SimpleSplitter(BaseSplitter):
         """
         text = document.content
 
-        if not text:
-            raise ValueError("Контент документа не может быть пустым")
+        if not text or not text.strip():
+            # Возвращаем один пустой чанк вместо ошибки
+            return [
+                Chunk(
+                    chunk_index=0,
+                    content="",
+                    metadata=document.metadata.copy() if document.metadata else {},
+                    parent_doc_id=document.id,
+                )
+            ]
 
         chunks = []
         start = 0

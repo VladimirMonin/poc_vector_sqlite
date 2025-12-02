@@ -168,3 +168,17 @@ class SemanticCore:
             Количество удалённых строк.
         """
         return self.store.delete(document_id)
+
+    def delete_by_metadata(self, filters: dict) -> int:
+        """Удаляет чанки по фильтрам метаданных.
+
+        Используется для удаления всех чанков, связанных с объектом
+        перед переиндексацией (например, при обновлении).
+
+        Args:
+            filters: Словарь фильтров по метаданным (например, {"source_id": "123"}).
+
+        Returns:
+            Количество удалённых чанков.
+        """
+        return self.store.delete_by_metadata(filters)
