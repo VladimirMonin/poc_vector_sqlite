@@ -12,7 +12,7 @@ import numpy as np
 from peewee import fn
 
 from semantic_core.interfaces import BaseVectorStore
-from semantic_core.domain import Document, Chunk, SearchResult, MatchType, MediaType
+from semantic_core.domain import Document, Chunk, SearchResult, ChunkResult, MatchType, MediaType, ChunkType
 from semantic_core.infrastructure.storage.peewee.models import (
     DocumentModel,
     ChunkModel,
@@ -136,6 +136,8 @@ class PeeweeVectorStore(BaseVectorStore):
                     document=doc_model,
                     chunk_index=chunk.chunk_index,
                     content=chunk.content,
+                    chunk_type=chunk.chunk_type.value,
+                    language=chunk.language,
                     metadata=json.dumps(chunk.metadata, ensure_ascii=False),
                     created_at=chunk.created_at,
                 )
@@ -496,6 +498,153 @@ class PeeweeVectorStore(BaseVectorStore):
             )
 
             return deleted_count
+
+    def search_chunks(
+        self,
+        query_vector: Optional[np.ndarray] = None,
+        query_text: Optional[str] = None,
+        filters: Optional[dict] = None,
+        limit: int = 10,
+        mode: str = "hybrid",
+        k: int = 60,
+        chunk_type_filter: Optional[str] = None,
+    ) -> list[ChunkResult]:
+        """Выполняет гранулярный поиск отдельных чанков.
+
+        Args:
+            query_vector: Вектор запроса (для векторного поиска).
+            query_text: Текст запроса (для FTS).
+            filters: Словарь фильтров по метаданным документа.
+            limit: Максимальное количество результатов.
+            mode: Режим поиска ('vector', 'fts', 'hybrid').
+            k: Константа для RRF алгоритма.
+            chunk_type_filter: Фильтр по типу чанка.
+
+        Returns:
+            Список ChunkResult.
+        """
+        if mode == "vector":
+            return self._vector_search_chunks(query_vector, filters, limit, chunk_type_filter)
+        elif mode == "fts":
+            # FTS для чанков пока не реализован, возвращаем пустой список
+            return []
+        elif mode == "hybrid":
+            # Для гибридного используем только векторный поиск чанков
+            return self._vector_search_chunks(query_vector, filters, limit, chunk_type_filter)
+        else:
+            raise ValueError(f"Неизвестный режим поиска: {mode}")
+
+    def _vector_search_chunks(
+        self,
+        query_vector: np.ndarray,
+        filters: Optional[dict],
+        limit: int,
+        chunk_type_filter: Optional[str],
+    ) -> list[ChunkResult]:
+        """Векторный поиск чанков.
+
+        Args:
+            query_vector: Вектор запроса.
+            filters: Фильтры по метаданным документа.
+            limit: Количество результатов.
+            chunk_type_filter: Фильтр по типу чанка.
+
+        Returns:
+            Список ChunkResult.
+        """
+        if query_vector is None:
+            return []
+
+        query_blob = query_vector.tobytes()
+
+        # SQL для векторного поиска с JOIN к документу
+        sql = """
+            SELECT 
+                cv.id,
+                cv.distance,
+                c.chunk_index,
+                c.content,
+                c.chunk_type,
+                c.language,
+                c.metadata as chunk_metadata,
+                c.created_at,
+                d.id as doc_id,
+                d.content as doc_content,
+                d.metadata as doc_metadata,
+                d.media_type,
+                d.created_at as doc_created_at
+            FROM chunks_vec cv
+            JOIN chunks c ON cv.id = c.id
+            JOIN documents d ON c.document_id = d.id
+        """
+
+        conditions = []
+        params = []
+
+        # Фильтр по типу чанка
+        if chunk_type_filter:
+            conditions.append("c.chunk_type = ?")
+            params.append(chunk_type_filter)
+
+        # Фильтры по метаданным документа
+        if filters:
+            for key, value in filters.items():
+                conditions.append(f"json_extract(d.metadata, '$.{key}') = ?")
+                params.append(value)
+
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+
+        sql += f"""
+            ORDER BY cv.distance
+            LIMIT ?
+        """
+        params.append(limit)
+
+        # Выполняем запрос
+        cursor = self.db.execute_sql(sql, params + [query_blob])
+        rows = cursor.fetchall()
+
+        # Преобразуем результаты в ChunkResult
+        results = []
+        for row in rows:
+            (
+                chunk_id, distance, chunk_index, content, chunk_type, language,
+                chunk_metadata, chunk_created_at, doc_id, doc_content,
+                doc_metadata, media_type, doc_created_at
+            ) = row
+
+            # Создаём Chunk DTO
+            chunk = Chunk(
+                id=chunk_id,
+                content=content,
+                chunk_index=chunk_index,
+                chunk_type=ChunkType(chunk_type),
+                language=language,
+                parent_doc_id=doc_id,
+                metadata=json.loads(chunk_metadata),
+                created_at=chunk_created_at,
+            )
+
+            # Извлекаем заголовок из метаданных документа
+            doc_meta = json.loads(doc_metadata)
+            doc_title = doc_meta.get("title")
+
+            # Конвертируем расстояние в скор (0.0 - 1.0)
+            score = 1.0 / (1.0 + distance)
+
+            results.append(
+                ChunkResult(
+                    chunk=chunk,
+                    score=score,
+                    match_type=MatchType.VECTOR,
+                    parent_doc_id=doc_id,
+                    parent_doc_title=doc_title,
+                    parent_metadata=doc_meta,
+                )
+            )
+
+        return results
 
     def _model_to_document(self, doc_model: DocumentModel) -> Document:
         """Конвертирует ORM модель в DTO.
