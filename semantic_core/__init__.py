@@ -49,6 +49,7 @@ from semantic_core.domain import (
     ChunkResult,
     MediaType,
     MatchType,
+    GoogleKeyring,
 )
 
 # Interfaces Layer
@@ -62,7 +63,7 @@ from semantic_core.interfaces import (
 )
 
 # Infrastructure Layer
-from semantic_core.infrastructure.gemini import GeminiEmbedder
+from semantic_core.infrastructure.gemini import GeminiEmbedder, GeminiBatchClient
 from semantic_core.infrastructure.storage import (
     PeeweeVectorStore,
     init_peewee_database,
@@ -84,6 +85,7 @@ from semantic_core.integrations import SemanticIndex
 
 # Pipeline Layer
 from semantic_core.pipeline import SemanticCore
+from semantic_core.batch_manager import BatchManager
 
 __all__ = [
     # Domain
@@ -94,6 +96,7 @@ __all__ = [
     "ChunkResult",
     "MediaType",
     "MatchType",
+    "GoogleKeyring",
     # Interfaces
     "BaseEmbedder",
     "BaseVectorStore",
@@ -103,6 +106,7 @@ __all__ = [
     "ParsingSegment",
     # Infrastructure: Gemini
     "GeminiEmbedder",
+    "GeminiBatchClient",
     # Infrastructure: Storage
     "PeeweeVectorStore",
     "init_peewee_database",
@@ -117,4 +121,5 @@ __all__ = [
     "SemanticIndex",
     # Pipeline
     "SemanticCore",
+    "BatchManager",
 ]
