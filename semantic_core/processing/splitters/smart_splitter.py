@@ -80,8 +80,9 @@ class SmartSplitter(BaseSplitter):
             if segment.segment_type == ChunkType.CODE and self.preserve_code:
                 # Сначала сбрасываем накопленный текст
                 if text_buffer:
-                    chunks.extend(self._flush_text_buffer(text_buffer, chunk_index))
-                    chunk_index += len(chunks)
+                    text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
+                    chunks.extend(text_chunks)
+                    chunk_index += len(text_chunks)
                     text_buffer.clear()
 
                 # Создаем чанк(и) для кода
@@ -96,8 +97,9 @@ class SmartSplitter(BaseSplitter):
                 # Проверяем, не переполнен ли буфер
                 buffer_size = sum(len(s.content) for s in text_buffer)
                 if buffer_size >= self.chunk_size:
-                    chunks.extend(self._flush_text_buffer(text_buffer, chunk_index))
-                    chunk_index += len(chunks)
+                    text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
+                    chunks.extend(text_chunks)
+                    chunk_index += len(text_chunks)
                     text_buffer.clear()
 
             else:
@@ -106,7 +108,8 @@ class SmartSplitter(BaseSplitter):
 
         # Сбрасываем оставшийся текст
         if text_buffer:
-            chunks.extend(self._flush_text_buffer(text_buffer, chunk_index))
+            text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
+            chunks.extend(text_chunks)
 
         return chunks
 
