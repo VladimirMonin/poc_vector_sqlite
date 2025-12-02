@@ -2,7 +2,7 @@
 Конфигурация pytest для тестов POC.
 
 Определяет фикстуры для:
-- Инициализации тестовой базы данных
+- Инициализации тестовой базы данных (новая и старая архитектура)
 - Создания тестовых данных
 - Очистки после тестов
 """
@@ -11,14 +11,31 @@ import pytest
 import tempfile
 from pathlib import Path
 
+# Новая архитектура (Фаза 1)
 from semantic_core import (
-    init_database,
-    create_vector_table,
-    create_fts_table,
-    EmbeddingGenerator,
-    SimpleTextSplitter,
+    init_peewee_database,
+    PeeweeVectorStore,
+    GeminiEmbedder,
+    SimpleSplitter,
+    BasicContextStrategy,
+    SemanticCore,
 )
-from domain.models import Note, NoteChunk, Category, Tag, NoteTag
+
+# Старая архитектура (для обратной совместимости старых тестов)
+try:
+    from semantic_core.database import (
+        init_database,
+        create_vector_table,
+        create_fts_table,
+        db,
+    )
+    from semantic_core.embeddings import EmbeddingGenerator
+    from semantic_core.text_processing import SimpleTextSplitter
+    from domain.models import Note, NoteChunk, Category, Tag, NoteTag
+    
+    OLD_API_AVAILABLE = True
+except ImportError:
+    OLD_API_AVAILABLE = False
 
 
 @pytest.fixture(scope="session")
@@ -41,10 +58,13 @@ def temp_db_path():
 @pytest.fixture(scope="function")
 def test_db(temp_db_path):
     """
-    Инициализирует тестовую базу данных.
+    Инициализирует тестовую базу данных (старый API).
 
     Scope: function - каждый тест получает чистую базу.
     """
+    if not OLD_API_AVAILABLE:
+        pytest.skip("Старый API недоступен")
+    
     # Инициализируем БД
     database = init_database(temp_db_path)
     database.connect()
@@ -73,6 +93,8 @@ def test_db(temp_db_path):
 @pytest.fixture
 def sample_category(test_db):
     """Создает тестовую категорию."""
+    if not OLD_API_AVAILABLE:
+        pytest.skip("Старый API недоступен")
     category = Category.create(name="Python")
     return category
 
@@ -80,6 +102,8 @@ def sample_category(test_db):
 @pytest.fixture
 def sample_tags(test_db):
     """Создает набор тестовых тегов."""
+    if not OLD_API_AVAILABLE:
+        pytest.skip("Старый API недоступен")
     tags = [
         Tag.create(name="#код"),
         Tag.create(name="#обучение"),
@@ -90,13 +114,17 @@ def sample_tags(test_db):
 
 @pytest.fixture
 def embedding_generator():
-    """Создает экземпляр генератора эмбеддингов."""
+    """Создает экземпляр генератора эмбеддингов (старый API)."""
+    if not OLD_API_AVAILABLE:
+        pytest.skip("Старый API недоступен")
     return EmbeddingGenerator()
 
 
 @pytest.fixture
 def text_splitter():
-    """Создает экземпляр сплиттера с тестовыми параметрами."""
+    """Создает экземпляр сплиттера с тестовыми параметрами (старый API)."""
+    if not OLD_API_AVAILABLE:
+        pytest.skip("Старый API недоступен")
     return SimpleTextSplitter(
         chunk_size=500,  # Меньше для быстрых тестов
         overlap=100,
