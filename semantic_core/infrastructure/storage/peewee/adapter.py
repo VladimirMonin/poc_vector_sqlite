@@ -120,7 +120,7 @@ class PeeweeVectorStore(BaseVectorStore):
 
         Args:
             document: Родительский документ.
-            chunks: Список чанков с векторами.
+            chunks: Список чанков с векторами (или без для async режима).
 
         Returns:
             Document с заполненным id.
@@ -145,6 +145,12 @@ class PeeweeVectorStore(BaseVectorStore):
             for chunk in chunks:
                 chunk.parent_doc_id = doc_model.id
 
+                # Проверяем статус эмбеддинга из metadata (для async режима)
+                embedding_status = chunk.metadata.get(
+                    "_embedding_status",
+                    "READY"  # По умолчанию READY для sync режима
+                )
+
                 # Создаём чанк
                 chunk_model = ChunkModel.create(
                     document=doc_model,
@@ -153,12 +159,13 @@ class PeeweeVectorStore(BaseVectorStore):
                     chunk_type=chunk.chunk_type.value,
                     language=chunk.language,
                     metadata=json.dumps(chunk.metadata, ensure_ascii=False),
+                    embedding_status=embedding_status,
                     created_at=chunk.created_at,
                 )
 
                 chunk.id = chunk_model.id
 
-                # Сохраняем вектор (поддержка обеих версий: embedding и vector для обратной совместимости)
+                # Сохраняем вектор только если он есть (sync режим)
                 vector = getattr(chunk, "vector", None)
                 if vector is None:
                     vector = getattr(chunk, "embedding", None)
