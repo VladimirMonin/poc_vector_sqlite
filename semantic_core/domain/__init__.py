@@ -17,12 +17,29 @@
         Перечисление типов совпадения в поиске.
     GoogleKeyring
         Контейнер для API-ключей Google с разделением биллинга.
+    MediaConfig
+        Конфигурация для обработки медиа.
+    TaskStatus
+        Статусы задачи на обработку медиа.
+    MediaResource
+        Контейнер для медиа-файла.
+    MediaRequest
+        Запрос на анализ медиа.
+    MediaAnalysisResult
+        Результат анализа.
 """
 
 from semantic_core.domain.document import Document, MediaType
 from semantic_core.domain.chunk import Chunk, ChunkType
 from semantic_core.domain.search_result import SearchResult, ChunkResult, MatchType
 from semantic_core.domain.auth import GoogleKeyring
+from semantic_core.domain.config import MediaConfig
+from semantic_core.domain.media import (
+    TaskStatus,
+    MediaResource,
+    MediaRequest,
+    MediaAnalysisResult,
+)
 
 __all__ = [
     "Document",
@@ -33,4 +50,9 @@ __all__ = [
     "ChunkResult",
     "MatchType",
     "GoogleKeyring",
+    "MediaConfig",
+    "TaskStatus",
+    "MediaResource",
+    "MediaRequest",
+    "MediaAnalysisResult",
 ]

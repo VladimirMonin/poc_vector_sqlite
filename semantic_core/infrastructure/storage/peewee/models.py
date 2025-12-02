@@ -13,6 +13,8 @@
         Статусы батч-задания.
     EmbeddingStatus
         Статусы векторизации чанка.
+    MediaTaskModel
+        Модель задачи на обработку медиа.
 """
 
 from datetime import datetime
@@ -25,6 +27,7 @@ from peewee import (
     ForeignKeyField,
     DateTimeField,
     IntegerField,
+    CharField,
 )
 
 
@@ -170,4 +173,61 @@ class ChunkModel(BaseModel):
             (("document", "chunk_index"), True),  # Уникальная пара
             (("chunk_type",), False),  # Индекс для фильтрации по типу
             (("embedding_status",), False),  # Индекс для поиска PENDING чанков
+        )
+
+
+class MediaTaskModel(BaseModel):
+    """Внутренняя ORM модель задачи на обработку медиа.
+
+    Хранит задачи для async обработки изображений/аудио/видео.
+
+    Attributes:
+        id: UUID первичный ключ.
+        media_path: Путь к медиа-файлу.
+        media_type: Тип медиа (image, audio, video).
+        mime_type: MIME-тип файла.
+        user_prompt: Пользовательский промпт.
+        context_text: Контекст из метаданных (заголовки секции).
+        status: Статус задачи (pending/processing/completed/failed).
+        error_message: Сообщение об ошибке.
+        result_description: Описание из анализа.
+        result_alt_text: Alt-текст из анализа.
+        result_keywords: JSON массив ключевых слов.
+        result_ocr_text: Распознанный текст.
+        result_chunk_id: ID созданного чанка.
+        created_at: Время создания.
+        processed_at: Время обработки.
+    """
+
+    id = CharField(primary_key=True)  # UUID
+    media_path = CharField()
+    media_type = CharField()  # image, audio, video
+    mime_type = CharField()
+
+    # Контекст
+    user_prompt = TextField(null=True)
+    context_text = TextField(null=True)
+
+    # Статус
+    status = CharField(default="pending")
+    error_message = TextField(null=True)
+
+    # Результат
+    result_description = TextField(null=True)
+    result_alt_text = TextField(null=True)
+    result_keywords = TextField(null=True)  # JSON array
+    result_ocr_text = TextField(null=True)
+
+    # Связь с результирующим чанком
+    result_chunk_id = IntegerField(null=True)
+
+    # Метаданные
+    created_at = DateTimeField(default=datetime.now)
+    processed_at = DateTimeField(null=True)
+
+    class Meta:
+        table_name = "media_tasks"
+        indexes = (
+            (("status",), False),  # Индекс для поиска pending задач
+            (("media_type",), False),  # Индекс для фильтрации по типу
         )

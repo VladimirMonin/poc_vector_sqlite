@@ -4,6 +4,7 @@
     Domain: Чистые DTO (Document, Chunk, SearchResult).
     Interfaces: Контракты (BaseEmbedder, BaseVectorStore, etc.).
     Infrastructure: Реализации (GeminiEmbedder, PeeweeVectorStore, etc.).
+    Core: Бизнес-логика (MediaQueueProcessor).
     Pipeline: Оркестратор (SemanticCore).
 
 Пример:
@@ -50,6 +51,11 @@ from semantic_core.domain import (
     MediaType,
     MatchType,
     GoogleKeyring,
+    MediaConfig,
+    TaskStatus,
+    MediaResource,
+    MediaRequest,
+    MediaAnalysisResult,
 )
 
 # Interfaces Layer
@@ -63,7 +69,13 @@ from semantic_core.interfaces import (
 )
 
 # Infrastructure Layer
-from semantic_core.infrastructure.gemini import GeminiEmbedder, GeminiBatchClient
+from semantic_core.infrastructure.gemini import (
+    GeminiEmbedder,
+    GeminiBatchClient,
+    GeminiImageAnalyzer,
+    MediaProcessingError,
+    RateLimiter,
+)
 from semantic_core.infrastructure.storage import (
     PeeweeVectorStore,
     init_peewee_database,
@@ -79,6 +91,9 @@ from semantic_core.processing import (
     SmartSplitter,
     HierarchicalContextStrategy,
 )
+
+# Core Layer (Phase 6)
+from semantic_core.core import MediaQueueProcessor
 
 # Integration Layer
 from semantic_core.integrations import SemanticIndex
@@ -97,6 +112,11 @@ __all__ = [
     "MediaType",
     "MatchType",
     "GoogleKeyring",
+    "MediaConfig",
+    "TaskStatus",
+    "MediaResource",
+    "MediaRequest",
+    "MediaAnalysisResult",
     # Interfaces
     "BaseEmbedder",
     "BaseVectorStore",
@@ -107,6 +127,9 @@ __all__ = [
     # Infrastructure: Gemini
     "GeminiEmbedder",
     "GeminiBatchClient",
+    "GeminiImageAnalyzer",
+    "MediaProcessingError",
+    "RateLimiter",
     # Infrastructure: Storage
     "PeeweeVectorStore",
     "init_peewee_database",
@@ -117,6 +140,8 @@ __all__ = [
     "MarkdownNodeParser",
     "SmartSplitter",
     "HierarchicalContextStrategy",
+    # Core: Phase 6
+    "MediaQueueProcessor",
     # Integration
     "SemanticIndex",
     # Pipeline
