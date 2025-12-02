@@ -148,6 +148,7 @@ class BatchManager:
                 chunk_type=c.chunk_type,
                 language=c.language,
                 metadata=json.loads(c.metadata),
+                chunk_index=c.chunk_index,
             )
             for c in chunk_objects
         ]

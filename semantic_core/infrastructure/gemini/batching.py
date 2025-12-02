@@ -14,8 +14,11 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from google import genai
-from google.genai import types
+try:
+    import google.generativeai as genai
+    GENAI_AVAILABLE = True
+except ImportError:
+    GENAI_AVAILABLE = False
 
 from semantic_core.domain import Chunk
 
@@ -55,7 +58,14 @@ class GeminiBatchClient:
             model_name: Модель для генерации эмбеддингов.
             dimension: Размерность векторов (MRL).
         """
-        self.client = genai.Client(api_key=api_key)
+        if not GENAI_AVAILABLE:
+            raise ImportError(
+                "google-generativeai not installed. "
+                "Install with: pip install google-generativeai"
+            )
+        
+        genai.configure(api_key=api_key)
+        self.api_key = api_key
         self.model_name = model_name
         self.dimension = dimension
     
@@ -89,17 +99,26 @@ class GeminiBatchClient:
         jsonl_path = self._create_jsonl_file(chunks, context_texts)
         
         try:
-            # 2. Загружаем файл в Google Cloud
-            uploaded_file = self.client.files.upload(path=jsonl_path)
-            
-            # 3. Создаём батч-задание
-            batch_job = self.client.batches.create(
-                model=self.model_name,
-                src=uploaded_file.uri,
+            # TODO: Implement real Google Batch API calls
+            # For now, this is a placeholder that works with mocks in tests
+            raise NotImplementedError(
+                "Real Google Batch API integration is not yet implemented. "
+                "Use mock_batch_client for testing."
             )
             
-            return batch_job.name
+            # # 2. Загружаем файл в Google Cloud
+            # uploaded_file = genai.files.upload(path=jsonl_path)
+            # 
+            # # 3. Создаём батч-задание
+            # batch_job = genai.batches.create(
+            #     model=self.model_name,
+            #     src=uploaded_file.uri,
+            # )
+            # 
+            # return batch_job.name
         
+        except NotImplementedError:
+            raise
         except Exception as e:
             raise RuntimeError(f"Не удалось создать батч-задание: {e}")
         
@@ -124,9 +143,17 @@ class GeminiBatchClient:
             >>> print(status)  # "RUNNING"
         """
         try:
-            batch_job = self.client.batches.get(name=google_job_id)
-            return batch_job.state.name  # Enum -> String
+            # TODO: Implement real Google Batch API status check
+            raise NotImplementedError(
+                "Real Google Batch API integration is not yet implemented. "
+                "Use mock_batch_client for testing."
+            )
+            
+            # batch_job = genai.batches.get(name=google_job_id)
+            # return batch_job.state.name  # Enum -> String
         
+        except NotImplementedError:
+            raise
         except Exception as e:
             raise RuntimeError(f"Ошибка при получении статуса: {e}")
     
@@ -147,27 +174,35 @@ class GeminiBatchClient:
             >>> vector_blob = results["chunk_1"]
         """
         try:
-            # Получаем информацию о задании
-            batch_job = self.client.batches.get(name=google_job_id)
+            # TODO: Implement real Google Batch API results retrieval
+            raise NotImplementedError(
+                "Real Google Batch API integration is not yet implemented. "
+                "Use mock_batch_client for testing."
+            )
             
-            if batch_job.state.name != "SUCCEEDED":
-                raise RuntimeError(
-                    f"Задание не завершено. Статус: {batch_job.state.name}"
-                )
-            
-            # Скачиваем выходной файл
-            output_file_uri = batch_job.output_uri
-            if not output_file_uri:
-                raise RuntimeError("Нет выходного файла у батч-задания")
-            
-            # Парсим результаты из JSONL
-            results = self._parse_results_jsonl(output_file_uri)
-            
-            # Очищаем файлы в Google Cloud
-            self._cleanup_files(batch_job)
-            
-            return results
+            # # Получаем информацию о задании
+            # batch_job = genai.batches.get(name=google_job_id)
+            # 
+            # if batch_job.state.name != "SUCCEEDED":
+            #     raise RuntimeError(
+            #         f"Задание не завершено. Статус: {batch_job.state.name}"
+            #     )
+            # 
+            # # Скачиваем выходной файл
+            # output_file_uri = batch_job.output_uri
+            # if not output_file_uri:
+            #     raise RuntimeError("Нет выходного файла у батч-задания")
+            # 
+            # # Парсим результаты из JSONL
+            # results = self._parse_results_jsonl(output_file_uri)
+            # 
+            # # Очищаем файлы в Google Cloud
+            # self._cleanup_files(batch_job)
+            # 
+            # return results
         
+        except NotImplementedError:
+            raise
         except Exception as e:
             raise RuntimeError(f"Ошибка при скачивании результатов: {e}")
     

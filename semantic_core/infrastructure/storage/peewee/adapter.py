@@ -748,31 +748,28 @@ class PeeweeVectorStore(BaseVectorStore):
         data = [(int(chunk_id), blob) for chunk_id, blob in vectors_dict.items()]
         
         try:
-            # Вставляем/обновляем векторы в vec0 таблице
-            cursor = self.db.execute_sql(
-                "INSERT OR REPLACE INTO chunks_vec(id, embedding) VALUES (?, ?)",
-                data,
-                commit=False,
-            )
-            
-            # Обновляем статус чанков на READY
-            chunk_ids = list(vectors_dict.keys())
-            placeholders = ",".join(["?"] * len(chunk_ids))
-            
-            self.db.execute_sql(
-                f"""
-                UPDATE chunks 
-                SET embedding_status = 'READY',
-                    batch_job_id = NULL,
-                    error_message = NULL
-                WHERE id IN ({placeholders})
-                """,
-                chunk_ids,
-                commit=False,
-            )
-            
-            # Коммитим транзакцию
-            self.db.commit()
+            # Вставляем/обновляем векторы в vec0 таблице (по одному)
+            with self.db.atomic():
+                for chunk_id, blob in data:
+                    self.db.execute_sql(
+                        "INSERT OR REPLACE INTO chunks_vec(id, embedding) VALUES (?, ?)",
+                        (chunk_id, blob),
+                    )
+                
+                # Обновляем статус чанков на READY
+                chunk_ids = [int(cid) for cid in vectors_dict.keys()]
+                placeholders = ",".join(["?"] * len(chunk_ids))
+                
+                self.db.execute_sql(
+                    f"""
+                    UPDATE chunks 
+                    SET embedding_status = 'READY',
+                        batch_job_id = NULL,
+                        error_message = NULL
+                    WHERE id IN ({placeholders})
+                    """,
+                    chunk_ids,
+                )
             
             return len(vectors_dict)
         
