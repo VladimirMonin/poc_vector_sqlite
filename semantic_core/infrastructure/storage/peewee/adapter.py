@@ -12,7 +12,15 @@ import numpy as np
 from peewee import fn
 
 from semantic_core.interfaces import BaseVectorStore
-from semantic_core.domain import Document, Chunk, SearchResult, ChunkResult, MatchType, MediaType, ChunkType
+from semantic_core.domain import (
+    Document,
+    Chunk,
+    SearchResult,
+    ChunkResult,
+    MatchType,
+    MediaType,
+    ChunkType,
+)
 from semantic_core.infrastructure.storage.peewee.models import (
     DocumentModel,
     ChunkModel,
@@ -524,13 +532,17 @@ class PeeweeVectorStore(BaseVectorStore):
             Список ChunkResult.
         """
         if mode == "vector":
-            return self._vector_search_chunks(query_vector, filters, limit, chunk_type_filter)
+            return self._vector_search_chunks(
+                query_vector, filters, limit, chunk_type_filter
+            )
         elif mode == "fts":
             # FTS для чанков пока не реализован, возвращаем пустой список
             return []
         elif mode == "hybrid":
             # Для гибридного используем только векторный поиск чанков
-            return self._vector_search_chunks(query_vector, filters, limit, chunk_type_filter)
+            return self._vector_search_chunks(
+                query_vector, filters, limit, chunk_type_filter
+            )
         else:
             raise ValueError(f"Неизвестный режим поиска: {mode}")
 
@@ -609,9 +621,19 @@ class PeeweeVectorStore(BaseVectorStore):
         results = []
         for row in rows:
             (
-                chunk_id, distance, chunk_index, content, chunk_type, language,
-                chunk_metadata, chunk_created_at, doc_id, doc_content,
-                doc_metadata, media_type, doc_created_at
+                chunk_id,
+                distance,
+                chunk_index,
+                content,
+                chunk_type,
+                language,
+                chunk_metadata,
+                chunk_created_at,
+                doc_id,
+                doc_content,
+                doc_metadata,
+                media_type,
+                doc_created_at,
             ) = row
 
             # Создаём Chunk DTO

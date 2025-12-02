@@ -63,11 +63,11 @@ class SearchResult:
 @dataclass
 class ChunkResult:
     """Результат гранулярного поиска (отдельный чанк).
-    
+
     Используется когда нужно найти конкретные фрагменты документа,
     а не весь документ целиком. Удобно для поиска кода, цитат или
     специфических абзацев.
-    
+
     Attributes:
         chunk: Найденный чанк.
         score: Релевантность (0.0 - 1.0).
@@ -77,7 +77,7 @@ class ChunkResult:
         parent_metadata: Метаданные родительского документа.
         highlight: Подсвеченный фрагмент (для FTS).
     """
-    
+
     chunk: Chunk
     score: float
     match_type: MatchType
@@ -85,13 +85,17 @@ class ChunkResult:
     parent_doc_title: Optional[str] = None
     parent_metadata: dict[str, Any] = None
     highlight: Optional[str] = None
-    
+
     def __repr__(self) -> str:
         chunk_type = self.chunk.chunk_type.value
         lang = f"[{self.chunk.language}]" if self.chunk.language else ""
         parent = self.parent_doc_title or f"Doc#{self.parent_doc_id}"
-        preview = self.chunk.content[:30] + "..." if len(self.chunk.content) > 30 else self.chunk.content
-        
+        preview = (
+            self.chunk.content[:30] + "..."
+            if len(self.chunk.content) > 30
+            else self.chunk.content
+        )
+
         return (
             f"ChunkResult(type={chunk_type}{lang}, parent='{parent}', "
             f"score={self.score:.3f}, preview='{preview}')"

@@ -17,14 +17,14 @@ import numpy as np
 
 class ChunkType(str, Enum):
     """Типы контента в чанке.
-    
+
     Attributes:
         TEXT: Обычный текстовый контент.
         CODE: Блок кода.
         TABLE: Таблица (Markdown/HTML).
         IMAGE_REF: Ссылка на изображение (для будущей мультимодальности).
     """
-    
+
     TEXT = "text"
     CODE = "code"
     TABLE = "table"

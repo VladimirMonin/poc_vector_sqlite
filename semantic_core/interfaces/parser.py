@@ -16,10 +16,10 @@ from semantic_core.domain import ChunkType
 @dataclass
 class ParsingSegment:
     """Промежуточная единица контента после парсинга.
-    
+
     Это логический сегмент документа (параграф, заголовок, блок кода),
     который еще не разбит на чанки, но уже содержит всю структурную информацию.
-    
+
     Attributes:
         content: Текстовое содержимое сегмента.
         segment_type: Тип контента (TEXT/CODE/TABLE/IMAGE_REF).
@@ -29,7 +29,7 @@ class ParsingSegment:
         end_line: Номер конечной строки в исходном документе.
         metadata: Дополнительные метаданные специфичные для типа контента.
     """
-    
+
     content: str
     segment_type: ChunkType = ChunkType.TEXT
     language: Optional[str] = None
@@ -37,7 +37,7 @@ class ParsingSegment:
     start_line: Optional[int] = None
     end_line: Optional[int] = None
     metadata: dict = field(default_factory=dict)
-    
+
     def __repr__(self) -> str:
         preview = self.content[:30] + "..." if len(self.content) > 30 else self.content
         lang_info = f"[{self.language}]" if self.language else ""
@@ -50,17 +50,17 @@ class ParsingSegment:
 
 class DocumentParser(Protocol):
     """Протокол для парсеров документов.
-    
+
     Любой парсер должен уметь преобразовывать сырой текст
     в поток структурированных сегментов.
     """
-    
+
     def parse(self, content: str) -> Iterator[ParsingSegment]:
         """Парсит текст и возвращает поток логических сегментов.
-        
+
         Args:
             content: Сырой текст документа.
-            
+
         Yields:
             ParsingSegment: Логические сегменты с метаданными структуры.
         """

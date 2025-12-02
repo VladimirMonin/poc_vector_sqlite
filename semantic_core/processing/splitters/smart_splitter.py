@@ -14,22 +14,22 @@ from semantic_core.interfaces.splitter import BaseSplitter
 
 class SmartSplitter(BaseSplitter):
     """Умный сплиттер для структурированных документов.
-    
+
     Работает поверх DocumentParser и применяет интеллектуальную
     логику группировки сегментов в чанки:
-    
+
     - Группирует мелкие текстовые параграфы до достижения chunk_size
     - Изолирует блоки кода в отдельные чанки (даже маленькие)
     - Сохраняет метаданные иерархии заголовков
     - Режет большие блоки кода построчно с дублированием метаданных
-    
+
     Attributes:
         parser: Парсер документов (например, MarkdownNodeParser).
         chunk_size: Максимальный размер текстового чанка в символах.
         code_chunk_size: Максимальный размер чанка кода в символах.
         preserve_code: Если True, код никогда не смешивается с текстом.
     """
-    
+
     def __init__(
         self,
         parser: DocumentParser,
@@ -38,7 +38,7 @@ class SmartSplitter(BaseSplitter):
         preserve_code: bool = True,
     ):
         """Инициализирует SmartSplitter.
-        
+
         Args:
             parser: Экземпляр парсера документов.
             chunk_size: Макс. размер текстового чанка.
@@ -49,100 +49,92 @@ class SmartSplitter(BaseSplitter):
         self.chunk_size = chunk_size
         self.code_chunk_size = code_chunk_size
         self.preserve_code = preserve_code
-    
+
     def split(self, document: Document) -> list[Chunk]:
         """Разбивает документ на умные чанки.
-        
+
         Args:
             document: Исходный документ.
-            
+
         Returns:
             Список чанков с метаданными структуры.
-            
+
         Raises:
             ValueError: Если document пустой.
         """
         if not document.content or not document.content.strip():
             raise ValueError("Document content is empty")
-        
+
         # Парсим документ на сегменты
         segments = list(self.parser.parse(document.content))
-        
+
         # Преобразуем сегменты в чанки
         chunks: list[Chunk] = []
         chunk_index = 0
-        
+
         # Буфер для накопления текстовых сегментов
         text_buffer: list[ParsingSegment] = []
-        
+
         for segment in segments:
             # Обработка блоков кода - всегда изолированно
             if segment.segment_type == ChunkType.CODE and self.preserve_code:
                 # Сначала сбрасываем накопленный текст
                 if text_buffer:
-                    chunks.extend(
-                        self._flush_text_buffer(text_buffer, chunk_index)
-                    )
+                    chunks.extend(self._flush_text_buffer(text_buffer, chunk_index))
                     chunk_index += len(chunks)
                     text_buffer.clear()
-                
+
                 # Создаем чанк(и) для кода
                 code_chunks = self._create_code_chunks(segment, chunk_index)
                 chunks.extend(code_chunks)
                 chunk_index += len(code_chunks)
-            
+
             # Обработка текста и изображений
             elif segment.segment_type in (ChunkType.TEXT, ChunkType.IMAGE_REF):
                 text_buffer.append(segment)
-                
+
                 # Проверяем, не переполнен ли буфер
                 buffer_size = sum(len(s.content) for s in text_buffer)
                 if buffer_size >= self.chunk_size:
-                    chunks.extend(
-                        self._flush_text_buffer(text_buffer, chunk_index)
-                    )
+                    chunks.extend(self._flush_text_buffer(text_buffer, chunk_index))
                     chunk_index += len(chunks)
                     text_buffer.clear()
-            
+
             else:
                 # Для других типов (TABLE и т.д.) - пока обрабатываем как текст
                 text_buffer.append(segment)
-        
+
         # Сбрасываем оставшийся текст
         if text_buffer:
-            chunks.extend(
-                self._flush_text_buffer(text_buffer, chunk_index)
-            )
-        
+            chunks.extend(self._flush_text_buffer(text_buffer, chunk_index))
+
         return chunks
-    
+
     def _flush_text_buffer(
-        self, 
-        buffer: list[ParsingSegment], 
-        start_index: int
+        self, buffer: list[ParsingSegment], start_index: int
     ) -> list[Chunk]:
         """Преобразует накопленные текстовые сегменты в чанки.
-        
+
         Args:
             buffer: Список сегментов для группировки.
             start_index: Начальный индекс для нумерации чанков.
-            
+
         Returns:
             Список чанков.
         """
         if not buffer:
             return []
-        
+
         chunks: list[Chunk] = []
         current_chunk_parts: list[str] = []
         current_size = 0
         current_headers: list[str] = []
         current_start_line: Optional[int] = None
         current_end_line: Optional[int] = None
-        
+
         for segment in buffer:
             segment_size = len(segment.content)
-            
+
             # Если добавление этого сегмента превысит размер, создаем чанк
             if current_size + segment_size > self.chunk_size and current_chunk_parts:
                 chunks.append(
@@ -154,16 +146,16 @@ class SmartSplitter(BaseSplitter):
                             "headers": current_headers,
                             "start_line": current_start_line,
                             "end_line": current_end_line,
-                        }
+                        },
                     )
                 )
                 current_chunk_parts.clear()
                 current_size = 0
-            
+
             # Добавляем сегмент в текущий чанк
             current_chunk_parts.append(segment.content)
             current_size += segment_size
-            
+
             # Обновляем метаданные
             if segment.headers:
                 current_headers = segment.headers
@@ -171,7 +163,7 @@ class SmartSplitter(BaseSplitter):
                 current_start_line = segment.start_line
             if segment.end_line:
                 current_end_line = segment.end_line
-        
+
         # Создаем последний чанк
         if current_chunk_parts:
             chunks.append(
@@ -183,31 +175,29 @@ class SmartSplitter(BaseSplitter):
                         "headers": current_headers,
                         "start_line": current_start_line,
                         "end_line": current_end_line,
-                    }
+                    },
                 )
             )
-        
+
         return chunks
-    
+
     def _create_code_chunks(
-        self, 
-        segment: ParsingSegment, 
-        start_index: int
+        self, segment: ParsingSegment, start_index: int
     ) -> list[Chunk]:
         """Создает чанк(и) для блока кода.
-        
+
         Если код маленький - один чанк.
         Если большой - режет построчно.
-        
+
         Args:
             segment: Сегмент с кодом.
             start_index: Начальный индекс для нумерации.
-            
+
         Returns:
             Список чанков кода.
         """
         code_content = segment.content
-        
+
         # Если код влезает в лимит - создаем один чанк
         if len(code_content) <= self.code_chunk_size:
             return [
@@ -220,19 +210,19 @@ class SmartSplitter(BaseSplitter):
                         "headers": segment.headers,
                         "start_line": segment.start_line,
                         "end_line": segment.end_line,
-                    }
+                    },
                 )
             ]
-        
+
         # Иначе режем построчно
         chunks: list[Chunk] = []
         lines = code_content.splitlines(keepends=True)
         current_chunk_lines: list[str] = []
         current_size = 0
-        
+
         for line in lines:
             line_size = len(line)
-            
+
             if current_size + line_size > self.code_chunk_size and current_chunk_lines:
                 # Создаем чанк
                 chunks.append(
@@ -246,15 +236,15 @@ class SmartSplitter(BaseSplitter):
                             "start_line": segment.start_line,
                             "end_line": segment.end_line,
                             "partial": True,  # Помечаем как часть большого блока
-                        }
+                        },
                     )
                 )
                 current_chunk_lines.clear()
                 current_size = 0
-            
+
             current_chunk_lines.append(line)
             current_size += line_size
-        
+
         # Последний чанк
         if current_chunk_lines:
             chunks.append(
@@ -268,8 +258,8 @@ class SmartSplitter(BaseSplitter):
                         "start_line": segment.start_line,
                         "end_line": segment.end_line,
                         "partial": True,
-                    }
+                    },
                 )
             )
-        
+
         return chunks

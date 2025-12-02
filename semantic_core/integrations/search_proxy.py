@@ -172,7 +172,9 @@ class SearchProxy:
             ...     print(f"Из: {chunk_result.parent_doc_title}")
         """
         results = self.core.storage.search_chunks(
-            query_vector=self.core.embedder.embed_query(query) if mode in ("vector", "hybrid") else None,
+            query_vector=self.core.embedder.embed_query(query)
+            if mode in ("vector", "hybrid")
+            else None,
             query_text=query if mode in ("fts", "hybrid") else None,
             filters=filters or None,
             limit=limit,
