@@ -8,7 +8,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from semantic_core.domain import Document, Chunk, SearchResult
+from semantic_core.domain import Document, Chunk, SearchResult, ChunkResult
 
 
 class BaseVectorStore(ABC):
@@ -87,5 +87,38 @@ class BaseVectorStore(ABC):
 
         Returns:
             Количество удалённых чанков.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def search_chunks(
+        self,
+        query_vector: Optional[Any] = None,
+        query_text: Optional[str] = None,
+        filters: Optional[dict] = None,
+        limit: int = 10,
+        mode: str = "hybrid",
+        k: int = 60,
+        chunk_type_filter: Optional[str] = None,
+    ) -> list[ChunkResult]:
+        """Выполняет гранулярный поиск отдельных чанков.
+
+        В отличие от search(), который группирует чанки по документам,
+        этот метод возвращает конкретные фрагменты (чанки).
+
+        Args:
+            query_vector: Вектор запроса (для векторного поиска).
+            query_text: Текст запроса (для FTS).
+            filters: Словарь фильтров по метаданным документа.
+            limit: Максимальное количество результатов.
+            mode: Режим поиска ('vector', 'fts', 'hybrid').
+            k: Константа для RRF алгоритма.
+            chunk_type_filter: Фильтр по типу чанка ('text', 'code', 'table', 'image_ref').
+
+        Returns:
+            Список ChunkResult с чанками и их метаданными.
+
+        Raises:
+            ValueError: Если не передан ни vector, ни text.
         """
         raise NotImplementedError
