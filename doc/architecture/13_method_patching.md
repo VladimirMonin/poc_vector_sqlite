@@ -44,6 +44,7 @@ semantic_core.ingest(doc)
 ```
 
 **Проблемы:**
+
 - ❌ Легко забыть
 - ❌ Дублирование кода
 - ❌ Не DRY (Don't Repeat Yourself)
@@ -65,6 +66,7 @@ class Article(Model):
 ```
 
 **Проблемы:**
+
 - ❌ Захламляем модель логикой индексации
 - ❌ Нарушаем Single Responsibility Principle
 - ❌ Сложно масштабировать (каждая модель должна переопределять save)
@@ -90,6 +92,7 @@ def on_article_save(sender, instance, created):
 **Проблема:** Сигналы работают **только с `SignalModel`**, не с обычной `peewee.Model`!
 
 **Почему плохо:**
+
 - ❌ Требуем наследоваться от специального класса
 - ❌ Нарушаем принцип "минимальной инвазивности"
 - ❌ Что если у пользователя уже своя базовая модель?
@@ -107,6 +110,7 @@ def on_article_save(sender, instance, created):
 3. Подменяем методы на классе модели
 
 **Преимущества:**
+
 - ✅ Работает с **любой** `peewee.Model`
 - ✅ Не требует наследования
 - ✅ Логика индексации в `SemanticIndex`, не в модели
@@ -157,6 +161,7 @@ if issubclass(owner, Model):  # Это Peewee модель?
 ```
 
 **Что происходит:**
+
 1. Создается `PeeweeAdapter(model=Article, descriptor=self)`
 2. Вызывается `adapter._apply_hooks()`
 
@@ -207,6 +212,7 @@ def _patch_save(self):
 ```
 
 **Что происходит:**
+
 1. Сохраняем ссылку на оригинальный `save()`
 2. Создаем функцию `save_wrapper`, которая:
    - Проверяет, создается объект или обновляется
@@ -281,18 +287,23 @@ _MODEL_HOOKS: dict[type[Model], list[SemanticIndex]] = {}
 **Как работает:**
 
 1. Первый дескриптор (`search_full`) регистрируется:
+
    ```python
    _MODEL_HOOKS[Article] = [search_full]
    ```
+
    Патчит `save()` и `delete_instance()`
 
 2. Второй дескриптор (`search_summary`) регистрируется:
+
    ```python
    _MODEL_HOOKS[Article] = [search_full, search_summary]
    ```
+
    **НЕ** патчит методы (они уже пропатчены)
 
 3. При вызове `article.save()`:
+
    ```python
    for desc in _MODEL_HOOKS[Article]:  # Оба дескриптора!
        desc._handle_save(article, created=is_new)

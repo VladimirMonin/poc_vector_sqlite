@@ -9,6 +9,7 @@
 **Дескриптор** — это объект Python, который перехватывает обращения к атрибуту класса.
 
 Когда ты пишешь `Article.search.hybrid("python")`, на самом деле происходит следующее:
+
 1. Python видит обращение к атрибуту `search`
 2. Проверяет, является ли `search` дескриптором
 3. Вызывает специальный метод `__get__()` дескриптора
@@ -67,10 +68,12 @@ class Article(Model):
 ```
 
 Теперь:
+
 - `Article.search.hybrid("python")` — поиск по всей таблице
 - `article.search.update()` — переиндексация конкретной записи
 
 **Преимущества:**
+
 - ✅ Чистое разделение: модель отдельно, поиск отдельно
 - ✅ Удобный API (как у Django)
 - ✅ Автоматическая индексация при сохранении
@@ -112,6 +115,7 @@ search.__set_name__(Article, 'search')
 ```
 
 **В этот момент:**
+
 - Дескриптор узнает свое имя (`'search'`)
 - Узнает класс-владелец (`Article`)
 - Регистрирует хуки для автоматической индексации (об этом в следующем выпуске)
@@ -129,10 +133,12 @@ search.__get__(instance=None, owner=Article)
 ```
 
 **Параметры:**
+
 - `instance=None` — потому что мы обращаемся через класс, не через инстанс
 - `owner=Article` — класс-владелец
 
 **Дескриптор возвращает:**
+
 ```python
 return SearchProxy(core=self.core, model=Article, descriptor=self)
 ```
@@ -150,10 +156,12 @@ search.__get__(instance=article, owner=Article)
 ```
 
 **Параметры:**
+
 - `instance=article` — конкретный объект
 - `owner=Article` — класс
 
 **Дескриптор возвращает:**
+
 ```python
 return InstanceManager(instance=article, descriptor=self)
 ```
@@ -187,6 +195,7 @@ for article, score in results:
 ```
 
 **Что происходит под капотом:**
+
 1. `Article.search` вызывает `__get__(None, Article)`
 2. Возвращается `SearchProxy`
 3. `SearchProxy.hybrid()` вызывает `SemanticCore.search()`
@@ -213,6 +222,7 @@ article.search.update()  # ← __get__(article, Article) → InstanceManager
 ```
 
 **Что происходит:**
+
 1. `article.search` вызывает `__get__(article, Article)`
 2. Возвращается `InstanceManager(instance=article)`
 3. `InstanceManager.update()` удаляет старые чанки и создает новые
@@ -311,6 +321,7 @@ class Article(Model):
 ```
 
 **Проблемы:**
+
 - ❌ Нет разделения между поиском и управлением индексом
 - ❌ Нужно передавать `core`, `builder` в каждый метод
 - ❌ Захламляет класс модели
@@ -333,6 +344,7 @@ results = Article.search_helper.hybrid("python")
 ```
 
 **Проблемы:**
+
 - ❌ Нет автоматической индексации
 - ❌ Некрасивый API (search_helper вместо search)
 - ❌ Нужно вручную создавать инстанс
