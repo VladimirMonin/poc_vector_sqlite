@@ -112,6 +112,9 @@
 23. [**Schema Evolution: Миграция без downtime**](23_schema_evolution.md)  
     Автоматическое добавление колонок через ALTER TABLE и backward compatibility
 
+24. [**Production Optimizations: От прототипа к масштабу**](24_production_optimizations.md)  
+    Partial failures handling, производительность bulk_update_vectors и готовность к миллионам чанков
+
 ---
 
 ## 🚀 Быстрый старт
