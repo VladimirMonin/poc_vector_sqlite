@@ -527,3 +527,249 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "real_api: Tests that make real API calls (expensive, slow)"
     )
+
+
+# ============================================================================
+# Фикстуры для Phase 6 (Media Processing)
+# ============================================================================
+
+
+@pytest.fixture
+def images_dir(fixtures_dir):
+    """Путь к директории с тестовыми изображениями."""
+    path = fixtures_dir / "images"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+@pytest.fixture
+def red_square_path(images_dir):
+    """Создаёт красный квадрат 200x200 для тестов."""
+    try:
+        from PIL import Image
+    except ImportError:
+        pytest.skip("Pillow not installed (optional dependency)")
+
+    path = images_dir / "red_square.png"
+    if not path.exists():
+        img = Image.new("RGB", (200, 200), color="red")
+        img.save(path)
+    return path
+
+
+@pytest.fixture
+def large_image_path(images_dir):
+    """Создаёт большую картинку 3000x2000 для тестов токенов."""
+    try:
+        from PIL import Image
+    except ImportError:
+        pytest.skip("Pillow not installed (optional dependency)")
+
+    path = images_dir / "large_blue.png"
+    if not path.exists():
+        img = Image.new("RGB", (3000, 2000), color="blue")
+        img.save(path)
+    return path
+
+
+@pytest.fixture
+def medium_image_path(images_dir):
+    """Создаёт среднюю картинку 800x600 для тестов токенов."""
+    try:
+        from PIL import Image
+    except ImportError:
+        pytest.skip("Pillow not installed (optional dependency)")
+
+    path = images_dir / "medium_green.png"
+    if not path.exists():
+        img = Image.new("RGB", (800, 600), color="green")
+        img.save(path)
+    return path
+
+
+@pytest.fixture
+def mock_analysis_result():
+    """Фабрика результатов анализа для моков."""
+    from semantic_core.domain.media import MediaAnalysisResult
+
+    def _create(
+        description="A test image description",
+        alt_text="Test image",
+        keywords=None,
+        ocr_text=None,
+    ):
+        return MediaAnalysisResult(
+            description=description,
+            alt_text=alt_text,
+            keywords=keywords or ["test"],
+            ocr_text=ocr_text,
+        )
+
+    return _create
+
+
+@pytest.fixture
+def mock_image_analyzer(mock_analysis_result):
+    """Mock GeminiImageAnalyzer для unit-тестов."""
+    from unittest.mock import MagicMock
+
+    analyzer = MagicMock()
+    analyzer.analyze.return_value = mock_analysis_result()
+    return analyzer
+
+
+@pytest.fixture
+def media_db(tmp_path):
+    """БД с таблицей MediaTaskModel для тестов.
+    
+    Использует init_peewee_database для загрузки sqlite-vec extension.
+    ВАЖНО: Сохраняем и восстанавливаем оригинальную БД моделей чтобы 
+    не влиять на другие тесты.
+    """
+    from semantic_core.infrastructure.storage.peewee.engine import init_peewee_database
+    from semantic_core.infrastructure.storage.peewee.models import (
+        BaseModel,
+        MediaTaskModel,
+        ChunkModel,
+        DocumentModel,
+        BatchJobModel,
+    )
+
+    # Сохраняем оригинальные БД для каждой модели
+    original_dbs = {
+        DocumentModel: DocumentModel._meta.database,
+        ChunkModel: ChunkModel._meta.database,
+        BatchJobModel: BatchJobModel._meta.database,
+        MediaTaskModel: MediaTaskModel._meta.database,
+    }
+
+    db_path = tmp_path / "test_media.db"
+    db = init_peewee_database(str(db_path))
+    
+    # Привязываем модели напрямую через _meta (как в PeeweeVectorStore)
+    DocumentModel._meta.database = db
+    ChunkModel._meta.database = db
+    BatchJobModel._meta.database = db
+    MediaTaskModel._meta.database = db
+    
+    # Создаём таблицы
+    db.create_tables([DocumentModel, ChunkModel, BatchJobModel, MediaTaskModel])
+
+    yield db
+
+    db.close()
+    
+    # Восстанавливаем оригинальные БД для моделей
+    for model, original_db in original_dbs.items():
+        model._meta.database = original_db
+
+
+@pytest.fixture
+def rate_limiter():
+    """RateLimiter для тестов (быстрый - 60 RPM)."""
+    from semantic_core.infrastructure.gemini.rate_limiter import RateLimiter
+
+    return RateLimiter(rpm_limit=60)
+
+
+@pytest.fixture
+def media_queue_processor(media_db, mock_image_analyzer, rate_limiter):
+    """MediaQueueProcessor с мок-анализатором для integration тестов."""
+    from semantic_core.core.media_queue import MediaQueueProcessor
+
+    return MediaQueueProcessor(
+        analyzer=mock_image_analyzer,
+        rate_limiter=rate_limiter,
+    )
+
+
+# ============================================================================
+# Реальные картинки для E2E тестов (tests/asests/)
+# ============================================================================
+
+
+@pytest.fixture
+def assets_dir():
+    """Путь к директории с реальными тестовыми ассетами."""
+    return Path(__file__).parent / "asests"
+
+
+@pytest.fixture
+def red_car_path(assets_dir):
+    """Путь к фото красной машины."""
+    path = assets_dir / "red_car.jpg"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
+
+
+@pytest.fixture
+def cat_photo_path(assets_dir):
+    """Путь к фото кота."""
+    path = assets_dir / "cat_photo.png"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
+
+
+@pytest.fixture
+def eiffel_tower_path(assets_dir):
+    """Путь к фото Эйфелевой башни."""
+    path = assets_dir / "eiffel_tower.jpg"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
+
+
+@pytest.fixture
+def text_sign_path(assets_dir):
+    """Путь к фото с текстом/вывеской (для OCR)."""
+    path = assets_dir / "text_sign.jpg"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
+
+
+@pytest.fixture
+def code_screenshot_path(assets_dir):
+    """Путь к скриншоту кода."""
+    path = assets_dir / "code_screen.jpg"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
+
+
+@pytest.fixture
+def paris_street_path(assets_dir):
+    """Путь к фото парижской улицы."""
+    path = assets_dir / "paris_street.jpg"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
+
+
+@pytest.fixture
+def diagram_path(assets_dir):
+    """Путь к диаграмме Django."""
+    path = assets_dir / "seq_django_diagram.png"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
+
+
+@pytest.fixture
+def small_icon_path(assets_dir):
+    """Путь к маленькой иконке WebP."""
+    path = assets_dir / "small_icon.webp"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
+
+
+@pytest.fixture
+def large_wallpaper_path(assets_dir):
+    """Путь к большому 8K изображению."""
+    path = assets_dir / "8k_japanese_walpaper.jpg"
+    if not path.exists():
+        pytest.skip(f"Asset not found: {path}")
+    return path
