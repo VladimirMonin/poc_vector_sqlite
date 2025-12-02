@@ -61,13 +61,15 @@ class MediaQueueProcessor:
 
     def __init__(
         self,
-        image_analyzer: "GeminiImageAnalyzer",
-        rate_limiter: "RateLimiter",
+        image_analyzer: Optional["GeminiImageAnalyzer"] = None,
+        rate_limiter: Optional["RateLimiter"] = None,
         audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
         video_analyzer: Optional["GeminiVideoAnalyzer"] = None,
         video_config: Optional[VideoAnalysisConfig] = None,
         embedder=None,
         store=None,
+        # Обратная совместимость с Phase 6.0
+        analyzer: Optional["GeminiImageAnalyzer"] = None,
     ):
         """Инициализация процессора.
 
@@ -79,7 +81,17 @@ class MediaQueueProcessor:
             video_config: Конфигурация для видео-анализа.
             embedder: Опциональный embedder (для создания векторов).
             store: Опциональный VectorStore (для сохранения чанков).
+            analyzer: DEPRECATED - используй image_analyzer.
         """
+        # Обратная совместимость: analyzer → image_analyzer
+        if analyzer is not None and image_analyzer is None:
+            image_analyzer = analyzer
+
+        if image_analyzer is None:
+            raise ValueError("image_analyzer is required")
+        if rate_limiter is None:
+            raise ValueError("rate_limiter is required")
+
         self.image_analyzer = image_analyzer
         self.audio_analyzer = audio_analyzer
         self.video_analyzer = video_analyzer
