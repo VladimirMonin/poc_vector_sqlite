@@ -24,6 +24,7 @@ from semantic_core.domain import (
 from semantic_core.infrastructure.storage.peewee.models import (
     DocumentModel,
     ChunkModel,
+    BatchJobModel,
 )
 from semantic_core.infrastructure.storage.peewee.engine import VectorDatabase
 
@@ -55,6 +56,7 @@ class PeeweeVectorStore(BaseVectorStore):
         # Привязываем модели к БД
         DocumentModel._meta.database = self.db
         ChunkModel._meta.database = self.db
+        BatchJobModel._meta.database = self.db
 
         # Создаём таблицы
         self._create_tables()
@@ -62,7 +64,7 @@ class PeeweeVectorStore(BaseVectorStore):
     def _create_tables(self) -> None:
         """Создаёт таблицы и виртуальные индексы."""
         # Создаём обычные таблицы
-        self.db.create_tables([DocumentModel, ChunkModel], safe=True)
+        self.db.create_tables([DocumentModel, BatchJobModel, ChunkModel], safe=True)
 
         # Создаём векторную таблицу vec0
         self.db.execute_sql(f"""
@@ -120,7 +122,7 @@ class PeeweeVectorStore(BaseVectorStore):
 
         Args:
             document: Родительский документ.
-            chunks: Список чанков с векторами.
+            chunks: Список чанков с векторами (или без для async режима).
 
         Returns:
             Document с заполненным id.
@@ -145,6 +147,12 @@ class PeeweeVectorStore(BaseVectorStore):
             for chunk in chunks:
                 chunk.parent_doc_id = doc_model.id
 
+                # Проверяем статус эмбеддинга из metadata (для async режима)
+                embedding_status = chunk.metadata.get(
+                    "_embedding_status",
+                    "READY",  # По умолчанию READY для sync режима
+                )
+
                 # Создаём чанк
                 chunk_model = ChunkModel.create(
                     document=doc_model,
@@ -153,12 +161,13 @@ class PeeweeVectorStore(BaseVectorStore):
                     chunk_type=chunk.chunk_type.value,
                     language=chunk.language,
                     metadata=json.dumps(chunk.metadata, ensure_ascii=False),
+                    embedding_status=embedding_status,
                     created_at=chunk.created_at,
                 )
 
                 chunk.id = chunk_model.id
 
-                # Сохраняем вектор (поддержка обеих версий: embedding и vector для обратной совместимости)
+                # Сохраняем вектор только если он есть (sync режим)
                 vector = getattr(chunk, "vector", None)
                 if vector is None:
                     vector = getattr(chunk, "embedding", None)
@@ -714,3 +723,56 @@ class PeeweeVectorStore(BaseVectorStore):
             media_type=MediaType(doc_model.media_type),
             created_at=doc_model.created_at,
         )
+
+    def bulk_update_vectors(self, vectors_dict: dict[str, bytes]) -> int:
+        """Массово обновляет векторы для чанков.
+
+        Используется для высокоскоростной записи результатов батч-обработки.
+        Применяет executemany() для максимальной производительности.
+
+        Args:
+            vectors_dict: Словарь {chunk_id -> vector_blob}.
+                chunk_id должен быть строковым представлением int ID.
+
+        Returns:
+            Количество обновлённых чанков.
+
+        Raises:
+            ValueError: Если словарь пустой.
+            RuntimeError: Если произошла ошибка БД.
+        """
+        if not vectors_dict:
+            raise ValueError("Словарь векторов не может быть пустым")
+
+        # Подготавливаем данные для executemany
+        data = [(int(chunk_id), blob) for chunk_id, blob in vectors_dict.items()]
+
+        try:
+            # Вставляем/обновляем векторы в vec0 таблице (по одному)
+            with self.db.atomic():
+                for chunk_id, blob in data:
+                    self.db.execute_sql(
+                        "INSERT OR REPLACE INTO chunks_vec(id, embedding) VALUES (?, ?)",
+                        (chunk_id, blob),
+                    )
+
+                # Обновляем статус чанков на READY
+                chunk_ids = [int(cid) for cid in vectors_dict.keys()]
+                placeholders = ",".join(["?"] * len(chunk_ids))
+
+                self.db.execute_sql(
+                    f"""
+                    UPDATE chunks 
+                    SET embedding_status = 'READY',
+                        batch_job_id = NULL,
+                        error_message = NULL
+                    WHERE id IN ({placeholders})
+                    """,
+                    chunk_ids,
+                )
+
+            return len(vectors_dict)
+
+        except Exception as e:
+            self.db.rollback()
+            raise RuntimeError(f"Ошибка при массовом обновлении векторов: {e}")

@@ -1,0 +1,1 @@
+"""Integration-тесты для batching."""

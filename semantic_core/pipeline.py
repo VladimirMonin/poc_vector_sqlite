@@ -5,7 +5,8 @@
         Фасад для всей системы семантического поиска.
 """
 
-from typing import Optional
+import json
+from typing import Optional, Literal
 
 from semantic_core.interfaces import (
     BaseEmbedder,
@@ -14,6 +15,10 @@ from semantic_core.interfaces import (
     BaseContextStrategy,
 )
 from semantic_core.domain import Document, SearchResult
+from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
+
+
+IngestionMode = Literal["sync", "async"]
 
 
 class SemanticCore:
@@ -71,18 +76,29 @@ class SemanticCore:
         self.splitter = splitter
         self.context_strategy = context_strategy
 
-    def ingest(self, document: Document) -> Document:
+    def ingest(
+        self,
+        document: Document,
+        mode: IngestionMode = "sync",
+    ) -> Document:
         """Обрабатывает и сохраняет документ.
 
-        Алгоритм:
+        Алгоритм (sync):
         1. Нарезает документ на чанки (splitter.split).
         2. Формирует контекст для каждого чанка (context_strategy).
         3. Генерирует эмбеддинги (embedder.embed_documents).
         4. Записывает векторы в чанки.
         5. Сохраняет документ с чанками (store.save).
 
+        Алгоритм (async):
+        1. Нарезает документ на чанки.
+        2. Формирует контекст и сохраняет в metadata['_vector_source'].
+        3. Сохраняет чанки со статусом PENDING (без векторов).
+        4. Пользователь позже вызывает batch_manager.flush_queue().
+
         Args:
             document: Исходный документ.
+            mode: Режим обработки ('sync' или 'async').
 
         Returns:
             Document с заполненным id.
@@ -103,12 +119,23 @@ class SemanticCore:
             text = self.context_strategy.form_vector_text(chunk, document)
             vector_texts.append(text)
 
-        # 3. Генерируем эмбеддинги
-        embeddings = self.embedder.embed_documents(vector_texts)
+            # Сохраняем текст в metadata для async режима
+            if mode == "async":
+                chunk.metadata["_vector_source"] = text
 
-        # 4. Записываем векторы в чанки
-        for chunk, embedding in zip(chunks, embeddings):
-            chunk.embedding = embedding
+        if mode == "sync":
+            # 3. Генерируем эмбеддинги
+            embeddings = self.embedder.embed_documents(vector_texts)
+
+            # 4. Записываем векторы в чанки
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk.embedding = embedding
+
+        else:  # mode == "async"
+            # Помечаем чанки как PENDING (без векторов)
+            for chunk in chunks:
+                chunk.embedding = None
+                chunk.metadata["_embedding_status"] = EmbeddingStatus.PENDING.value
 
         # 5. Сохраняем в БД
         saved_document = self.store.save(document, chunks)
