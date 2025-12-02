@@ -118,7 +118,7 @@ class SemanticCore:
         for chunk in chunks:
             text = self.context_strategy.form_vector_text(chunk, document)
             vector_texts.append(text)
-            
+
             # Сохраняем текст в metadata для async режима
             if mode == "async":
                 chunk.metadata["_vector_source"] = text
@@ -130,7 +130,7 @@ class SemanticCore:
             # 4. Записываем векторы в чанки
             for chunk, embedding in zip(chunks, embeddings):
                 chunk.embedding = embedding
-        
+
         else:  # mode == "async"
             # Помечаем чанки как PENDING (без векторов)
             for chunk in chunks:

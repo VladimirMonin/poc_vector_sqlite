@@ -189,19 +189,19 @@ def create_fts_table(model_class, text_columns: list[str]) -> None:
 
 def ensure_schema_compatibility(database: VectorDatabase) -> None:
     """Автоматическая миграция схемы для обратной совместимости.
-    
+
     Проверяет наличие новых колонок (добавленных в Phase 5) и создаёт их,
     если база данных была создана на более старой версии библиотеки.
-    
+
     Миграции:
         - batch_jobs: Таблица для батч-заданий (Phase 5)
         - chunks.embedding_status: Статус векторизации (Phase 5)
         - chunks.batch_job_id: Связь с батч-заданием (Phase 5)
         - chunks.error_message: Сообщение об ошибке (Phase 5)
-    
+
     Args:
         database: Инициализированная база данных VectorDatabase.
-    
+
     Examples:
         >>> database = init_database()
         >>> database.connect()
@@ -209,7 +209,7 @@ def ensure_schema_compatibility(database: VectorDatabase) -> None:
     """
     conn = database.connection()
     cursor = conn.cursor()
-    
+
     # === Миграция 1: Создание таблицы batch_jobs ===
     cursor.execute("""
         SELECT name FROM sqlite_master 
@@ -227,13 +227,13 @@ def ensure_schema_compatibility(database: VectorDatabase) -> None:
             )
         """)
         print("[Migration] Created table 'batch_jobs'")
-    
+
     # === Миграция 2: Добавление новых колонок в chunks ===
     cursor.execute("PRAGMA table_info(chunks)")
     existing_columns = {row[1] for row in cursor.fetchall()}
-    
+
     migrations_applied = False
-    
+
     if "embedding_status" not in existing_columns:
         cursor.execute("""
             ALTER TABLE chunks 
@@ -241,7 +241,7 @@ def ensure_schema_compatibility(database: VectorDatabase) -> None:
         """)
         print("[Migration] Added column 'chunks.embedding_status'")
         migrations_applied = True
-    
+
     if "batch_job_id" not in existing_columns:
         cursor.execute("""
             ALTER TABLE chunks 
@@ -254,7 +254,7 @@ def ensure_schema_compatibility(database: VectorDatabase) -> None:
         """)
         print("[Migration] Added column 'chunks.batch_job_id' with index")
         migrations_applied = True
-    
+
     if "error_message" not in existing_columns:
         cursor.execute("""
             ALTER TABLE chunks 
@@ -262,7 +262,7 @@ def ensure_schema_compatibility(database: VectorDatabase) -> None:
         """)
         print("[Migration] Added column 'chunks.error_message'")
         migrations_applied = True
-    
+
     # Добавляем индекс для embedding_status, если его нет
     if "embedding_status" in existing_columns:
         cursor.execute("""
@@ -276,8 +276,8 @@ def ensure_schema_compatibility(database: VectorDatabase) -> None:
             """)
             print("[Migration] Created index on 'chunks.embedding_status'")
             migrations_applied = True
-    
+
     conn.commit()
-    
+
     if not migrations_applied:
         print("[Migration] Schema is up-to-date, no migrations needed")

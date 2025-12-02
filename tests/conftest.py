@@ -420,7 +420,7 @@ def smart_semantic_core(
 def google_keyring():
     """Тестовая конфигурация GoogleKeyring с моками ключей."""
     from semantic_core.domain import GoogleKeyring
-    
+
     return GoogleKeyring(
         default_key="MOCK_DEFAULT_KEY",
         batch_key="MOCK_BATCH_KEY",
@@ -431,7 +431,7 @@ def google_keyring():
 def google_keyring_no_batch():
     """GoogleKeyring без batch_key для тестирования валидации."""
     from semantic_core.domain import GoogleKeyring
-    
+
     return GoogleKeyring(
         default_key="MOCK_DEFAULT_KEY",
         batch_key=None,
@@ -441,65 +441,65 @@ def google_keyring_no_batch():
 @pytest.fixture
 def mock_batch_client(mock_embedder):
     """Mock клиент для Google Batch API (без реальных вызовов).
-    
+
     Эмулирует поведение GeminiBatchClient:
     - create_embedding_job -> возвращает mock job_id
     - get_job_status -> возвращает SUCCEEDED
     - retrieve_results -> возвращает фейковые векторы
     """
     import struct
-    
+
     class MockBatchClient:
         def __init__(self):
             self.jobs = {}  # {job_id: {"status": str, "chunks": list}}
             self._job_counter = 0
-        
+
         def create_embedding_job(self, chunks, context_texts=None):
             """Создаёт фейковое задание."""
             job_id = f"mock-batch-job-{self._job_counter}"
             self._job_counter += 1
-            
+
             self.jobs[job_id] = {
                 "status": "RUNNING",
                 "chunks": chunks,
                 "context_texts": context_texts or {},
             }
-            
+
             return job_id
-        
+
         def get_job_status(self, job_id):
             """Возвращает статус (по умолчанию SUCCEEDED)."""
             if job_id not in self.jobs:
                 return "FAILED"
             return self.jobs[job_id]["status"]
-        
+
         def set_job_status(self, job_id, status):
             """Вспомогательный метод для тестов - установить статус."""
             if job_id in self.jobs:
                 self.jobs[job_id]["status"] = status
-        
+
         def retrieve_results(self, job_id):
             """Возвращает фейковые векторы для чанков."""
             if job_id not in self.jobs:
                 raise RuntimeError(f"Job {job_id} not found")
-            
+
             job = self.jobs[job_id]
             if job["status"] != "SUCCEEDED":
                 raise RuntimeError(f"Job not completed: {job['status']}")
-            
+
             # Генерируем фейковые векторы через mock_embedder
             results = {}
             for chunk in job["chunks"]:
                 # Используем context_text если есть, иначе content
                 text = job["context_texts"].get(chunk.id, chunk.content)
                 vector = mock_embedder.embed_query(text)
-                
+
                 # Конвертируем в bytes
                 blob = struct.pack(f"{len(vector)}f", *vector.tolist())
                 results[chunk.id] = blob
-            
+
             return results
-    
+
     return MockBatchClient()
 
 
@@ -507,24 +507,23 @@ def mock_batch_client(mock_embedder):
 def batch_manager(google_keyring, in_memory_db, mock_batch_client):
     """BatchManager с mock клиентом для тестов."""
     from semantic_core import BatchManager, PeeweeVectorStore
-    
+
     store = PeeweeVectorStore(in_memory_db)
-    
+
     # Создаём менеджер и подменяем batch_client на мок
     manager = BatchManager(
         keyring=google_keyring,
         vector_store=store,
     )
-    
+
     # Подмена реального клиента на мок
     manager.batch_client = mock_batch_client
-    
+
     return manager
 
 
 def pytest_configure(config):
     """Регистрация custom markers."""
     config.addinivalue_line(
-        "markers", 
-        "real_api: Tests that make real API calls (expensive, slow)"
+        "markers", "real_api: Tests that make real API calls (expensive, slow)"
     )

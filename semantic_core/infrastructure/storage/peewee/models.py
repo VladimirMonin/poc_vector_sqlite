@@ -30,7 +30,7 @@ from peewee import (
 
 class BatchStatus(str, Enum):
     """Статусы батч-задания в жизненном цикле обработки.
-    
+
     Attributes:
         CREATED: Задание создано, но еще не отправлено в Google.
         SUBMITTED: JSONL файл загружен, задание отправлено.
@@ -38,7 +38,7 @@ class BatchStatus(str, Enum):
         COMPLETED: Обработка завершена, результаты доступны.
         FAILED: Критическая ошибка в обработке.
     """
-    
+
     CREATED = "CREATED"
     SUBMITTED = "SUBMITTED"
     PROCESSING = "PROCESSING"
@@ -48,13 +48,13 @@ class BatchStatus(str, Enum):
 
 class EmbeddingStatus(str, Enum):
     """Статусы векторизации чанка.
-    
+
     Attributes:
         READY: Вектор готов и сохранён в vec0.
         PENDING: Чанк в очереди на векторизацию.
         FAILED: Ошибка при получении вектора.
     """
-    
+
     READY = "READY"
     PENDING = "PENDING"
     FAILED = "FAILED"
@@ -95,9 +95,9 @@ class DocumentModel(BaseModel):
 
 class BatchJobModel(BaseModel):
     """Внутренняя ORM модель задания для батч-обработки.
-    
+
     Хранит состояние батч-задания в Google Cloud и статистику.
-    
+
     Attributes:
         id: UUID первичный ключ.
         google_job_id: Идентификатор задания в Google (например, batches/123...).
@@ -106,14 +106,14 @@ class BatchJobModel(BaseModel):
         created_at: Время создания задания.
         updated_at: Время последнего обновления статуса.
     """
-    
+
     id = TextField(primary_key=True)  # UUID
     google_job_id = TextField(null=True, unique=True)
     status = TextField(default=BatchStatus.CREATED.value)
     stats = TextField(default="{}")  # JSON строка
     created_at = DateTimeField(default=datetime.now)
     updated_at = DateTimeField(default=datetime.now)
-    
+
     class Meta:
         table_name = "batch_jobs"
 
@@ -150,7 +150,7 @@ class ChunkModel(BaseModel):
     chunk_type = TextField(default="text")  # text, code, table, image_ref
     language = TextField(null=True)  # Python, JavaScript и т.д.
     metadata = TextField()  # JSON строка
-    
+
     # Новые поля для батчинга (Phase 5)
     embedding_status = TextField(default=EmbeddingStatus.READY.value)
     batch_job = ForeignKeyField(
@@ -161,7 +161,7 @@ class ChunkModel(BaseModel):
         index=True,
     )
     error_message = TextField(null=True)
-    
+
     created_at = DateTimeField(default=datetime.now)
 
     class Meta:

@@ -150,7 +150,7 @@ class PeeweeVectorStore(BaseVectorStore):
                 # Проверяем статус эмбеддинга из metadata (для async режима)
                 embedding_status = chunk.metadata.get(
                     "_embedding_status",
-                    "READY"  # По умолчанию READY для sync режима
+                    "READY",  # По умолчанию READY для sync режима
                 )
 
                 # Создаём чанк
@@ -726,27 +726,27 @@ class PeeweeVectorStore(BaseVectorStore):
 
     def bulk_update_vectors(self, vectors_dict: dict[str, bytes]) -> int:
         """Массово обновляет векторы для чанков.
-        
+
         Используется для высокоскоростной записи результатов батч-обработки.
         Применяет executemany() для максимальной производительности.
-        
+
         Args:
             vectors_dict: Словарь {chunk_id -> vector_blob}.
                 chunk_id должен быть строковым представлением int ID.
-        
+
         Returns:
             Количество обновлённых чанков.
-        
+
         Raises:
             ValueError: Если словарь пустой.
             RuntimeError: Если произошла ошибка БД.
         """
         if not vectors_dict:
             raise ValueError("Словарь векторов не может быть пустым")
-        
+
         # Подготавливаем данные для executemany
         data = [(int(chunk_id), blob) for chunk_id, blob in vectors_dict.items()]
-        
+
         try:
             # Вставляем/обновляем векторы в vec0 таблице (по одному)
             with self.db.atomic():
@@ -755,11 +755,11 @@ class PeeweeVectorStore(BaseVectorStore):
                         "INSERT OR REPLACE INTO chunks_vec(id, embedding) VALUES (?, ?)",
                         (chunk_id, blob),
                     )
-                
+
                 # Обновляем статус чанков на READY
                 chunk_ids = [int(cid) for cid in vectors_dict.keys()]
                 placeholders = ",".join(["?"] * len(chunk_ids))
-                
+
                 self.db.execute_sql(
                     f"""
                     UPDATE chunks 
@@ -770,9 +770,9 @@ class PeeweeVectorStore(BaseVectorStore):
                     """,
                     chunk_ids,
                 )
-            
+
             return len(vectors_dict)
-        
+
         except Exception as e:
             self.db.rollback()
             raise RuntimeError(f"Ошибка при массовом обновлении векторов: {e}")
