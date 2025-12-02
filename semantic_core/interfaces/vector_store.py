@@ -43,6 +43,7 @@ class BaseVectorStore(ABC):
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
+        k: int = 60,
     ) -> list[SearchResult]:
         """Выполняет поиск документов.
 
@@ -52,6 +53,7 @@ class BaseVectorStore(ABC):
             filters: Словарь фильтров (metadata).
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
+            k: Константа для RRF алгоритма (по умолчанию 60).
 
         Returns:
             Список SearchResult с документами и скорами.

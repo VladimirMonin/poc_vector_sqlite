@@ -159,15 +159,17 @@ class PeeweeVectorStore(BaseVectorStore):
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
+        k: int = 60,
     ) -> list[SearchResult]:
         """Выполняет поиск документов.
 
         Args:
             query_vector: Вектор запроса (для векторного поиска).
             query_text: Текст запроса (для FTS).
-            filters: Словарь фильтров (metadata).
+            filters: Словарь фильтров по метаданным (например, {"category": "Python"}).
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
+            k: Константа для RRF алгоритма (по умолчанию 60).
 
         Returns:
             Список SearchResult с документами и скорами.
@@ -180,7 +182,7 @@ class PeeweeVectorStore(BaseVectorStore):
         elif mode == "fts":
             return self._fts_search(query_text, filters, limit)
         elif mode == "hybrid":
-            return self._hybrid_search(query_vector, query_text, filters, limit)
+            return self._hybrid_search(query_vector, query_text, filters, limit, k)
         else:
             raise ValueError(f"Неизвестный режим поиска: {mode}")
 
@@ -190,25 +192,49 @@ class PeeweeVectorStore(BaseVectorStore):
         filters: Optional[dict],
         limit: int,
     ) -> list[SearchResult]:
-        """Векторный поиск через sqlite-vec."""
+        """Векторный поиск через sqlite-vec.
+
+        Args:
+            query_vector: Вектор запроса.
+            filters: Фильтры по метаданным (JSON).
+            limit: Количество результатов.
+
+        Returns:
+            Список SearchResult.
+        """
         if query_vector is None:
             raise ValueError("Для векторного поиска нужен query_vector")
 
         blob = query_vector.tobytes()
 
+        # Формируем WHERE условия для фильтров
+        where_conditions = []
+        where_params = []
+        if filters:
+            for key, value in filters.items():
+                where_conditions.append(f"json_extract(d.metadata, '$.{key}') = ?")
+                where_params.append(value)
+
+        where_clause = (
+            f"AND {' AND '.join(where_conditions)}" if where_conditions else ""
+        )
+
         # Поиск через vec0
-        sql = """
+        sql = f"""
             SELECT
                 c.id as chunk_id,
                 c.document_id,
                 vec_distance_cosine(cv.embedding, ?) as distance
             FROM chunks_vec cv
             JOIN chunks c ON c.id = cv.id
+            JOIN documents d ON d.id = c.document_id
+            WHERE 1=1 {where_clause}
             ORDER BY distance
             LIMIT ?
         """
 
-        cursor = self.db.execute_sql(sql, (blob, limit))
+        params = [blob] + where_params + [limit]
+        cursor = self.db.execute_sql(sql, params)
         results = []
 
         for row in cursor.fetchall():
@@ -236,22 +262,45 @@ class PeeweeVectorStore(BaseVectorStore):
         filters: Optional[dict],
         limit: int,
     ) -> list[SearchResult]:
-        """Полнотекстовый поиск через FTS5."""
+        """Полнотекстовый поиск через FTS5.
+
+        Args:
+            query_text: Текст запроса.
+            filters: Фильтры по метаданным (JSON).
+            limit: Количество результатов.
+
+        Returns:
+            Список SearchResult.
+        """
         if not query_text:
             raise ValueError("Для FTS поиска нужен query_text")
 
-        sql = """
+        # Формируем WHERE условия для фильтров
+        where_conditions = []
+        where_params = []
+        if filters:
+            for key, value in filters.items():
+                where_conditions.append(f"json_extract(d.metadata, '$.{key}') = ?")
+                where_params.append(value)
+
+        where_clause = (
+            f"AND {' AND '.join(where_conditions)}" if where_conditions else ""
+        )
+
+        sql = f"""
             SELECT
                 d.id,
-                rank
+                fts.rank
             FROM documents_fts fts
             JOIN documents d ON d.id = fts.rowid
             WHERE documents_fts MATCH ?
-            ORDER BY rank
+            {where_clause}
+            ORDER BY fts.rank
             LIMIT ?
         """
 
-        cursor = self.db.execute_sql(sql, (query_text, limit))
+        params = [query_text] + where_params + [limit]
+        cursor = self.db.execute_sql(sql, params)
         results = []
 
         for row in cursor.fetchall():
@@ -276,16 +325,113 @@ class PeeweeVectorStore(BaseVectorStore):
         query_text: Optional[str],
         filters: Optional[dict],
         limit: int,
+        k: int = 60,
     ) -> list[SearchResult]:
-        """Гибридный поиск (RRF) - упрощённая версия."""
-        # TODO: Реализовать полноценный RRF алгоритм через CTE
-        # Пока возвращаем векторные результаты
-        if query_vector is not None:
-            return self._vector_search(query_vector, filters, limit)
-        elif query_text is not None:
-            return self._fts_search(query_text, filters, limit)
-        else:
+        """Гибридный поиск с RRF (Reciprocal Rank Fusion).
+
+        Алгоритм:
+        1. Выполняет векторный поиск (TOP 100).
+        2. Выполняет FTS поиск (TOP 100).
+        3. Объединяет через RRF: score = 1/(k+rank_vec) + 1/(k+rank_fts).
+        4. Возвращает TOP N по RRF score.
+
+        Args:
+            query_vector: Вектор запроса.
+            query_text: Текст запроса.
+            filters: Фильтры по метаданным.
+            limit: Итоговое количество результатов.
+            k: Константа RRF (обычно 60).
+
+        Returns:
+            Список SearchResult, отсортированный по RRF score.
+        """
+        if query_vector is None and query_text is None:
             raise ValueError("Нужен хотя бы один параметр: query_vector или query_text")
+
+        # Если только один метод, используем его напрямую
+        if query_vector is None:
+            return self._fts_search(query_text, filters, limit)
+        if query_text is None:
+            return self._vector_search(query_vector, filters, limit)
+
+        # Формируем WHERE условия для фильтров
+        where_conditions = []
+        where_params = []
+        if filters:
+            for key, value in filters.items():
+                # Фильтруем по metadata JSON
+                where_conditions.append(f"json_extract(main.metadata, '$.{key}') = ?")
+                where_params.append(value)
+
+        where_clause = (
+            f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
+        )
+
+        # Подготовка blob для векторного поиска
+        blob = query_vector.tobytes()
+
+        # SQL запрос с RRF через CTE
+        sql = f"""
+            WITH vector_results AS (
+                SELECT 
+                    c.document_id as doc_id,
+                    ROW_NUMBER() OVER (
+                        ORDER BY vec_distance_cosine(cv.embedding, ?)
+                    ) as rank
+                FROM chunks_vec cv
+                JOIN chunks c ON c.id = cv.id
+                JOIN documents main ON main.id = c.document_id
+                {where_clause}
+                LIMIT 100
+            ),
+            fts_results AS (
+                SELECT 
+                    main.id as doc_id,
+                    ROW_NUMBER() OVER (ORDER BY fts.rank) as rank
+                FROM documents_fts fts
+                JOIN documents main ON main.id = fts.rowid
+                WHERE documents_fts MATCH ?
+                {f"AND {' AND '.join(where_conditions)}" if where_conditions else ""}
+                LIMIT 100
+            ),
+            rrf_scores AS (
+                SELECT 
+                    COALESCE(v.doc_id, f.doc_id) as doc_id,
+                    (
+                        COALESCE(1.0 / (? + v.rank), 0.0) + 
+                        COALESCE(1.0 / (? + f.rank), 0.0)
+                    ) as rrf_score
+                FROM vector_results v
+                FULL OUTER JOIN fts_results f ON v.doc_id = f.doc_id
+            )
+            SELECT doc_id, rrf_score
+            FROM rrf_scores
+            ORDER BY rrf_score DESC
+            LIMIT ?
+        """
+
+        # Собираем параметры: blob, where_params, query_text, where_params, k, k, limit
+        params = [blob] + where_params + [query_text] + where_params + [k, k, limit]
+
+        cursor = self.db.execute_sql(sql, params)
+        results = []
+
+        for row in cursor.fetchall():
+            doc_id, rrf_score = row
+
+            # Загружаем документ
+            doc_model = DocumentModel.get_by_id(doc_id)
+            document = self._model_to_document(doc_model)
+
+            results.append(
+                SearchResult(
+                    document=document,
+                    score=rrf_score,
+                    match_type=MatchType.HYBRID,
+                )
+            )
+
+        return results
 
     def delete(self, document_id: int) -> int:
         """Удаляет документ и все его чанки.
