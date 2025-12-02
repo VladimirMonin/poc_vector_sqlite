@@ -12,11 +12,9 @@ class TestSemanticCoreImageIngestion:
     """Тесты ingest_image() в SemanticCore."""
 
     @pytest.fixture
-    def core_with_image_analyzer(
-        self, mock_embedder, media_db, mock_image_analyzer
-    ):
+    def core_with_image_analyzer(self, mock_embedder, media_db, mock_image_analyzer):
         """SemanticCore с настроенным image analyzer.
-        
+
         Использует media_db вместо in_memory_db для поддержки MediaTaskModel.
         """
         from semantic_core import (
@@ -208,9 +206,7 @@ class TestSemanticCoreMediaConfig:
         assert core.media_config is not None
         assert core.media_config.rpm_limit == 15  # Default
 
-    def test_custom_media_config(
-        self, mock_embedder, media_db, mock_image_analyzer
-    ):
+    def test_custom_media_config(self, mock_embedder, media_db, mock_image_analyzer):
         """Кастомный MediaConfig."""
         from semantic_core import (
             PeeweeVectorStore,

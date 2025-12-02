@@ -178,7 +178,7 @@ class TestMediaProcessingError:
     def test_chained_exception(self):
         """Можно chain с оригинальным исключением через raise."""
         original = ValueError("Original error")
-        
+
         try:
             raise MediaProcessingError("Wrapped") from original
         except MediaProcessingError as error:

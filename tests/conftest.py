@@ -621,9 +621,9 @@ def mock_image_analyzer(mock_analysis_result):
 @pytest.fixture
 def media_db(tmp_path):
     """БД с таблицей MediaTaskModel для тестов.
-    
+
     Использует init_peewee_database для загрузки sqlite-vec extension.
-    ВАЖНО: Сохраняем и восстанавливаем оригинальную БД моделей чтобы 
+    ВАЖНО: Сохраняем и восстанавливаем оригинальную БД моделей чтобы
     не влиять на другие тесты.
     """
     from semantic_core.infrastructure.storage.peewee.engine import init_peewee_database
@@ -645,20 +645,20 @@ def media_db(tmp_path):
 
     db_path = tmp_path / "test_media.db"
     db = init_peewee_database(str(db_path))
-    
+
     # Привязываем модели напрямую через _meta (как в PeeweeVectorStore)
     DocumentModel._meta.database = db
     ChunkModel._meta.database = db
     BatchJobModel._meta.database = db
     MediaTaskModel._meta.database = db
-    
+
     # Создаём таблицы
     db.create_tables([DocumentModel, ChunkModel, BatchJobModel, MediaTaskModel])
 
     yield db
 
     db.close()
-    
+
     # Восстанавливаем оригинальные БД для моделей
     for model, original_db in original_dbs.items():
         model._meta.database = original_db
