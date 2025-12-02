@@ -45,8 +45,8 @@ Production-ready библиотека для локального семанти
 - **Phase 2: Storage Layer** (`plan_phase_2.md`) — Peewee Adapter, Parent-Child схема. {DONE}
 - **Phase 3: Integration API** (`plan_phase_3.md`) — Дескрипторы `SemanticIndex`, DocumentBuilder. {DONE}
 - **Phase 3.1: Testing** (`plan_phase_3.1.md`) — Моки, Фикстуры, Unit/Integration тесты. {DONE}
-- **Phase 4: Smart Markdown** (`plan_phase_4.md`) — AST парсинг, Иерархический контекст. {WE ARE HERE}
-- **Phase 5: Async Batching** (`plan_phase_5.md`) — Очереди `BatchJob`, отложенная обработка. {PLANNED}
+- **Phase 4: Smart Markdown** (`plan_phase_4.md`) — AST парсинг, Иерархический контекст. {DONE}
+- **Phase 5: Async Batching** (`plan_phase_5.md`) — Очереди `BatchJob`, отложенная обработка. {WE ARE HERE}
 - **Phase 6: Multimodality** (`plan_phase_6.md`) — Vision стратегии, OCR, Media Processing. {PLANNED}
 
 ### 📂 Структура Проекта
