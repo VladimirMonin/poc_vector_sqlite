@@ -122,3 +122,27 @@ class BaseVectorStore(ABC):
             ValueError: Если не передан ни vector, ни text.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def bulk_update_vectors(self, vectors_dict: dict[str, bytes]) -> int:
+        """Массово обновляет векторы для чанков.
+        
+        Используется для высокоскоростной записи результатов батч-обработки.
+        Применяет executemany() для максимальной производительности.
+        
+        Args:
+            vectors_dict: Словарь {chunk_id -> vector_blob}.
+                chunk_id должен быть строковым представлением int ID.
+        
+        Returns:
+            Количество обновлённых чанков.
+        
+        Raises:
+            ValueError: Если словарь пустой.
+            RuntimeError: Если произошла ошибка БД.
+        
+        Examples:
+            >>> vectors = {"1": b"...", "2": b"..."}
+            >>> count = store.bulk_update_vectors(vectors)
+        """
+        raise NotImplementedError

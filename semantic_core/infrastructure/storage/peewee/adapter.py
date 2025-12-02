@@ -714,3 +714,59 @@ class PeeweeVectorStore(BaseVectorStore):
             media_type=MediaType(doc_model.media_type),
             created_at=doc_model.created_at,
         )
+
+    def bulk_update_vectors(self, vectors_dict: dict[str, bytes]) -> int:
+        """Массово обновляет векторы для чанков.
+        
+        Используется для высокоскоростной записи результатов батч-обработки.
+        Применяет executemany() для максимальной производительности.
+        
+        Args:
+            vectors_dict: Словарь {chunk_id -> vector_blob}.
+                chunk_id должен быть строковым представлением int ID.
+        
+        Returns:
+            Количество обновлённых чанков.
+        
+        Raises:
+            ValueError: Если словарь пустой.
+            RuntimeError: Если произошла ошибка БД.
+        """
+        if not vectors_dict:
+            raise ValueError("Словарь векторов не может быть пустым")
+        
+        # Подготавливаем данные для executemany
+        data = [(int(chunk_id), blob) for chunk_id, blob in vectors_dict.items()]
+        
+        try:
+            # Вставляем/обновляем векторы в vec0 таблице
+            cursor = self.db.execute_sql(
+                "INSERT OR REPLACE INTO chunks_vec(id, embedding) VALUES (?, ?)",
+                data,
+                commit=False,
+            )
+            
+            # Обновляем статус чанков на READY
+            chunk_ids = list(vectors_dict.keys())
+            placeholders = ",".join(["?"] * len(chunk_ids))
+            
+            self.db.execute_sql(
+                f"""
+                UPDATE chunks 
+                SET embedding_status = 'READY',
+                    batch_job_id = NULL,
+                    error_message = NULL
+                WHERE id IN ({placeholders})
+                """,
+                chunk_ids,
+                commit=False,
+            )
+            
+            # Коммитим транзакцию
+            self.db.commit()
+            
+            return len(vectors_dict)
+        
+        except Exception as e:
+            self.db.rollback()
+            raise RuntimeError(f"Ошибка при массовом обновлении векторов: {e}")
