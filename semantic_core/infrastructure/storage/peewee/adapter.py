@@ -152,9 +152,13 @@ class PeeweeVectorStore(BaseVectorStore):
 
                 chunk.id = chunk_model.id
 
-                # Сохраняем вектор
-                if chunk.vector is not None:
-                    blob = chunk.vector.tobytes()
+                # Сохраняем вектор (поддержка обеих версий: embedding и vector для обратной совместимости)
+                vector = getattr(chunk, 'vector', None)
+                if vector is None:
+                    vector = getattr(chunk, 'embedding', None)
+                    
+                if vector is not None:
+                    blob = vector.tobytes()
                     self.db.execute_sql(
                         "INSERT INTO chunks_vec(id, embedding) VALUES (?, ?)",
                         (chunk_model.id, blob),
