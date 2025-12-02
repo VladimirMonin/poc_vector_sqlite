@@ -1,56 +1,96 @@
-"""
-Semantic Core - переносимое ядро для семантического поиска.
+"""Semantic Core - библиотека для локального семантического поиска.
 
-Этот пакет обеспечивает:
-- Инициализацию SQLite с расширением sqlite-vec
-- Генерацию эмбеддингов через Google Gemini API
-- Нарезку текста на чанки с перекрытием
-- Сервисный слой для работы с Parent-Child документами
-- Миксин для добавления hybrid search в любую Peewee модель
+Архитектура:
+    Domain: Чистые DTO (Document, Chunk, SearchResult).
+    Interfaces: Контракты (BaseEmbedder, BaseVectorStore, etc.).
+    Infrastructure: Реализации (GeminiEmbedder, PeeweeVectorStore, etc.).
+    Pipeline: Оркестратор (SemanticCore).
+
+Пример:
+    >>> from semantic_core import SemanticCore
+    >>> from semantic_core.domain import Document
+    >>> from semantic_core.infrastructure.gemini import GeminiEmbedder
+    >>> from semantic_core.infrastructure.storage import (
+    ...     PeeweeVectorStore,
+    ...     init_peewee_database,
+    ... )
+    >>> from semantic_core.infrastructure.text_processing import (
+    ...     SimpleSplitter,
+    ...     BasicContextStrategy,
+    ... )
+    >>>
+    >>> # Настройка компонентов
+    >>> db = init_peewee_database("data.db")
+    >>> embedder = GeminiEmbedder(api_key="...")
+    >>> store = PeeweeVectorStore(db)
+    >>> splitter = SimpleSplitter()
+    >>> context = BasicContextStrategy()
+    >>>
+    >>> # Создание ядра
+    >>> core = SemanticCore(
+    ...     embedder=embedder,
+    ...     store=store,
+    ...     splitter=splitter,
+    ...     context_strategy=context,
+    ... )
+    >>>
+    >>> # Использование
+    >>> doc = Document(content="Текст", metadata={"title": "Тест"})
+    >>> core.ingest(doc)
+    >>> results = core.search("запрос")
 """
 
-from semantic_core.database import (
-    db,
-    init_database,
-    create_vector_table,
-    create_fts_table,
-)
-from semantic_core.embeddings import EmbeddingGenerator
-from semantic_core.search_mixin import HybridSearchMixin
-from semantic_core.text_processing import (
-    TextSplitter,
+# Domain Layer
+from semantic_core.domain import (
+    Document,
     Chunk,
-    SimpleTextSplitter,
+    SearchResult,
+    MediaType,
+    MatchType,
 )
-from semantic_core.services import (
-    save_note_with_chunks,
-    delete_note_with_chunks,
+
+# Interfaces Layer
+from semantic_core.interfaces import (
+    BaseEmbedder,
+    BaseVectorStore,
+    BaseSplitter,
+    BaseContextStrategy,
 )
-from semantic_core.search import (
-    vector_search_chunks,
-    fulltext_search_parents,
-    hybrid_search_rrf,
+
+# Infrastructure Layer
+from semantic_core.infrastructure.gemini import GeminiEmbedder
+from semantic_core.infrastructure.storage import (
+    PeeweeVectorStore,
+    init_peewee_database,
 )
+from semantic_core.infrastructure.text_processing import (
+    SimpleSplitter,
+    BasicContextStrategy,
+)
+
+# Pipeline Layer
+from semantic_core.pipeline import SemanticCore
 
 __all__ = [
-    # Database
-    "db",
-    "init_database",
-    "create_vector_table",
-    "create_fts_table",
-    # Embeddings
-    "EmbeddingGenerator",
-    # Search (legacy mixin)
-    "HybridSearchMixin",
-    # Search (Parent-Child functions)
-    "vector_search_chunks",
-    "fulltext_search_parents",
-    "hybrid_search_rrf",
-    # Text processing
-    "TextSplitter",
+    # Domain
+    "Document",
     "Chunk",
-    "SimpleTextSplitter",
-    # Services
-    "save_note_with_chunks",
-    "delete_note_with_chunks",
+    "SearchResult",
+    "MediaType",
+    "MatchType",
+    # Interfaces
+    "BaseEmbedder",
+    "BaseVectorStore",
+    "BaseSplitter",
+    "BaseContextStrategy",
+    # Infrastructure: Gemini
+    "GeminiEmbedder",
+    # Infrastructure: Storage
+    "PeeweeVectorStore",
+    "init_peewee_database",
+    # Infrastructure: Text Processing
+    "SimpleSplitter",
+    "BasicContextStrategy",
+    # Pipeline
+    "SemanticCore",
 ]
