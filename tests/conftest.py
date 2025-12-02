@@ -32,7 +32,7 @@ try:
     from semantic_core.embeddings import EmbeddingGenerator
     from semantic_core.text_processing import SimpleTextSplitter
     from domain.models import Note, NoteChunk, Category, Tag, NoteTag
-    
+
     OLD_API_AVAILABLE = True
 except ImportError:
     OLD_API_AVAILABLE = False
@@ -64,7 +64,7 @@ def test_db(temp_db_path):
     """
     if not OLD_API_AVAILABLE:
         pytest.skip("Старый API недоступен")
-    
+
     # Инициализируем БД
     database = init_database(temp_db_path)
     database.connect()
@@ -85,7 +85,7 @@ def test_db(temp_db_path):
         database.execute_sql("DROP TABLE IF EXISTS notes_fts")
     except Exception:
         pass  # Игнорируем ошибки при удалении виртуальных таблиц
-    
+
     database.drop_tables([NoteTag, NoteChunk, Note, Tag, Category], safe=True)
     database.close()
 
