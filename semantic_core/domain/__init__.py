@@ -15,11 +15,14 @@
         Перечисление типов медиа.
     MatchType
         Перечисление типов совпадения в поиске.
+    GoogleKeyring
+        Контейнер для API-ключей Google с разделением биллинга.
 """
 
 from semantic_core.domain.document import Document, MediaType
 from semantic_core.domain.chunk import Chunk, ChunkType
 from semantic_core.domain.search_result import SearchResult, ChunkResult, MatchType
+from semantic_core.domain.auth import GoogleKeyring
 
 __all__ = [
     "Document",
@@ -29,4 +32,5 @@ __all__ = [
     "SearchResult",
     "ChunkResult",
     "MatchType",
+    "GoogleKeyring",
 ]
