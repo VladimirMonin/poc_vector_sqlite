@@ -31,6 +31,7 @@ results = store.search(
 **Документ:** API Documentation (5000 строк, 15 chunks)
 
 **Chunks:**
+
 - Chunk 0-4: TEXT (описание API)
 - Chunk 5: CODE Python (метод authenticate)
 - Chunk 6-8: TEXT (примеры использования)
@@ -721,19 +722,23 @@ results = search_chunks_batch(
 ### Преимущества Granular Search
 
 ✅ **Точность**
+
 - Возвращаются только релевантные chunks
 - chunk_type фильтрация улучшает precision
 
 ✅ **Производительность**
+
 - Composite index: 10x speedup
 - Меньше данных передаётся (chunk vs document)
 
 ✅ **Гибкость**
+
 - Фильтрация по language
 - Фильтрация по chunk_type
 - Фильтрация по document metadata
 
 ✅ **User Experience**
+
 - Пользователь видит конкретный фрагмент
 - Breadcrumbs показывают контекст
 - Навигация к parent документу
@@ -741,16 +746,19 @@ results = search_chunks_batch(
 ### Архитектурные решения
 
 🏗️ **ChunkResult DTO**
+
 - Lightweight результат (chunk, не document)
 - Convenience properties для удобства
 - Parent metadata для контекста
 
 🗄️ **Schema Evolution**
+
 - Backward compatible (defaults для новых полей)
 - Composite index для performance
 - Extensible (легко добавить новые поля)
 
 🔍 **SQL Optimization**
+
 - Правильный JOIN pattern для sqlite-vec
 - Parameter binding без дублирования
 - Enum handling для type safety
@@ -760,16 +768,19 @@ results = search_chunks_batch(
 ## 🔗 Связь с другими сериями
 
 **Предыдущие:**
+
 - [15: Smart Parsing](15_smart_parsing.md) — откуда ChunkType и language
 - [16: Smart Splitting](16_smart_splitting.md) — как chunks создаются
 - [17: Hierarchical Context](17_hierarchical_context.md) — обогащение для embeddings
 
 **Базовые концепции:**
+
 - [03: SQLite-vec](03_sqlite_vec.md) — векторный поиск
 - [04: Search Types](04_search_types.md) — vector/fts/hybrid
 - [11: Storage Layer](11_storage_layer_phase2.md) — PeeweeVectorStore
 
 **Следующие фазы:**
+
 - Phase 5: FTS для chunks, Batch API
 - Phase 6: Vision API для IMAGE_REF chunks
 

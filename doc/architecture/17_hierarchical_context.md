@@ -35,6 +35,7 @@ vector = embedder.embed("The User model represents authenticated users. Fields: 
 ```
 
 **Проблема:** Вектор НЕ знает, что это про:
+
 - ❌ Database (а не Frontend)
 - ❌ Models (а не Controllers)
 - ❌ User (а не Product/Order)
@@ -91,6 +92,7 @@ class BaseContextStrategy(ABC):
 ```
 
 **Контракт:**
+
 - Вход: `Chunk` (с metadata) + `Document` (с metadata)
 - Выход: `str` (готовый текст для embedder)
 
@@ -199,6 +201,7 @@ class User(Model):
 ```
 
 **Зачем "Type: Python Code"?**
+
 - Embedder понимает, что это код (не текст)
 - Language указывает на Python (не JavaScript/SQL)
 - Улучшает релевантность при поиске "Python examples"
@@ -244,6 +247,7 @@ Source: /images/install_wizard.png
 ```
 
 **Phase 6 (Multimodality):**
+
 - Vision API получит этот контекст + изображение
 - OCR для скриншотов
 - Семантический поиск по содержимому изображений
@@ -268,6 +272,7 @@ def form_vector_text(self, chunk: Chunk, document: Document) -> str:
 ```
 
 **Откуда headers?**
+
 - Из серии 15: MarkdownNodeParser отслеживает иерархию
 - Из серии 16: SmartSplitter копирует headers в каждый chunk
 
@@ -706,16 +711,19 @@ Source: /images/install_step1.png
 ### Что даёт Hierarchical Context
 
 ✅ **Структурный контекст**
+
 - Breadcrumbs показывают положение в документе
 - Название документа даёт scope
 - Улучшает precision на 28%
 
 ✅ **Типизированное форматирование**
+
 - CODE: специальный формат с language
 - IMAGE_REF: alt-text и title для поиска
 - TEXT: Section breadcrumbs
 
 ✅ **Улучшение embeddings**
+
 - Embedder "видит" иерархию
 - Похожие chunks из разных разделов различаются
 - False positives снижаются на 67%
@@ -723,17 +731,20 @@ Source: /images/install_step1.png
 ### Архитектурные принципы
 
 🏗️ **Strategy Pattern**
+
 - Легко заменить на другую стратегию
 - Можно добавить SlidingWindowContext, ParentDocumentContext
 - Pluggable в SemanticIndex
 
 🔧 **Separation of Concerns**
+
 - Parser: структура
 - Splitter: размер
 - Context: обогащение
 - Embedder: векторизация
 
 📊 **Quality Improvement**
+
 - +28% precision
 - +26% recall
 - -67% false positives
@@ -743,13 +754,16 @@ Source: /images/install_step1.png
 ## 🔗 Связь с другими сериями
 
 **Предыдущие:**
+
 - [15: Smart Parsing](15_smart_parsing.md) — откуда headers
 - [16: Smart Splitting](16_smart_splitting.md) — как headers попадают в chunks
 
 **Следующие:**
+
 - [18: Granular Search](18_granular_search.md) — как enriched chunks используются для поиска
 
 **Базовые концепции:**
+
 - [01: Embeddings Basics](01_embeddings_basics.md) — что такое векторы
 - [02: Gemini API](02_gemini_api.md) — как работает embedder
 
