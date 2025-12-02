@@ -68,6 +68,9 @@ from semantic_core.infrastructure.text_processing import (
     BasicContextStrategy,
 )
 
+# Integration Layer
+from semantic_core.integrations import SemanticIndex
+
 # Pipeline Layer
 from semantic_core.pipeline import SemanticCore
 
@@ -91,6 +94,8 @@ __all__ = [
     # Infrastructure: Text Processing
     "SimpleSplitter",
     "BasicContextStrategy",
+    # Integration
+    "SemanticIndex",
     # Pipeline
     "SemanticCore",
 ]
