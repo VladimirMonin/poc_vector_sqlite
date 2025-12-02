@@ -47,7 +47,7 @@ def test_chunk_type_filtering(
 
     # Читаем evil.md
     content = evil_md_path.read_text()
-    
+
     # Act: создаём документ и разбиваем на чанки
     document = Document(content=content, metadata={"title": "Evil Test Cases"})
     chunks = splitter.split(document)
@@ -71,7 +71,9 @@ def test_chunk_type_filtering(
     assert len(code_results) > 0, "Должны быть найдены CODE чанки"
 
     for result in code_results:
-        assert result.chunk_type == ChunkType.CODE, f"Ожидался CODE, получен {result.chunk_type}"
+        assert result.chunk_type == ChunkType.CODE, (
+            f"Ожидался CODE, получен {result.chunk_type}"
+        )
 
         # Проверяем наличие метаданных родителя
         assert result.parent_doc_title == "Evil Test Cases"
@@ -174,9 +176,9 @@ def test_language_metadata_for_code(
     assert len(languages_found) > 0, "Должны быть обнаружены языки программирования"
 
     # evil.md должен содержать хотя бы один из этих языков
-    assert any(
-        lang in ["python", "javascript", "bash"] for lang in languages_found
-    ), f"Неожиданные языки: {languages_found}"
+    assert any(lang in ["python", "javascript", "bash"] for lang in languages_found), (
+        f"Неожиданные языки: {languages_found}"
+    )
 
 
 def test_chunk_index_sequential(

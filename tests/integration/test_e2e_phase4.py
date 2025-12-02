@@ -34,12 +34,12 @@ def phase3_doc(real_docs_path):
     path = real_docs_path / "phase_3" / "plan_phase_3.md"
     if not path.exists():
         pytest.skip(f"Документ не найден: {path}")
-    
+
     content = path.read_text(encoding="utf-8")
     return Document(
         id=None,
         content=content,
-        metadata={"source": "plan_phase_3.md", "phase": "3", "type": "plan"}
+        metadata={"source": "plan_phase_3.md", "phase": "3", "type": "plan"},
     )
 
 
@@ -49,12 +49,12 @@ def phase4_doc(real_docs_path):
     path = real_docs_path / "phase_4" / "plan_phase_4.md"
     if not path.exists():
         pytest.skip(f"Документ не найден: {path}")
-    
+
     content = path.read_text(encoding="utf-8")
     return Document(
         id=None,
         content=content,
-        metadata={"source": "plan_phase_4.md", "phase": "4", "type": "plan"}
+        metadata={"source": "plan_phase_4.md", "phase": "4", "type": "plan"},
     )
 
 
@@ -89,10 +89,7 @@ def parser():
 def splitter(parser):
     """Инициализирует SmartSplitter."""
     return SmartSplitter(
-        parser=parser,
-        chunk_size=500,
-        code_chunk_size=1000,
-        preserve_code=True
+        parser=parser, chunk_size=500, code_chunk_size=1000, preserve_code=True
     )
 
 
@@ -103,15 +100,10 @@ def context_strategy():
 
 
 def test_e2e_pipeline_phase3(
-    phase3_doc,
-    e2e_store,
-    mock_embedder,
-    parser,
-    splitter,
-    context_strategy
+    phase3_doc, e2e_store, mock_embedder, parser, splitter, context_strategy
 ):
     """E2E: Phase 3 план → парсинг → сплиттинг → контекст → индексация → поиск.
-    
+
     Проверяем:
         - Markdown парсится в иерархию нод
         - Ноды разбиваются на чанки с chunk_type
@@ -122,37 +114,35 @@ def test_e2e_pipeline_phase3(
     # 1. Сплиттинг (внутри уже вызывается parser.parse())
     chunks = splitter.split(phase3_doc)
     assert len(chunks) > 0, "Должны быть созданы чанки"
-    
+
     # Проверяем, что есть разные типы чанков
     chunk_types = {chunk.chunk_type for chunk in chunks}
     assert ChunkType.TEXT in chunk_types, "Должны быть TEXT чанки"
-    
+
     # 2. Добавление контекста
     for chunk in chunks:
         context_text = context_strategy.form_vector_text(chunk, phase3_doc)
         chunk.context = context_text
-    
+
     # Проверяем, что контекст добавлен
     for chunk in chunks:
         assert chunk.context is not None, "Контекст должен быть добавлен"
         assert len(chunk.context) > 0, "Контекст не должен быть пустым"
-    
+
     # 3. Генерация векторов
     for chunk in chunks:
         chunk.vector = mock_embedder.embed(chunk.content)
-    
+
     # 4. Индексация
     indexed_doc = e2e_store.save(phase3_doc, chunks)
     assert indexed_doc.id is not None, "Документ должен получить ID"
-    
+
     # 5. Поиск по chunk_type=CODE
     query_vector = np.random.rand(768).astype(np.float32)
     code_results = e2e_store.search_chunks(
-        query_vector=query_vector,
-        chunk_type_filter=ChunkType.CODE,
-        limit=10
+        query_vector=query_vector, chunk_type_filter=ChunkType.CODE, limit=10
     )
-    
+
     # Проверяем, что все результаты - CODE (если они есть)
     for result in code_results:
         assert result.chunk_type == ChunkType.CODE, "Должны быть только CODE чанки"
@@ -160,15 +150,10 @@ def test_e2e_pipeline_phase3(
 
 
 def test_e2e_pipeline_phase4(
-    phase4_doc,
-    e2e_store,
-    mock_embedder,
-    parser,
-    splitter,
-    context_strategy
+    phase4_doc, e2e_store, mock_embedder, parser, splitter, context_strategy
 ):
     """E2E: Phase 4 план → полный pipeline → проверка language фильтрации.
-    
+
     Проверяем:
         - Парсинг Phase 4 плана
         - Обнаружение Python кода
@@ -178,20 +163,20 @@ def test_e2e_pipeline_phase4(
     # 1. Сплиттинг
     chunks = splitter.split(phase4_doc)
     assert len(chunks) > 0
-    
+
     # 2. Контекст
     for chunk in chunks:
         context_text = context_strategy.form_vector_text(chunk, phase4_doc)
         chunk.context = context_text
-    
+
     # 3. Векторы
     for chunk in chunks:
         chunk.vector = mock_embedder.embed(chunk.content)
-    
+
     # 4. Индексация
     indexed_doc = e2e_store.save(phase4_doc, chunks)
     assert indexed_doc.id is not None
-    
+
     # 5. Проверяем, что есть Python чанки
     python_chunks = [c for c in chunks if c.language == "python"]
     if len(python_chunks) > 0:
@@ -201,9 +186,9 @@ def test_e2e_pipeline_phase4(
             query_vector=query_vector,
             chunk_type_filter=ChunkType.CODE,
             language_filter="python",
-            limit=10
+            limit=10,
         )
-        
+
         # Все результаты должны быть Python
         for result in python_results:
             assert result.language == "python", "Должны быть только Python чанки"
@@ -212,55 +197,51 @@ def test_e2e_pipeline_phase4(
 
 
 def test_e2e_multi_document_search(
-    phase3_doc,
-    phase4_doc,
-    e2e_store,
-    mock_embedder,
-    parser,
-    splitter,
-    context_strategy
+    phase3_doc, phase4_doc, e2e_store, mock_embedder, parser, splitter, context_strategy
 ):
     """E2E: Индексация двух документов → поиск по обоим.
-    
+
     Проверяем:
         - Оба документа индексируются
         - Поиск возвращает чанки из обоих документов
         - Фильтрация по метаданным (source) работает
     """
     all_chunks = []
-    
+
     # Индексируем оба документа
     for doc in [phase3_doc, phase4_doc]:
         chunks = splitter.split(doc)
-        
+
         for chunk in chunks:
             context_text = context_strategy.form_vector_text(chunk, doc)
             chunk.context = context_text
             chunk.vector = mock_embedder.embed(chunk.content)
-        
+
         e2e_store.save(doc, chunks)
         all_chunks.extend(chunks)
-    
+
     # Поиск по всем документам
     query_vector = np.random.rand(768).astype(np.float32)
-    all_results = e2e_store.search_chunks(
-        query_vector=query_vector,
-        limit=20
-    )
-    
+    all_results = e2e_store.search_chunks(query_vector=query_vector, limit=20)
+
     # Должны быть результаты из обоих документов
-    sources = {r.parent_metadata.get("source") for r in all_results if r.parent_metadata}
+    sources = {
+        r.parent_metadata.get("source") for r in all_results if r.parent_metadata
+    }
     assert len(sources) > 0, "Должны быть результаты из документов"
-    
+
     # Проверяем, что можем отфильтровать по source через parent_metadata
     phase3_chunks = [
-        r for r in all_results 
+        r
+        for r in all_results
         if r.parent_metadata and r.parent_metadata.get("source") == "plan_phase_3.md"
     ]
     phase4_chunks = [
-        r for r in all_results 
+        r
+        for r in all_results
         if r.parent_metadata and r.parent_metadata.get("source") == "plan_phase_4.md"
     ]
-    
-    assert len(phase3_chunks) + len(phase4_chunks) == len(all_results), \
+
+    assert len(phase3_chunks) + len(phase4_chunks) == len(all_results), (
         "Все результаты должны быть из известных источников"
+    )

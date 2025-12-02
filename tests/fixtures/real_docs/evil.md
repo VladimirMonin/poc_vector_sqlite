@@ -19,14 +19,14 @@ def function():
 Список с кодом внутри:
 
 1. Первый пункт списка
-   
+
    ```bash
    echo "Code inside list"
    # Comment with ## H2 inside bash
    ```
 
 2. Второй пункт списка
-   
+
    Текст внутри пункта.
 
 <!-- HTML комментарий -->
@@ -34,7 +34,7 @@ def function():
 #### H4 Deep Level
 
 > Цитата с кодом:
-> 
+>
 > ```javascript
 > console.log("Code in blockquote");
 > ```

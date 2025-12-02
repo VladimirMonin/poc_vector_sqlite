@@ -365,7 +365,7 @@ def evil_md_content(evil_md_path):
 def markdown_parser():
     """Экземпляр MarkdownNodeParser для тестов."""
     from semantic_core.processing.parsers.markdown_parser import MarkdownNodeParser
-    
+
     return MarkdownNodeParser()
 
 
@@ -373,7 +373,7 @@ def markdown_parser():
 def smart_splitter(markdown_parser):
     """Экземпляр SmartSplitter с MarkdownNodeParser."""
     from semantic_core.processing.splitters.smart_splitter import SmartSplitter
-    
+
     return SmartSplitter(
         parser=markdown_parser,
         chunk_size=1000,
@@ -388,22 +388,24 @@ def hierarchical_context():
     from semantic_core.processing.context.hierarchical_strategy import (
         HierarchicalContextStrategy,
     )
-    
+
     return HierarchicalContextStrategy(include_doc_title=True)
 
 
 @pytest.fixture
-def smart_semantic_core(mock_embedder, in_memory_db, smart_splitter, hierarchical_context):
+def smart_semantic_core(
+    mock_embedder, in_memory_db, smart_splitter, hierarchical_context
+):
     """SemanticCore с умным парсингом для Phase 4 тестов."""
     from semantic_core import PeeweeVectorStore, SemanticCore
-    
+
     store = PeeweeVectorStore(in_memory_db)
-    
+
     core = SemanticCore(
         embedder=mock_embedder,
         store=store,
         splitter=smart_splitter,
         context_strategy=hierarchical_context,
     )
-    
+
     return core

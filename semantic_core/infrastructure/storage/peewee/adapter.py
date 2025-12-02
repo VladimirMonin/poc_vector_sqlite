@@ -159,10 +159,10 @@ class PeeweeVectorStore(BaseVectorStore):
                 chunk.id = chunk_model.id
 
                 # Сохраняем вектор (поддержка обеих версий: embedding и vector для обратной совместимости)
-                vector = getattr(chunk, 'vector', None)
+                vector = getattr(chunk, "vector", None)
                 if vector is None:
-                    vector = getattr(chunk, 'embedding', None)
-                    
+                    vector = getattr(chunk, "embedding", None)
+
                 if vector is not None:
                     blob = vector.tobytes()
                     self.db.execute_sql(
@@ -616,7 +616,11 @@ class PeeweeVectorStore(BaseVectorStore):
         if chunk_type_filter:
             filter_conditions.append("c.chunk_type = ?")
             # Конвертируем ChunkType enum в строку для SQL
-            chunk_type_value = chunk_type_filter.value if hasattr(chunk_type_filter, 'value') else chunk_type_filter
+            chunk_type_value = (
+                chunk_type_filter.value
+                if hasattr(chunk_type_filter, "value")
+                else chunk_type_filter
+            )
             params.append(chunk_type_value)
 
         # Фильтр по языку
