@@ -3,6 +3,7 @@
 Классы:
     MediaQueueProcessor
         Обрабатывает задачи из очереди с Rate Limiting.
+        Роутит на нужный анализатор по типу медиа.
 """
 
 import json
@@ -15,29 +16,43 @@ from semantic_core.domain.media import (
     MediaResource,
     MediaRequest,
     MediaAnalysisResult,
+    VideoAnalysisConfig,
 )
 from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+from semantic_core.infrastructure.media.utils.audio import is_audio_supported
+from semantic_core.infrastructure.media.utils.video import is_video_supported
 
 if TYPE_CHECKING:
     from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
+    from semantic_core.infrastructure.gemini.audio_analyzer import GeminiAudioAnalyzer
+    from semantic_core.infrastructure.gemini.video_analyzer import GeminiVideoAnalyzer
     from semantic_core.infrastructure.gemini.rate_limiter import RateLimiter
 
 
 class MediaQueueProcessor:
     """Обработчик очереди медиа-задач.
 
-    Извлекает pending задачи из БД, анализирует их через Gemini,
-    и сохраняет результаты.
+    Извлекает pending задачи из БД, роутит на нужный анализатор
+    по mime-type, и сохраняет результаты.
+
+    Поддерживаемые типы:
+    - image/* → GeminiImageAnalyzer
+    - audio/* → GeminiAudioAnalyzer
+    - video/* → GeminiVideoAnalyzer
 
     Attributes:
-        analyzer: Анализатор изображений.
+        image_analyzer: Анализатор изображений.
+        audio_analyzer: Анализатор аудио (опционально).
+        video_analyzer: Анализатор видео (опционально).
         rate_limiter: Rate Limiter для контроля RPM.
         embedder: Опциональный embedder для создания чанков.
         store: Опциональный VectorStore для сохранения чанков.
 
     Пример использования:
         >>> processor = MediaQueueProcessor(
-        ...     analyzer=analyzer,
+        ...     image_analyzer=image_analyzer,
+        ...     audio_analyzer=audio_analyzer,
+        ...     video_analyzer=video_analyzer,
         ...     rate_limiter=limiter,
         ... )
         >>> processed = processor.process_batch(max_tasks=10)
@@ -46,23 +61,35 @@ class MediaQueueProcessor:
 
     def __init__(
         self,
-        analyzer: "GeminiImageAnalyzer",
+        image_analyzer: "GeminiImageAnalyzer",
         rate_limiter: "RateLimiter",
+        audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
+        video_analyzer: Optional["GeminiVideoAnalyzer"] = None,
+        video_config: Optional[VideoAnalysisConfig] = None,
         embedder=None,
         store=None,
     ):
         """Инициализация процессора.
 
         Args:
-            analyzer: Анализатор изображений.
+            image_analyzer: Анализатор изображений (обязательный).
             rate_limiter: Rate Limiter для API.
+            audio_analyzer: Анализатор аудио (опциональный).
+            video_analyzer: Анализатор видео (опциональный).
+            video_config: Конфигурация для видео-анализа.
             embedder: Опциональный embedder (для создания векторов).
             store: Опциональный VectorStore (для сохранения чанков).
         """
-        self.analyzer = analyzer
+        self.image_analyzer = image_analyzer
+        self.audio_analyzer = audio_analyzer
+        self.video_analyzer = video_analyzer
+        self.video_config = video_config or VideoAnalysisConfig()
         self.rate_limiter = rate_limiter
         self.embedder = embedder
         self.store = store
+
+        # Для обратной совместимости
+        self.analyzer = image_analyzer
 
     def process_one(self) -> bool:
         """Обрабатывает одну задачу из очереди.
@@ -86,8 +113,8 @@ class MediaQueueProcessor:
             # Конвертируем в request
             request = self._to_request(task)
 
-            # Анализируем
-            result = self.analyzer.analyze(request)
+            # Роутим на нужный анализатор по mime-type
+            result = self._route_and_analyze(request, task.mime_type)
 
             # Сохраняем результат
             self._save_result(task.id, result)
@@ -98,6 +125,43 @@ class MediaQueueProcessor:
             # Обновляем статус с ошибкой
             self._update_status(task.id, TaskStatus.FAILED, error=str(e))
             return True
+
+    def _route_and_analyze(
+        self,
+        request: MediaRequest,
+        mime_type: str,
+    ) -> MediaAnalysisResult:
+        """Роутит запрос на нужный анализатор по mime-type.
+
+        Args:
+            request: Запрос на анализ.
+            mime_type: MIME-тип медиа.
+
+        Returns:
+            Результат анализа.
+
+        Raises:
+            ValueError: Если тип медиа не поддерживается.
+        """
+        if is_audio_supported(mime_type):
+            if self.audio_analyzer is None:
+                raise ValueError(
+                    f"Audio analyzer not configured, cannot process {mime_type}"
+                )
+            return self.audio_analyzer.analyze(request)
+
+        elif is_video_supported(mime_type):
+            if self.video_analyzer is None:
+                raise ValueError(
+                    f"Video analyzer not configured, cannot process {mime_type}"
+                )
+            return self.video_analyzer.analyze(request, self.video_config)
+
+        elif mime_type.startswith("image/"):
+            return self.image_analyzer.analyze(request)
+
+        else:
+            raise ValueError(f"Unsupported media type: {mime_type}")
 
     def process_batch(self, max_tasks: int = 10) -> int:
         """Обрабатывает пачку задач.
@@ -133,7 +197,7 @@ class MediaQueueProcessor:
         try:
             self.rate_limiter.wait()
             request = self._to_request(task)
-            result = self.analyzer.analyze(request)
+            result = self._route_and_analyze(request, task.mime_type)
             self._save_result(task.id, result)
             return True
         except Exception as e:
@@ -222,14 +286,26 @@ class MediaQueueProcessor:
             result: Результат анализа.
             chunk_id: ID созданного чанка (опционально).
         """
-        MediaTaskModel.update(
-            {
-                "status": TaskStatus.COMPLETED.value,
-                "result_description": result.description,
-                "result_alt_text": result.alt_text,
-                "result_keywords": json.dumps(result.keywords),
-                "result_ocr_text": result.ocr_text,
-                "result_chunk_id": chunk_id,
-                "processed_at": datetime.now(),
-            }
-        ).where(MediaTaskModel.id == task_id).execute()
+        update_data = {
+            "status": TaskStatus.COMPLETED.value,
+            "result_description": result.description,
+            "result_alt_text": result.alt_text,
+            "result_keywords": json.dumps(result.keywords),
+            "result_ocr_text": result.ocr_text,
+            "result_chunk_id": chunk_id,
+            "processed_at": datetime.now(),
+        }
+
+        # Audio/Video fields (Phase 6.2)
+        if result.transcription:
+            update_data["result_transcription"] = result.transcription
+        if result.participants:
+            update_data["result_participants"] = json.dumps(result.participants)
+        if result.action_items:
+            update_data["result_action_items"] = json.dumps(result.action_items)
+        if result.duration_seconds:
+            update_data["result_duration_seconds"] = result.duration_seconds
+
+        MediaTaskModel.update(update_data).where(
+            MediaTaskModel.id == task_id
+        ).execute()

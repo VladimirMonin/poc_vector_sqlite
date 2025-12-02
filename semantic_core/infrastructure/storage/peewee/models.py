@@ -194,6 +194,10 @@ class MediaTaskModel(BaseModel):
         result_alt_text: Alt-текст из анализа.
         result_keywords: JSON массив ключевых слов.
         result_ocr_text: Распознанный текст.
+        result_transcription: Транскрипция аудио/видео (Phase 6.2).
+        result_participants: JSON массив участников (Phase 6.2).
+        result_action_items: JSON массив задач (Phase 6.2).
+        result_duration_seconds: Длительность медиа (Phase 6.2).
         result_chunk_id: ID созданного чанка.
         created_at: Время создания.
         processed_at: Время обработки.
@@ -212,11 +216,17 @@ class MediaTaskModel(BaseModel):
     status = CharField(default="pending")
     error_message = TextField(null=True)
 
-    # Результат
+    # Результат — Image fields
     result_description = TextField(null=True)
     result_alt_text = TextField(null=True)
     result_keywords = TextField(null=True)  # JSON array
     result_ocr_text = TextField(null=True)
+
+    # Результат — Audio/Video fields (Phase 6.2)
+    result_transcription = TextField(null=True)
+    result_participants = TextField(null=True)  # JSON array
+    result_action_items = TextField(null=True)  # JSON array
+    result_duration_seconds = IntegerField(null=True)
 
     # Связь с результирующим чанком
     result_chunk_id = IntegerField(null=True)
