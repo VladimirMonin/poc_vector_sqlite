@@ -330,3 +330,82 @@ def create_test_model(in_memory_db, semantic_core):
     # Cleanup: удаляем все созданные таблицы
     if created_models:
         in_memory_db.drop_tables(created_models, safe=True)
+
+
+# ============================================================================
+# Фикстуры для Phase 4 (Smart Parsing & Granular Search)
+# ============================================================================
+
+
+@pytest.fixture
+def fixtures_dir():
+    """Путь к директории с test fixtures."""
+    return Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def real_docs_dir(fixtures_dir):
+    """Путь к директории с реальными документами для тестирования."""
+    return fixtures_dir / "real_docs"
+
+
+@pytest.fixture
+def evil_md_path(real_docs_dir):
+    """Путь к evil.md с edge cases."""
+    return real_docs_dir / "evil.md"
+
+
+@pytest.fixture
+def evil_md_content(evil_md_path):
+    """Содержимое evil.md."""
+    return evil_md_path.read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def markdown_parser():
+    """Экземпляр MarkdownNodeParser для тестов."""
+    from semantic_core.processing.parsers.markdown_parser import MarkdownNodeParser
+
+    return MarkdownNodeParser()
+
+
+@pytest.fixture
+def smart_splitter(markdown_parser):
+    """Экземпляр SmartSplitter с MarkdownNodeParser."""
+    from semantic_core.processing.splitters.smart_splitter import SmartSplitter
+
+    return SmartSplitter(
+        parser=markdown_parser,
+        chunk_size=1000,
+        code_chunk_size=2000,
+        preserve_code=True,
+    )
+
+
+@pytest.fixture
+def hierarchical_context():
+    """Экземпляр HierarchicalContextStrategy для тестов."""
+    from semantic_core.processing.context.hierarchical_strategy import (
+        HierarchicalContextStrategy,
+    )
+
+    return HierarchicalContextStrategy(include_doc_title=True)
+
+
+@pytest.fixture
+def smart_semantic_core(
+    mock_embedder, in_memory_db, smart_splitter, hierarchical_context
+):
+    """SemanticCore с умным парсингом для Phase 4 тестов."""
+    from semantic_core import PeeweeVectorStore, SemanticCore
+
+    store = PeeweeVectorStore(in_memory_db)
+
+    core = SemanticCore(
+        embedder=mock_embedder,
+        store=store,
+        splitter=smart_splitter,
+        context_strategy=hierarchical_context,
+    )
+
+    return core

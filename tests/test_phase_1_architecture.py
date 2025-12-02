@@ -277,10 +277,10 @@ class TestSOLIDPrinciples:
         ]
         assert len(embedder_methods) == 2
 
-        # BaseVectorStore имеет только 4 метода (save, search, delete, delete_by_metadata)
+        # BaseVectorStore имеет только 5 методов (save, search, delete, delete_by_metadata, search_chunks)
         store_methods = [
             m
             for m in dir(BaseVectorStore)
             if not m.startswith("_") and callable(getattr(BaseVectorStore, m))
         ]
-        assert len(store_methods) == 4
+        assert len(store_methods) == 5

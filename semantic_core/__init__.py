@@ -44,7 +44,9 @@
 from semantic_core.domain import (
     Document,
     Chunk,
+    ChunkType,
     SearchResult,
+    ChunkResult,
     MediaType,
     MatchType,
 )
@@ -55,6 +57,8 @@ from semantic_core.interfaces import (
     BaseVectorStore,
     BaseSplitter,
     BaseContextStrategy,
+    DocumentParser,
+    ParsingSegment,
 )
 
 # Infrastructure Layer
@@ -68,6 +72,13 @@ from semantic_core.infrastructure.text_processing import (
     BasicContextStrategy,
 )
 
+# Processing Layer (Phase 4)
+from semantic_core.processing import (
+    MarkdownNodeParser,
+    SmartSplitter,
+    HierarchicalContextStrategy,
+)
+
 # Integration Layer
 from semantic_core.integrations import SemanticIndex
 
@@ -78,7 +89,9 @@ __all__ = [
     # Domain
     "Document",
     "Chunk",
+    "ChunkType",
     "SearchResult",
+    "ChunkResult",
     "MediaType",
     "MatchType",
     # Interfaces
@@ -86,6 +99,8 @@ __all__ = [
     "BaseVectorStore",
     "BaseSplitter",
     "BaseContextStrategy",
+    "DocumentParser",
+    "ParsingSegment",
     # Infrastructure: Gemini
     "GeminiEmbedder",
     # Infrastructure: Storage
@@ -94,6 +109,10 @@ __all__ = [
     # Infrastructure: Text Processing
     "SimpleSplitter",
     "BasicContextStrategy",
+    # Processing: Phase 4
+    "MarkdownNodeParser",
+    "SmartSplitter",
+    "HierarchicalContextStrategy",
     # Integration
     "SemanticIndex",
     # Pipeline

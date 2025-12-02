@@ -7,7 +7,7 @@
 
 from typing import Any, Optional, TYPE_CHECKING
 
-from semantic_core.domain import SearchResult
+from semantic_core.domain import SearchResult, ChunkResult
 
 if TYPE_CHECKING:
     from semantic_core.pipeline import SemanticCore
@@ -129,6 +129,61 @@ class SearchProxy:
         )
 
         return self._results_to_objects(results)
+
+    def chunks(
+        self,
+        query: str,
+        limit: int = 10,
+        mode: str = "hybrid",
+        k: int = 60,
+        chunk_type: Optional[str] = None,
+        **filters: Any,
+    ) -> list[ChunkResult]:
+        """Выполняет гранулярный поиск отдельных чанков.
+
+        В отличие от обычных методов поиска, которые возвращают
+        целые документы (ORM объекты), этот метод возвращает
+        конкретные фрагменты с их контекстом.
+
+        Args:
+            query: Поисковый запрос.
+            limit: Максимальное количество результатов.
+            mode: Режим поиска ('vector', 'fts', 'hybrid').
+            k: Константа для RRF алгоритма.
+            chunk_type: Фильтр по типу чанка ('text', 'code', 'table', 'image_ref').
+            **filters: Фильтры по метаданным документа.
+
+        Returns:
+            Список ChunkResult.
+
+        Raises:
+            ValueError: Если query пустой.
+
+        Example:
+            >>> # Найти только блоки кода Python
+            >>> code_chunks = Article.search.chunks(
+            ...     "сортировка списка",
+            ...     chunk_type="code",
+            ...     limit=5
+            ... )
+            >>> for chunk_result in code_chunks:
+            ...     print(f"Язык: {chunk_result.chunk.language}")
+            ...     print(f"Код: {chunk_result.chunk.content}")
+            ...     print(f"Из: {chunk_result.parent_doc_title}")
+        """
+        results = self.core.storage.search_chunks(
+            query_vector=self.core.embedder.embed_query(query)
+            if mode in ("vector", "hybrid")
+            else None,
+            query_text=query if mode in ("fts", "hybrid") else None,
+            filters=filters or None,
+            limit=limit,
+            mode=mode,
+            k=k,
+            chunk_type_filter=chunk_type,
+        )
+
+        return results
 
     def _results_to_objects(
         self, results: list[SearchResult]

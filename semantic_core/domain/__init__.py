@@ -5,8 +5,12 @@
         Представление исходного документа.
     Chunk
         Фрагмент документа для векторного поиска.
+    ChunkType
+        Перечисление типов контента в чанке.
     SearchResult
-        Унифицированный результат поиска.
+        Унифицированный результат поиска (документ).
+    ChunkResult
+        Результат гранулярного поиска (отдельный чанк).
     MediaType
         Перечисление типов медиа.
     MatchType
@@ -14,13 +18,15 @@
 """
 
 from semantic_core.domain.document import Document, MediaType
-from semantic_core.domain.chunk import Chunk
-from semantic_core.domain.search_result import SearchResult, MatchType
+from semantic_core.domain.chunk import Chunk, ChunkType
+from semantic_core.domain.search_result import SearchResult, ChunkResult, MatchType
 
 __all__ = [
     "Document",
     "MediaType",
     "Chunk",
+    "ChunkType",
     "SearchResult",
+    "ChunkResult",
     "MatchType",
 ]

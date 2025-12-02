@@ -65,6 +65,8 @@ class ChunkModel(BaseModel):
         document: Ссылка на родительский документ.
         chunk_index: Порядковый номер чанка.
         content: Текст фрагмента.
+        chunk_type: Тип контента (text/code/table/image_ref).
+        language: Язык программирования для блоков кода.
         metadata: JSON строка с метаданными чанка.
         created_at: Дата создания.
     """
@@ -78,6 +80,8 @@ class ChunkModel(BaseModel):
     )
     chunk_index = IntegerField()
     content = TextField()
+    chunk_type = TextField(default="text")  # text, code, table, image_ref
+    language = TextField(null=True)  # Python, JavaScript и т.д.
     metadata = TextField()  # JSON строка
     created_at = DateTimeField(default=datetime.now)
 
@@ -85,4 +89,5 @@ class ChunkModel(BaseModel):
         table_name = "chunks"
         indexes = (
             (("document", "chunk_index"), True),  # Уникальная пара
+            (("chunk_type",), False),  # Индекс для фильтрации по типу
         )
