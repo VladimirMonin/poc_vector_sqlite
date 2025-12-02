@@ -37,13 +37,13 @@ Production-ready библиотека для локального семанти
 
 Детали реализации смотри в соответствующих файлах планов в подпапках.:
 
-* **Phase 1: Core & Contracts** (`plan_phase_1.md`) — DTO, Интерфейсы, Базовая структура.
-* **Phase 2: Storage Layer** (`plan_phase_2.md`) — Peewee Adapter, Parent-Child схема.
-* **Phase 3: Integration API** (`plan_phase_3.md`) — Дескрипторы `SemanticIndex`, DocumentBuilder.
-* **Phase 3.1: Testing** (`plan_phase_3.1.md`) — Моки, Фикстуры, Unit/Integration тесты.
-* **Phase 4: Smart Markdown** (`plan_phase_4.md`) — AST парсинг, Иерархический контекст.
-* **Phase 5: Async Batching** (`plan_phase_5.md`) — Очереди `BatchJob`, отложенная обработка.
-* **Phase 6: Multimodality** (`plan_phase_6.md`) — Vision стратегии, OCR, Media Processing.
+* **Phase 1: Core & Contracts** (`plan_phase_1.md`) — DTO, Интерфейсы, Базовая структура. {DONE}
+* **Phase 2: Storage Layer** (`plan_phase_2.md`) — Peewee Adapter, Parent-Child схема. {WE ARE HERE}
+* **Phase 3: Integration API** (`plan_phase_3.md`) — Дескрипторы `SemanticIndex`, DocumentBuilder. {PLANNED}
+* **Phase 3.1: Testing** (`plan_phase_3.1.md`) — Моки, Фикстуры, Unit/Integration тесты. {PLANNED}
+* **Phase 4: Smart Markdown** (`plan_phase_4.md`) — AST парсинг, Иерархический контекст. {PLANNED}
+* **Phase 5: Async Batching** (`plan_phase_5.md`) — Очереди `BatchJob`, отложенная обработка. {PLANNED}
+* **Phase 6: Multimodality** (`plan_phase_6.md`) — Vision стратегии, OCR, Media Processing. {PLANNED}
 
 ### 📂 Структура Проекта
 ```text
