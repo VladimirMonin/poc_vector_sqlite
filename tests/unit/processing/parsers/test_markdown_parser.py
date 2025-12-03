@@ -350,7 +350,9 @@ class TestMediaTypeDetectionFunction:
 
     def test_relative_path_with_dots(self):
         """Относительный путь с точками обрабатывается корректно."""
-        assert _get_media_type_by_extension("../audio/speech.mp3") == ChunkType.AUDIO_REF
+        assert (
+            _get_media_type_by_extension("../audio/speech.mp3") == ChunkType.AUDIO_REF
+        )
         assert _get_media_type_by_extension("./video/demo.mp4") == ChunkType.VIDEO_REF
 
 

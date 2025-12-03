@@ -534,9 +534,10 @@ class TestMarkdownAudioVideoLinks:
         # Обычная ссылка на картинку не создаёт медиа-сегмент
         # (только ![](path) синтаксис создаёт IMAGE_REF)
         media_segments = [
-            s for s in segments if s.segment_type in (
-                ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF
-            )
+            s
+            for s in segments
+            if s.segment_type
+            in (ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF)
         ]
         assert len(media_segments) == 0
 

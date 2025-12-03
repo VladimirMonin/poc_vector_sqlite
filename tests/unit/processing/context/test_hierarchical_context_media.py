@@ -220,7 +220,12 @@ class TestHierarchicalContextVideoEnriched:
                 "_enriched": True,
                 "_original_path": "video/oauth_demo.mp4",
                 "_video_transcription": "Здесь мы видим sequence diagram авторизации",
-                "_video_keywords": ["OAuth", "Django", "авторизация", "sequence diagram"],
+                "_video_keywords": [
+                    "OAuth",
+                    "Django",
+                    "авторизация",
+                    "sequence diagram",
+                ],
                 "_video_ocr": "OAuth 2.0 Authorization Code Flow",
                 "_video_duration": 35.0,
             },
@@ -366,7 +371,11 @@ class TestHierarchicalContextMediaCommon:
         """Все медиа-типы содержат 'Section:' с breadcrumbs."""
         headers = ["Chapter 1", "Section A"]
 
-        for chunk_type in [ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF]:
+        for chunk_type in [
+            ChunkType.IMAGE_REF,
+            ChunkType.AUDIO_REF,
+            ChunkType.VIDEO_REF,
+        ]:
             chunk = Chunk(
                 content="path/to/media.ext",
                 chunk_index=0,
@@ -380,7 +389,11 @@ class TestHierarchicalContextMediaCommon:
 
     def test_all_media_types_include_document_title(self, strategy, document):
         """Все медиа-типы содержат 'Document:' заголовок."""
-        for chunk_type in [ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF]:
+        for chunk_type in [
+            ChunkType.IMAGE_REF,
+            ChunkType.AUDIO_REF,
+            ChunkType.VIDEO_REF,
+        ]:
             chunk = Chunk(
                 content="path/to/media.ext",
                 chunk_index=0,

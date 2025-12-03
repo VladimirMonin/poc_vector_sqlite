@@ -503,9 +503,7 @@ class TestMediaEnrichmentDatabase:
 class TestMediaEdgeCases:
     """Edge cases обработки медиа."""
 
-    def test_url_media_skipped(
-        self, semantic_core_with_analyzers
-    ):
+    def test_url_media_skipped(self, semantic_core_with_analyzers):
         """HTTP URL → пропускается (не локальный файл)."""
         md = """
 # Test
@@ -519,9 +517,7 @@ class TestMediaEdgeCases:
         # Анализатор не должен вызываться для URL
         semantic_core_with_analyzers.image_analyzer.analyze.assert_not_called()
 
-    def test_data_uri_skipped(
-        self, semantic_core_with_analyzers
-    ):
+    def test_data_uri_skipped(self, semantic_core_with_analyzers):
         """data: URI → пропускается."""
         md = """
 # Test
