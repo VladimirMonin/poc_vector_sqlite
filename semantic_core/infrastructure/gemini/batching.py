@@ -13,19 +13,42 @@ import struct
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
+from uuid import uuid4
 
 from semantic_core.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Проверяем доступность нового SDK (google-genai)
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types as genai_types
 
-    GENAI_AVAILABLE = True
+    GENAI_SDK_AVAILABLE = True
 except ImportError:
-    GENAI_AVAILABLE = False
+    GENAI_SDK_AVAILABLE = False
 
 from semantic_core.domain import Chunk
+
+
+# Маппинг статусов Google Batch API -> наши внутренние статусы
+GOOGLE_STATUS_MAP = {
+    "JOB_STATE_QUEUED": "QUEUED",
+    "JOB_STATE_PENDING": "QUEUED",
+    "JOB_STATE_RUNNING": "RUNNING",
+    "JOB_STATE_SUCCEEDED": "SUCCEEDED",
+    "JOB_STATE_FAILED": "FAILED",
+    "JOB_STATE_CANCELLED": "CANCELLED",
+    "JOB_STATE_PAUSED": "PAUSED",
+}
+
+# Терминальные статусы (задание завершено)
+COMPLETED_STATES = {
+    "JOB_STATE_SUCCEEDED",
+    "JOB_STATE_FAILED",
+    "JOB_STATE_CANCELLED",
+    "JOB_STATE_PAUSED",
+}
 
 
 class GeminiBatchClient:
@@ -62,18 +85,24 @@ class GeminiBatchClient:
             api_key: API-ключ Google Gemini для батч-операций.
             model_name: Модель для генерации эмбеддингов.
             dimension: Размерность векторов (MRL).
+
+        Raises:
+            ImportError: Если google-genai SDK не установлен.
         """
-        if not GENAI_AVAILABLE:
-            logger.error("google-generativeai not installed")
+        if not GENAI_SDK_AVAILABLE:
+            logger.error("google-genai SDK not installed")
             raise ImportError(
-                "google-generativeai not installed. "
-                "Install with: pip install google-generativeai"
+                "google-genai SDK not installed. "
+                "Install with: pip install google-genai"
             )
 
-        genai.configure(api_key=api_key)
         self.api_key = api_key
         self.model_name = model_name
         self.dimension = dimension
+        
+        # Инициализируем клиент нового SDK
+        self._client = genai.Client(api_key=api_key)
+        
         logger.debug(
             "Batch client initialized",
             model=model_name,
@@ -115,44 +144,52 @@ class GeminiBatchClient:
 
         # 1. Формируем JSONL файл
         jsonl_path = self._create_jsonl_file(chunks, context_texts)
-        logger.debug(
-            "JSONL file created",
-            path=jsonl_path,
-        )
+        logger.debug("JSONL file created", path=jsonl_path)
 
         try:
-            # TODO: Implement real Google Batch API calls
-            # For now, this is a placeholder that works with mocks in tests
-            logger.warning("Batch API not implemented, raising NotImplementedError")
-            raise NotImplementedError(
-                "Real Google Batch API integration is not yet implemented. "
-                "Use mock_batch_client for testing."
+            # 2. Загружаем файл в Google Cloud
+            batch_id = uuid4().hex[:8]
+            uploaded_file = self._client.files.upload(
+                file=jsonl_path,
+                config=genai_types.UploadFileConfig(
+                    display_name=f"batch_embeddings_{batch_id}"
+                ),
+            )
+            
+            logger.debug(
+                "JSONL file uploaded",
+                file_name=uploaded_file.name,
+                display_name=f"batch_embeddings_{batch_id}",
             )
 
-            # # 2. Загружаем файл в Google Cloud
-            # uploaded_file = genai.files.upload(path=jsonl_path)
-            #
-            # # 3. Создаём батч-задание
-            # batch_job = genai.batches.create(
-            #     model=self.model_name,
-            #     src=uploaded_file.uri,
-            # )
-            #
-            # return batch_job.name
+            # 3. Создаём батч-задание
+            # Используем display_name загруженного файла для src
+            batch_job = self._client.batches.create(
+                model=self.model_name,
+                src=f"files/{uploaded_file.name}",
+            )
 
-        except NotImplementedError:
-            raise
+            logger.info(
+                "Batch job created successfully",
+                job_name=batch_job.name,
+                file_name=uploaded_file.name,
+                chunk_count=len(chunks),
+            )
+
+            return batch_job.name
+
         except Exception as e:
             logger.error(
                 "Failed to create batch job",
                 error_type=type(e).__name__,
+                error_message=str(e)[:200],
             )
             raise RuntimeError(f"Не удалось создать батч-задание: {e}")
 
         finally:
-            # Удаляем временный JSONL файл
+            # Удаляем локальный временный JSONL файл
             Path(jsonl_path).unlink(missing_ok=True)
-            logger.trace("JSONL file deleted")
+            logger.trace("Local JSONL file deleted")
 
     def get_job_status(self, google_job_id: str) -> str:
         """Получить статус батч-задания.
@@ -174,25 +211,30 @@ class GeminiBatchClient:
             "Checking batch job status",
             job_id=google_job_id,
         )
-        
+
         try:
-            # TODO: Implement real Google Batch API status check
-            logger.warning("Batch API not implemented, raising NotImplementedError")
-            raise NotImplementedError(
-                "Real Google Batch API integration is not yet implemented. "
-                "Use mock_batch_client for testing."
+            # Получаем информацию о задании
+            batch_job = self._client.batches.get(name=google_job_id)
+            
+            # Маппим статус Google -> наш
+            google_state = batch_job.state
+            mapped_status = GOOGLE_STATUS_MAP.get(google_state, google_state)
+            
+            logger.debug(
+                "Batch job status retrieved",
+                job_id=google_job_id,
+                google_state=google_state,
+                mapped_status=mapped_status,
             )
+            
+            return mapped_status
 
-            # batch_job = genai.batches.get(name=google_job_id)
-            # return batch_job.state.name  # Enum -> String
-
-        except NotImplementedError:
-            raise
         except Exception as e:
             logger.error(
                 "Failed to get batch job status",
                 job_id=google_job_id,
                 error_type=type(e).__name__,
+                error_message=str(e)[:200],
             )
             raise RuntimeError(f"Ошибка при получении статуса: {e}")
 
@@ -216,45 +258,145 @@ class GeminiBatchClient:
             "Retrieving batch results",
             job_id=google_job_id,
         )
-        
+
         try:
-            # TODO: Implement real Google Batch API results retrieval
-            logger.warning("Batch API not implemented, raising NotImplementedError")
-            raise NotImplementedError(
-                "Real Google Batch API integration is not yet implemented. "
-                "Use mock_batch_client for testing."
+            # Получаем информацию о задании
+            batch_job = self._client.batches.get(name=google_job_id)
+            
+            # Проверяем, что задание завершено успешно
+            if batch_job.state != "JOB_STATE_SUCCEEDED":
+                raise RuntimeError(
+                    f"Задание не завершено успешно. Статус: {batch_job.state}"
+                )
+            
+            results = {}
+            failed_count = 0
+            
+            # Результаты инлайнятся в job.responses
+            # Каждый response содержит key (наш chunk_id) и результат
+            if hasattr(batch_job, "responses") and batch_job.responses:
+                for response in batch_job.responses:
+                    chunk_id = response.key
+                    
+                    # Проверяем на ошибку
+                    if hasattr(response, "error") and response.error:
+                        logger.warning(
+                            "Chunk embedding failed in batch",
+                            chunk_id=chunk_id,
+                            error=str(response.error)[:100],
+                        )
+                        failed_count += 1
+                        continue
+                    
+                    # Извлекаем embedding из response
+                    # Структура: response.response.embeddings[0].values
+                    try:
+                        embedding_values = self._extract_embedding_values(response)
+                        if embedding_values:
+                            # Конвертируем в bytes через struct.pack
+                            vector_blob = struct.pack(
+                                f"{len(embedding_values)}f",
+                                *embedding_values
+                            )
+                            results[chunk_id] = vector_blob
+                        else:
+                            logger.warning(
+                                "Empty embedding values",
+                                chunk_id=chunk_id,
+                            )
+                            failed_count += 1
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to extract embedding",
+                            chunk_id=chunk_id,
+                            error=str(e)[:100],
+                        )
+                        failed_count += 1
+            
+            logger.info(
+                "Batch results retrieved",
+                job_id=google_job_id,
+                success_count=len(results),
+                failed_count=failed_count,
             )
+            
+            # Cleanup: удаляем входной файл из Google Cloud
+            self._cleanup_source_file(batch_job)
+            
+            return results
 
-            # # Получаем информацию о задании
-            # batch_job = genai.batches.get(name=google_job_id)
-            #
-            # if batch_job.state.name != "SUCCEEDED":
-            #     raise RuntimeError(
-            #         f"Задание не завершено. Статус: {batch_job.state.name}"
-            #     )
-            #
-            # # Скачиваем выходной файл
-            # output_file_uri = batch_job.output_uri
-            # if not output_file_uri:
-            #     raise RuntimeError("Нет выходного файла у батч-задания")
-            #
-            # # Парсим результаты из JSONL
-            # results = self._parse_results_jsonl(output_file_uri)
-            #
-            # # Очищаем файлы в Google Cloud
-            # self._cleanup_files(batch_job)
-            #
-            # return results
-
-        except NotImplementedError:
+        except RuntimeError:
             raise
         except Exception as e:
             logger.error(
                 "Failed to retrieve batch results",
                 job_id=google_job_id,
                 error_type=type(e).__name__,
+                error_message=str(e)[:200],
             )
             raise RuntimeError(f"Ошибка при скачивании результатов: {e}")
+    
+    def _extract_embedding_values(self, response) -> Optional[List[float]]:
+        """Извлекает значения embedding из ответа batch job.
+        
+        Args:
+            response: Объект ответа из batch_job.responses.
+            
+        Returns:
+            Список float значений вектора или None если не удалось извлечь.
+        """
+        # Пробуем разные структуры ответа
+        # Структура может отличаться в зависимости от версии API
+        
+        # Вариант 1: response.response.embeddings[0].values
+        if hasattr(response, "response"):
+            resp = response.response
+            if hasattr(resp, "embeddings") and resp.embeddings:
+                if hasattr(resp.embeddings[0], "values"):
+                    return list(resp.embeddings[0].values)
+            
+            # Вариант 2: response.response.embedding.values
+            if hasattr(resp, "embedding"):
+                if hasattr(resp.embedding, "values"):
+                    return list(resp.embedding.values)
+        
+        # Вариант 3: Прямой доступ через dict-like интерфейс
+        if hasattr(response, "get"):
+            resp_data = response.get("response", {})
+            if "embeddings" in resp_data and resp_data["embeddings"]:
+                return resp_data["embeddings"][0].get("values")
+            if "embedding" in resp_data:
+                return resp_data["embedding"].get("values")
+        
+        return None
+    
+    def _cleanup_source_file(self, batch_job) -> None:
+        """Удаляет входной файл из Google Cloud.
+        
+        Args:
+            batch_job: Объект BatchJob из Google API.
+        """
+        try:
+            # Получаем source URI из задания
+            source = getattr(batch_job, "source", None) or getattr(batch_job, "src", None)
+            
+            if source:
+                # source может быть в формате "files/filename" или URI
+                if isinstance(source, str):
+                    if source.startswith("files/"):
+                        file_name = source
+                    else:
+                        file_name = f"files/{source.split('/')[-1]}"
+                    
+                    self._client.files.delete(name=file_name)
+                    logger.trace("Source file deleted from Google Cloud", file=file_name)
+                    
+        except Exception as e:
+            # Логируем, но не падаем, если файл не удалось удалить
+            logger.warning(
+                "Failed to cleanup source file",
+                error=str(e)[:100],
+            )
 
     def _create_jsonl_file(
         self,
@@ -262,6 +404,9 @@ class GeminiBatchClient:
         context_texts: Optional[Dict[str, str]] = None,
     ) -> str:
         """Создать временный JSONL файл с запросами эмбеддингов.
+
+        Формат JSONL по спецификации Google Batch API:
+        {"key": "chunk_id", "request": {"model": "...", "contents": [...], "config": {...}}}
 
         Args:
             chunks: Список чанков.
@@ -280,12 +425,13 @@ class GeminiBatchClient:
                 else chunk.content
             )
 
-            # Формируем запрос по спецификации Gemini Batch API
+            # Формируем запрос по спецификации Google Batch API
+            # ВАЖНО: используем "key" (не "custom_id") и "contents" (массив, не "content")
             request = {
-                "custom_id": chunk.id,  # Для идентификации результата
+                "key": str(chunk.id),  # Идентификатор для сопоставления результатов
                 "request": {
                     "model": self.model_name,
-                    "content": {"parts": [{"text": text}]},
+                    "contents": [{"parts": [{"text": text}]}],  # contents - массив!
                     "config": {
                         "task_type": "RETRIEVAL_DOCUMENT",
                         "output_dimensionality": self.dimension,
@@ -293,75 +439,14 @@ class GeminiBatchClient:
                 },
             }
 
-            temp_file.write(json.dumps(request) + "\n")
+            temp_file.write(json.dumps(request, ensure_ascii=False) + "\n")
 
         temp_file.close()
+        
+        logger.trace(
+            "JSONL file prepared",
+            path=temp_file.name,
+            chunk_count=len(chunks),
+        )
+        
         return temp_file.name
-
-    def _parse_results_jsonl(self, file_uri: str) -> Dict[str, bytes]:
-        """Парсит JSONL файл с результатами.
-
-        Args:
-            file_uri: URI выходного файла в Google Cloud.
-
-        Returns:
-            Словарь {chunk_id -> вектор (bytes)}.
-        """
-        # Скачиваем файл
-        file_info = self.client.files.get(name=file_uri.split("/")[-1])
-
-        # Создаём временный файл для результатов
-        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as temp_out:
-            temp_out.write(file_info.bytes)
-            temp_out_path = temp_out.name
-
-        results = {}
-
-        try:
-            with open(temp_out_path, "r") as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-
-                    response = json.loads(line)
-                    chunk_id = response.get("custom_id")
-
-                    # Извлекаем вектор
-                    embedding_data = response.get("response", {}).get("embedding")
-                    if embedding_data and "values" in embedding_data:
-                        values = embedding_data["values"]
-
-                        # Конвертируем в bytes через struct.pack
-                        vector_blob = struct.pack(f"{len(values)}f", *values)
-                        results[chunk_id] = vector_blob
-
-        finally:
-            Path(temp_out_path).unlink(missing_ok=True)
-
-        return results
-
-    def _cleanup_files(self, batch_job) -> None:
-        """Удаляет входной и выходной файлы из Google Cloud.
-
-        Args:
-            batch_job: Объект BatchJob из Google API.
-        """
-        try:
-            # Удаляем входной файл
-            if batch_job.source_uri:
-                input_file_name = batch_job.source_uri.split("/")[-1]
-                self.client.files.delete(name=input_file_name)
-                logger.trace("Input file deleted", file=input_file_name)
-
-            # Удаляем выходной файл
-            if batch_job.output_uri:
-                output_file_name = batch_job.output_uri.split("/")[-1]
-                self.client.files.delete(name=output_file_name)
-                logger.trace("Output file deleted", file=output_file_name)
-
-        except Exception as e:
-            # Логируем, но не падаем, если файлы не удалось удалить
-            logger.warning(
-                "Failed to cleanup batch files",
-                error=str(e)[:100],
-            )
