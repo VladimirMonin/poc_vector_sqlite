@@ -178,6 +178,9 @@
 41. [**CLI Architecture**](41_cli_architecture.md)  
     Typer + Rich: быстрый --help, lazy initialization, красивый вывод
 
+42. [**CLI Commands**](42_cli_commands.md)  
+    ingest, search, docs — три основные команды для повседневной работы
+
 ---
 
 ## 🚀 Быстрый старт
