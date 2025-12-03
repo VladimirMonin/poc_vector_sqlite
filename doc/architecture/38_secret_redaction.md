@@ -81,7 +81,7 @@ sequenceDiagram
 | OpenAI Project | `sk-proj-` | 50+ | `sk-proj-[0-9a-zA-Z_-]{20,}` |
 | Groq | `gsk_` | 56+ | `gsk_[0-9a-zA-Z]{50,}` |
 | xAI/Grok | `xai-` | 30+ | `xai-[0-9a-zA-Z]{20,}` |
-| Bearer | `bearer ` | varies | `bearer\s+[a-zA-Z0-9_-]{20,}` |
+| Bearer | `bearer` | varies | `bearer\s+[a-zA-Z0-9_-]{20,}` |
 
 ---
 
