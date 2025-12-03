@@ -111,7 +111,7 @@ class GeminiImageAnalyzer:
 
         start_time = time.perf_counter()
         image_path = str(request.resource.path)
-        
+
         logger.debug(
             "Analyzing image",
             path=image_path,
@@ -122,7 +122,7 @@ class GeminiImageAnalyzer:
         # 1. Загружаем изображение
         image = Image.open(request.resource.path)
         width, height = image.size
-        
+
         logger.trace(
             "Image loaded",
             width=width,
@@ -185,7 +185,9 @@ class GeminiImageAnalyzer:
             operation="image_analysis",
             model=self.model,
             prompt_preview=prompt[:100] + "..." if len(prompt) > 100 else prompt,
-            response_preview=response.text[:200] + "..." if len(response.text) > 200 else response.text,
+            response_preview=response.text[:200] + "..."
+            if len(response.text) > 200
+            else response.text,
         )
 
         try:

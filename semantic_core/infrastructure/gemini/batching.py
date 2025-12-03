@@ -14,6 +14,10 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 try:
     import google.generativeai as genai
 
@@ -60,6 +64,7 @@ class GeminiBatchClient:
             dimension: Размерность векторов (MRL).
         """
         if not GENAI_AVAILABLE:
+            logger.error("google-generativeai not installed")
             raise ImportError(
                 "google-generativeai not installed. "
                 "Install with: pip install google-generativeai"
@@ -69,6 +74,11 @@ class GeminiBatchClient:
         self.api_key = api_key
         self.model_name = model_name
         self.dimension = dimension
+        logger.debug(
+            "Batch client initialized",
+            model=model_name,
+            dimension=dimension,
+        )
 
     def create_embedding_job(
         self,
@@ -94,14 +104,26 @@ class GeminiBatchClient:
             >>> job_id = client.create_embedding_job(chunks)
         """
         if not chunks:
+            logger.warning("Empty chunks list provided")
             raise ValueError("Список чанков не может быть пустым")
+
+        logger.info(
+            "Creating batch job",
+            chunk_count=len(chunks),
+            model=self.model_name,
+        )
 
         # 1. Формируем JSONL файл
         jsonl_path = self._create_jsonl_file(chunks, context_texts)
+        logger.debug(
+            "JSONL file created",
+            path=jsonl_path,
+        )
 
         try:
             # TODO: Implement real Google Batch API calls
             # For now, this is a placeholder that works with mocks in tests
+            logger.warning("Batch API not implemented, raising NotImplementedError")
             raise NotImplementedError(
                 "Real Google Batch API integration is not yet implemented. "
                 "Use mock_batch_client for testing."
@@ -121,11 +143,16 @@ class GeminiBatchClient:
         except NotImplementedError:
             raise
         except Exception as e:
+            logger.error(
+                "Failed to create batch job",
+                error_type=type(e).__name__,
+            )
             raise RuntimeError(f"Не удалось создать батч-задание: {e}")
 
         finally:
             # Удаляем временный JSONL файл
             Path(jsonl_path).unlink(missing_ok=True)
+            logger.trace("JSONL file deleted")
 
     def get_job_status(self, google_job_id: str) -> str:
         """Получить статус батч-задания.
@@ -143,8 +170,14 @@ class GeminiBatchClient:
             >>> status = client.get_job_status("batches/abc123")
             >>> print(status)  # "RUNNING"
         """
+        logger.debug(
+            "Checking batch job status",
+            job_id=google_job_id,
+        )
+        
         try:
             # TODO: Implement real Google Batch API status check
+            logger.warning("Batch API not implemented, raising NotImplementedError")
             raise NotImplementedError(
                 "Real Google Batch API integration is not yet implemented. "
                 "Use mock_batch_client for testing."
@@ -156,6 +189,11 @@ class GeminiBatchClient:
         except NotImplementedError:
             raise
         except Exception as e:
+            logger.error(
+                "Failed to get batch job status",
+                job_id=google_job_id,
+                error_type=type(e).__name__,
+            )
             raise RuntimeError(f"Ошибка при получении статуса: {e}")
 
     def retrieve_results(self, google_job_id: str) -> Dict[str, bytes]:
@@ -174,8 +212,14 @@ class GeminiBatchClient:
             >>> results = client.retrieve_results("batches/abc123")
             >>> vector_blob = results["chunk_1"]
         """
+        logger.debug(
+            "Retrieving batch results",
+            job_id=google_job_id,
+        )
+        
         try:
             # TODO: Implement real Google Batch API results retrieval
+            logger.warning("Batch API not implemented, raising NotImplementedError")
             raise NotImplementedError(
                 "Real Google Batch API integration is not yet implemented. "
                 "Use mock_batch_client for testing."
@@ -205,6 +249,11 @@ class GeminiBatchClient:
         except NotImplementedError:
             raise
         except Exception as e:
+            logger.error(
+                "Failed to retrieve batch results",
+                job_id=google_job_id,
+                error_type=type(e).__name__,
+            )
             raise RuntimeError(f"Ошибка при скачивании результатов: {e}")
 
     def _create_jsonl_file(
@@ -302,12 +351,17 @@ class GeminiBatchClient:
             if batch_job.source_uri:
                 input_file_name = batch_job.source_uri.split("/")[-1]
                 self.client.files.delete(name=input_file_name)
+                logger.trace("Input file deleted", file=input_file_name)
 
             # Удаляем выходной файл
             if batch_job.output_uri:
                 output_file_name = batch_job.output_uri.split("/")[-1]
                 self.client.files.delete(name=output_file_name)
+                logger.trace("Output file deleted", file=output_file_name)
 
         except Exception as e:
             # Логируем, но не падаем, если файлы не удалось удалить
-            print(f"[Warning] Не удалось очистить файлы: {e}")
+            logger.warning(
+                "Failed to cleanup batch files",
+                error=str(e)[:100],
+            )

@@ -5,12 +5,16 @@
         Адаптер для генерации эмбеддингов через Gemini.
 """
 
+import time
 from typing import Literal
 
 import google.generativeai as genai
 import numpy as np
 
 from semantic_core.interfaces import BaseEmbedder
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 TaskType = Literal["RETRIEVAL_DOCUMENT", "RETRIEVAL_QUERY"]
@@ -48,6 +52,11 @@ class GeminiEmbedder(BaseEmbedder):
 
         # Конфигурируем API
         genai.configure(api_key=self.api_key)
+        logger.debug(
+            "Embedder initialized",
+            model=model_name,
+            dimension=dimension,
+        )
 
     def embed_documents(self, texts: list[str]) -> list[np.ndarray]:
         """Генерирует эмбеддинги для списка документов.
@@ -63,12 +72,27 @@ class GeminiEmbedder(BaseEmbedder):
             RuntimeError: Если API вернул ошибку.
         """
         if not texts:
+            logger.warning("Empty texts list provided")
             raise ValueError("Список текстов не может быть пустым")
 
+        logger.debug(
+            "Embedding documents",
+            count=len(texts),
+            model=self.model_name,
+        )
+
+        start_time = time.perf_counter()
         vectors = []
         for text in texts:
             vector = self._generate_embedding(text, task_type="RETRIEVAL_DOCUMENT")
             vectors.append(vector)
+
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Documents embedded",
+            count=len(texts),
+            latency_ms=round(latency_ms, 2),
+        )
 
         return vectors
 
@@ -86,9 +110,24 @@ class GeminiEmbedder(BaseEmbedder):
             RuntimeError: Если API вернул ошибку.
         """
         if not text or not text.strip():
+            logger.warning("Empty query text provided")
             raise ValueError("Текст запроса не может быть пустым")
 
-        return self._generate_embedding(text, task_type="RETRIEVAL_QUERY")
+        logger.debug(
+            "Embedding query",
+            text_length=len(text),
+        )
+
+        start_time = time.perf_counter()
+        vector = self._generate_embedding(text, task_type="RETRIEVAL_QUERY")
+        latency_ms = (time.perf_counter() - start_time) * 1000
+
+        logger.debug(
+            "Query embedded",
+            latency_ms=round(latency_ms, 2),
+        )
+
+        return vector
 
     def _generate_embedding(self, text: str, task_type: TaskType) -> np.ndarray:
         """Внутренний метод генерации эмбеддинга.
@@ -103,6 +142,12 @@ class GeminiEmbedder(BaseEmbedder):
         Raises:
             RuntimeError: Если API вернул ошибку.
         """
+        logger.trace(
+            "Generating embedding",
+            task_type=task_type,
+            text_length=len(text),
+        )
+
         try:
             result = genai.embed_content(
                 model=self.model_name,
@@ -114,9 +159,28 @@ class GeminiEmbedder(BaseEmbedder):
             embedding = np.array(result["embedding"], dtype=np.float32)
             embedding = self._normalize_vector(embedding)
 
+            # Логируем AI вызов
+            logger.trace_ai(
+                operation="embedding",
+                model=self.model_name,
+                prompt_preview=text[:100] + "..." if len(text) > 100 else text,
+                task_type=task_type,
+                dimension=self.dimension,
+            )
+
+            logger.trace(
+                "Embedding generated",
+                dimension=len(embedding),
+            )
+
             return embedding
 
         except Exception as e:
+            logger.error(
+                "Embedding generation failed",
+                error_type=type(e).__name__,
+                task_type=task_type,
+            )
             raise RuntimeError(f"Ошибка при генерации эмбеддинга: {e}")
 
     @staticmethod

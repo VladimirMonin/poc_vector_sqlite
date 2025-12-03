@@ -6,6 +6,7 @@
 """
 
 import json
+import time
 from typing import Optional, Any
 
 import numpy as np
@@ -27,6 +28,9 @@ from semantic_core.infrastructure.storage.peewee.models import (
     BatchJobModel,
 )
 from semantic_core.infrastructure.storage.peewee.engine import VectorDatabase
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class PeeweeVectorStore(BaseVectorStore):
@@ -60,9 +64,16 @@ class PeeweeVectorStore(BaseVectorStore):
 
         # Создаём таблицы
         self._create_tables()
+        
+        logger.debug(
+            "PeeweeVectorStore initialized",
+            dimension=dimension,
+        )
 
     def _create_tables(self) -> None:
         """Создаёт таблицы и виртуальные индексы."""
+        logger.debug("Creating tables and indexes")
+        
         # Создаём обычные таблицы
         self.db.create_tables([DocumentModel, BatchJobModel, ChunkModel], safe=True)
 
@@ -131,6 +142,13 @@ class PeeweeVectorStore(BaseVectorStore):
             ValueError: Если данные некорректны.
             RuntimeError: Если БД вернула ошибку.
         """
+        start_time = time.perf_counter()
+        logger.debug(
+            "Saving document",
+            chunk_count=len(chunks),
+            media_type=document.media_type.value,
+        )
+        
         with self.db.atomic():
             # Сохраняем документ
             doc_model = DocumentModel.create(
@@ -144,6 +162,7 @@ class PeeweeVectorStore(BaseVectorStore):
             document.id = doc_model.id
 
             # Сохраняем чанки
+            vectors_saved = 0
             for chunk in chunks:
                 chunk.parent_doc_id = doc_model.id
 
@@ -178,6 +197,16 @@ class PeeweeVectorStore(BaseVectorStore):
                         "INSERT INTO chunks_vec(id, embedding) VALUES (?, ?)",
                         (chunk_model.id, blob),
                     )
+                    vectors_saved += 1
+
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Document saved",
+            doc_id=document.id,
+            chunk_count=len(chunks),
+            vectors_saved=vectors_saved,
+            latency_ms=round(latency_ms, 2),
+        )
 
         return document
 
@@ -206,14 +235,35 @@ class PeeweeVectorStore(BaseVectorStore):
         Raises:
             ValueError: Если не передан ни vector, ни text.
         """
+        start_time = time.perf_counter()
+        logger.debug(
+            "Search started",
+            mode=mode,
+            limit=limit,
+            has_vector=query_vector is not None,
+            has_text=query_text is not None,
+            has_filters=filters is not None,
+        )
+        
         if mode == "vector":
-            return self._vector_search(query_vector, filters, limit)
+            results = self._vector_search(query_vector, filters, limit)
         elif mode == "fts":
-            return self._fts_search(query_text, filters, limit)
+            results = self._fts_search(query_text, filters, limit)
         elif mode == "hybrid":
-            return self._hybrid_search(query_vector, query_text, filters, limit, k)
+            results = self._hybrid_search(query_vector, query_text, filters, limit, k)
         else:
+            logger.error("Unknown search mode", mode=mode)
             raise ValueError(f"Неизвестный режим поиска: {mode}")
+        
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Search completed",
+            mode=mode,
+            results_count=len(results),
+            latency_ms=round(latency_ms, 2),
+        )
+        
+        return results
 
     def _vector_search(
         self,
@@ -232,7 +282,14 @@ class PeeweeVectorStore(BaseVectorStore):
             Список SearchResult.
         """
         if query_vector is None:
+            logger.warning("Vector search called without query_vector")
             raise ValueError("Для векторного поиска нужен query_vector")
+
+        logger.trace(
+            "Vector search",
+            vector_dim=len(query_vector),
+            limit=limit,
+        )
 
         blob = query_vector.tobytes()
 
@@ -302,7 +359,14 @@ class PeeweeVectorStore(BaseVectorStore):
             Список SearchResult.
         """
         if not query_text:
+            logger.warning("FTS search called without query_text")
             raise ValueError("Для FTS поиска нужен query_text")
+
+        logger.trace(
+            "FTS search",
+            query_length=len(query_text),
+            limit=limit,
+        )
 
         # Формируем WHERE условия для фильтров
         where_conditions = []
@@ -375,7 +439,14 @@ class PeeweeVectorStore(BaseVectorStore):
             Список SearchResult, отсортированный по RRF score.
         """
         if query_vector is None and query_text is None:
+            logger.warning("Hybrid search called without query_vector or query_text")
             raise ValueError("Нужен хотя бы один параметр: query_vector или query_text")
+
+        logger.trace(
+            "Hybrid search (RRF)",
+            k=k,
+            limit=limit,
+        )
 
         # Если только один метод, используем его напрямую
         if query_vector is None:
@@ -471,6 +542,11 @@ class PeeweeVectorStore(BaseVectorStore):
         Returns:
             Количество удалённых строк.
         """
+        logger.debug(
+            "Deleting document",
+            doc_id=document_id,
+        )
+        
         with self.db.atomic():
             doc_model = DocumentModel.get_by_id(document_id)
 
@@ -484,7 +560,15 @@ class PeeweeVectorStore(BaseVectorStore):
                 )
 
             # Удаляем документ (чанки удалятся каскадно)
-            return doc_model.delete_instance()
+            result = doc_model.delete_instance()
+            
+            logger.info(
+                "Document deleted",
+                doc_id=document_id,
+                chunks_deleted=len(chunk_ids),
+            )
+            
+            return result
 
     def delete_by_metadata(self, filters: dict) -> int:
         """Удаляет чанки по фильтрам метаданных.
@@ -495,6 +579,11 @@ class PeeweeVectorStore(BaseVectorStore):
         Returns:
             Количество удалённых чанков.
         """
+        logger.debug(
+            "Deleting chunks by metadata",
+            filters=filters,
+        )
+        
         # Находим все чанки, которые соответствуют фильтрам
         query = ChunkModel.select()
 
@@ -509,6 +598,7 @@ class PeeweeVectorStore(BaseVectorStore):
         chunk_ids = [chunk.id for chunk in query]
 
         if not chunk_ids:
+            logger.debug("No chunks found for deletion")
             return 0
 
         with self.db.atomic():
@@ -522,6 +612,11 @@ class PeeweeVectorStore(BaseVectorStore):
             # Удаляем сами чанки
             deleted_count = (
                 ChunkModel.delete().where(ChunkModel.id.in_(chunk_ids)).execute()
+            )
+
+            logger.info(
+                "Chunks deleted by metadata",
+                deleted_count=deleted_count,
             )
 
             return deleted_count
@@ -552,20 +647,41 @@ class PeeweeVectorStore(BaseVectorStore):
         Returns:
             Список ChunkResult.
         """
+        start_time = time.perf_counter()
+        logger.debug(
+            "Chunk search started",
+            mode=mode,
+            limit=limit,
+            chunk_type_filter=chunk_type_filter,
+            language_filter=language_filter,
+        )
+        
         if mode == "vector":
-            return self._vector_search_chunks(
+            results = self._vector_search_chunks(
                 query_vector, filters, limit, chunk_type_filter, language_filter
             )
         elif mode == "fts":
             # FTS для чанков пока не реализован, возвращаем пустой список
-            return []
+            logger.debug("FTS chunk search not implemented")
+            results = []
         elif mode == "hybrid":
             # Для гибридного используем только векторный поиск чанков
-            return self._vector_search_chunks(
+            results = self._vector_search_chunks(
                 query_vector, filters, limit, chunk_type_filter, language_filter
             )
         else:
+            logger.error("Unknown search mode", mode=mode)
             raise ValueError(f"Неизвестный режим поиска: {mode}")
+        
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Chunk search completed",
+            mode=mode,
+            results_count=len(results),
+            latency_ms=round(latency_ms, 2),
+        )
+        
+        return results
 
     def _vector_search_chunks(
         self,
@@ -742,7 +858,14 @@ class PeeweeVectorStore(BaseVectorStore):
             RuntimeError: Если произошла ошибка БД.
         """
         if not vectors_dict:
+            logger.warning("Empty vectors_dict provided")
             raise ValueError("Словарь векторов не может быть пустым")
+
+        start_time = time.perf_counter()
+        logger.debug(
+            "Bulk updating vectors",
+            count=len(vectors_dict),
+        )
 
         # Подготавливаем данные для executemany
         data = [(int(chunk_id), blob) for chunk_id, blob in vectors_dict.items()]
@@ -771,8 +894,20 @@ class PeeweeVectorStore(BaseVectorStore):
                     chunk_ids,
                 )
 
+            latency_ms = (time.perf_counter() - start_time) * 1000
+            logger.info(
+                "Vectors bulk updated",
+                count=len(vectors_dict),
+                latency_ms=round(latency_ms, 2),
+            )
+
             return len(vectors_dict)
 
         except Exception as e:
             self.db.rollback()
+            logger.error(
+                "Bulk vector update failed",
+                error_type=type(e).__name__,
+                count=len(vectors_dict),
+            )
             raise RuntimeError(f"Ошибка при массовом обновлении векторов: {e}")

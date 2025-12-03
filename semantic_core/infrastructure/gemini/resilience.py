@@ -115,7 +115,7 @@ def retry_with_backoff(
                     delay = min(base_delay * (2**attempt), max_delay)
                     jitter = random.uniform(0, 1)
                     total_delay = delay + jitter
-                    
+
                     logger.warning(
                         "Retry attempt",
                         func=func_name,

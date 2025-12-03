@@ -21,7 +21,11 @@ from typing import Literal
 import imageio.v3 as iio
 from PIL import Image
 
+from semantic_core.utils.logger import get_logger
+
 from .audio import ensure_ffmpeg
+
+logger = get_logger(__name__)
 
 # Поддерживаемые MIME-типы видео
 SUPPORTED_VIDEO_TYPES = [
@@ -81,6 +85,7 @@ def extract_frames(
 
     video_path = Path(video_path)
     if not video_path.exists():
+        logger.error("Video file not found", path=str(video_path))
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
     # Получаем метаданные
@@ -89,7 +94,17 @@ def extract_frames(
     video_fps = meta.get("fps", 30)
     total_frames_count = int(duration * video_fps)
 
+    logger.debug(
+        "Extracting frames from video",
+        video_path=str(video_path),
+        mode=mode,
+        duration_sec=duration,
+        video_fps=video_fps,
+        total_frames_available=total_frames_count,
+    )
+
     if total_frames_count == 0:
+        logger.warning("Video has no frames", video_path=str(video_path))
         return []
 
     # Вычисляем индексы кадров
@@ -107,6 +122,7 @@ def extract_frames(
         step = max(1, int(interval_seconds * video_fps))
         indices = list(range(0, total_frames_count, step))
     else:
+        logger.error("Unknown extraction mode", mode=mode)
         raise ValueError(f"Unknown mode: {mode}")
 
     # Лимитируем количество кадров
@@ -115,6 +131,7 @@ def extract_frames(
     # Извлекаем кадры
     frames = []
     max_dim = QUALITY_PRESETS.get(quality, DEFAULT_MAX_DIMENSION)
+    skipped_count = 0
 
     for idx in indices:
         try:
@@ -122,9 +139,26 @@ def extract_frames(
             img = Image.fromarray(frame)
             img = _resize_frame(img, max_dim)
             frames.append(img)
-        except Exception:
-            # Пропускаем битые кадры
+        except Exception as e:
+            # Логируем пропущенный кадр и продолжаем
+            logger.trace(
+                "Skipped corrupted frame",
+                video_path=str(video_path),
+                frame_index=idx,
+                error=str(e),
+            )
+            skipped_count += 1
             continue
+
+    logger.info(
+        "Frames extracted from video",
+        video_path=str(video_path),
+        mode=mode,
+        frames_extracted=len(frames),
+        frames_skipped=skipped_count,
+        quality=quality,
+        max_dimension=max_dim,
+    )
 
     return frames
 
@@ -144,6 +178,13 @@ def frames_to_bytes(
     Returns:
         Список tuple (image_bytes, mime_type).
     """
+    logger.debug(
+        "Converting frames to bytes",
+        frames_count=len(frames),
+        format=format,
+        quality=quality,
+    )
+
     result = []
     mime_type = f"image/{format.lower()}"
 
@@ -151,6 +192,14 @@ def frames_to_bytes(
         buffer = BytesIO()
         frame.save(buffer, format=format, quality=quality)
         result.append((buffer.getvalue(), mime_type))
+
+    total_size = sum(len(item[0]) for item in result)
+    logger.info(
+        "Frames converted to bytes",
+        frames_count=len(result),
+        total_size_bytes=total_size,
+        mime_type=mime_type,
+    )
 
     return result
 
@@ -165,7 +214,9 @@ def get_video_duration(path: str | Path) -> float:
         Длительность в секундах.
     """
     meta = iio.immeta(str(path), plugin="pyav")
-    return meta.get("duration", 0)
+    duration = meta.get("duration", 0)
+    logger.trace("Got video duration", path=str(path), duration_sec=duration)
+    return duration
 
 
 def get_video_metadata(path: str | Path) -> dict:
@@ -178,12 +229,20 @@ def get_video_metadata(path: str | Path) -> dict:
         Словарь с метаданными (duration, fps, size, codec).
     """
     meta = iio.immeta(str(path), plugin="pyav")
-    return {
+    result = {
         "duration": meta.get("duration", 0),
         "fps": meta.get("fps", 0),
         "size": meta.get("size", (0, 0)),
         "codec": meta.get("codec", "unknown"),
     }
+    logger.trace(
+        "Got video metadata",
+        path=str(path),
+        duration=result["duration"],
+        fps=result["fps"],
+        size=result["size"],
+    )
+    return result
 
 
 def is_video_supported(mime_type: str) -> bool:

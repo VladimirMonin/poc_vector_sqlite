@@ -10,6 +10,10 @@ from pathlib import Path
 
 from playhouse.sqlite_ext import SqliteExtDatabase
 
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class VectorDatabase(SqliteExtDatabase):
     """Расширенная БД SQLite с поддержкой sqlite-vec.
@@ -25,6 +29,10 @@ class VectorDatabase(SqliteExtDatabase):
         """
         super().__init__(database, *args, **kwargs)
         self._vector_extension_loaded = False
+        logger.debug(
+            "VectorDatabase created",
+            path=str(database),
+        )
 
     def _add_conn_hooks(self, conn: sqlite3.Connection) -> None:
         """Хук загрузки расширения sqlite-vec.
@@ -41,7 +49,12 @@ class VectorDatabase(SqliteExtDatabase):
 
                 sqlite_vec.load(conn)
                 self._vector_extension_loaded = True
+                logger.debug("sqlite-vec extension loaded")
             except Exception as e:
+                logger.error(
+                    "Failed to load sqlite-vec extension",
+                    error_type=type(e).__name__,
+                )
                 raise RuntimeError(f"Не удалось загрузить sqlite-vec: {e}")
             finally:
                 conn.enable_load_extension(False)
@@ -60,6 +73,12 @@ def init_peewee_database(
     Returns:
         Настроенный экземпляр VectorDatabase.
     """
+    logger.info(
+        "Initializing database",
+        path=str(db_path),
+        dimension=dimension,
+    )
+    
     database = VectorDatabase(
         str(db_path),
         pragmas={
@@ -73,5 +92,10 @@ def init_peewee_database(
 
     # Подключаемся для загрузки расширения
     database.connect()
+    
+    logger.info(
+        "Database initialized",
+        path=str(db_path),
+    )
 
     return database

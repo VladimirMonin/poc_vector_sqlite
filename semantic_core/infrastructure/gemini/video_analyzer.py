@@ -149,7 +149,7 @@ class GeminiVideoAnalyzer:
         start_time = time.perf_counter()
         config = config or VideoAnalysisConfig()
         video_path = request.resource.path
-        
+
         logger.debug(
             "Analyzing video",
             path=str(video_path),
@@ -281,7 +281,9 @@ class GeminiVideoAnalyzer:
             operation="video_analysis",
             model=self.model,
             prompt_preview="Video analysis with frames",
-            response_preview=response.text[:200] + "..." if len(response.text) > 200 else response.text,
+            response_preview=response.text[:200] + "..."
+            if len(response.text) > 200
+            else response.text,
         )
 
         try:
