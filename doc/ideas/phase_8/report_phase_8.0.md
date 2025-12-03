@@ -79,6 +79,7 @@ semantic_core/cli/
 ### 3.1 Назначение
 
 Индексация файлов в семантическую базу данных. Поддерживает:
+
 - Отдельные файлы
 - Директории (с рекурсией)
 - Glob-паттерны для фильтрации
@@ -191,6 +192,7 @@ semantic ingest ./docs/ -r -m async
 ### 3.6 Вывод
 
 **Dry-run:**
+
 ```
 ╭─────────────── 🔍 Dry Run ───────────────╮
 │ Найдено файлов: 43                       │
@@ -203,6 +205,7 @@ semantic ingest ./docs/ -r -m async
 ```
 
 **Успех:**
+
 ```
 ╭──────────── 📚 Индексация завершена ────────────╮
 │ ✓ Успешно проиндексировано: 43 из 43            │
@@ -210,6 +213,7 @@ semantic ingest ./docs/ -r -m async
 ```
 
 **С ошибками:**
+
 ```
 ╭──────── ⚠️  Индексация с ошибками ────────╮
 │ Проиндексировано: 41 из 43               │
@@ -228,6 +232,7 @@ semantic ingest ./docs/ -r -m async
 ### 4.1 Назначение
 
 Семантический поиск по проиндексированным документам. Поддерживает:
+
 - Три типа поиска: vector, fts, hybrid
 - Настройку порога релевантности
 - Лимит результатов
@@ -305,6 +310,7 @@ semantic search "async" -v
 ### 4.6 Вывод
 
 **Обычный:**
+
 ```
 🔍 Поиск: "как работает эмбеддинг"
 Тип: hybrid | Найдено: 5
@@ -321,6 +327,7 @@ semantic search "async" -v
 ```
 
 **JSON:**
+
 ```json
 {
   "query": "как работает эмбеддинг",
@@ -398,6 +405,7 @@ semantic docs api
 ### 5.5 Вывод
 
 **Список:**
+
 ```
 📖 Встроенная документация Semantic Core
 
@@ -415,6 +423,7 @@ semantic docs api
 ```
 
 **Топик:**
+
 ```
 ╭──────────────────────────────────────────────────────────────────╮
 │ 🔍 Типы поиска                                                   │
@@ -523,7 +532,8 @@ class ProgressTracker:
 
 **Проблема:** При добавлении команд случайно создали второй callback, что вызвало конфликт.
 
-**Симптом:** 
+**Симптом:**
+
 ```
 Error: Got unexpected extra argument (ingest)
 ```
@@ -554,6 +564,7 @@ def main_callback(
 **Проблема:** Команды импортируют `get_cli_context()` из `app.py`, а `app.py` импортирует команды.
 
 **Симптом:**
+
 ```
 ImportError: cannot import name 'ingest_cmd' from partially initialized module
 ```
@@ -622,6 +633,7 @@ tests/unit/cli/test_cli_phase_8_0.py  # 49 тестов
 ### 8.2 Классы тестов
 
 **TestIngestCommand (8 тестов):**
+
 - `test_ingest_help` — справка содержит все опции
 - `test_ingest_no_path_shows_error` — ошибка без PATH
 - `test_ingest_nonexistent_path` — ошибка для несуществующего пути
@@ -632,6 +644,7 @@ tests/unit/cli/test_cli_phase_8_0.py  # 49 тестов
 - `test_ingest_invalid_mode` — ошибка для неверного режима
 
 **TestMediaTypeDetection (14 тестов):**
+
 - Параметризованные тесты для всех расширений
 - TEXT: .md, .txt, .py
 - IMAGE: .jpg, .jpeg, .png, .gif, .webp
@@ -639,24 +652,29 @@ tests/unit/cli/test_cli_phase_8_0.py  # 49 тестов
 - VIDEO: .mp4, .avi, .mov
 
 **TestDocumentCreation (2 теста):**
+
 - `test_create_document_text` — Document с контентом
 - `test_create_document_image` — Document с путём
 
 **TestFileCollection (3 теста):**
+
 - `test_collect_single_file`
 - `test_collect_directory`
 - `test_collect_recursive`
 
 **TestSearchCommand (3 теста):**
+
 - `test_search_help`
 - `test_search_no_query_shows_error`
 - `test_search_invalid_type`
 
 **TestSearchValidation (2 теста):**
+
 - `test_limit_min_max`
 - `test_threshold_range`
 
 **TestDocsCommand (10 тестов):**
+
 - `test_docs_help`
 - `test_docs_list_topics`
 - `test_docs_show_overview`
@@ -668,15 +686,18 @@ tests/unit/cli/test_cli_phase_8_0.py  # 49 тестов
 - `test_all_topics_have_content`
 
 **TestUIRenderers (3 теста):**
+
 - `test_import_renderers`
 - `test_render_ingest_summary_success`
 - `test_render_error`
 
 **TestUISpinners (2 теста):**
+
 - `test_import_spinners`
 - `test_progress_tracker_class`
 
 **TestCommandIntegration (3 теста):**
+
 - `test_ingest_with_dry_run_works`
 - `test_docs_command_works`
 - `test_docs_with_topic_works`
@@ -754,6 +775,7 @@ Phase 8.0 превратила Semantic Core из библиотеки в пол
 - **docs** — документация прямо в терминале
 
 Вместе с Phase 8.3 это создаёт полный user journey:
+
 ```
 semantic init → semantic ingest ./docs/ -r → semantic search "query"
 ```

@@ -79,6 +79,7 @@ tests/unit/cli/test_cli_phase_8_1.py      # +NEW: ~490 строк, 30 тесто
 Показывает детальную статистику по обеим очередям.
 
 **Опции:**
+
 | Опция | Сокращение | Описание |
 |-------|------------|----------|
 | `--verbose` | `-v` | Детальная информация |
@@ -164,6 +165,7 @@ tests/unit/cli/test_cli_phase_8_1.py      # +NEW: ~490 строк, 30 тесто
 Удаляет завершённые и проваленные задачи из очередей.
 
 **Опции:**
+
 | Опция | Сокращение | Описание | Default |
 |-------|------------|----------|---------|
 | `--type` | `-t` | Тип очереди: text/media/all | all |
@@ -222,6 +224,7 @@ semantic queue flush -t media -y
 Сбрасывает статус failed задач на pending для повторной обработки.
 
 **Опции:**
+
 | Опция | Сокращение | Описание | Default |
 |-------|------------|----------|---------|
 | `--type` | `-t` | Тип очереди: text/media/all | all |
@@ -282,6 +285,7 @@ def _retry_media_queue(max_tasks: int | None) -> int:
 Выполняет один цикл обработки и завершается.
 
 **Опции:**
+
 | Опция | Сокращение | Описание | Default |
 |-------|------------|----------|---------|
 | `--max-tasks` | `-n` | Максимум задач | 10 |
@@ -335,6 +339,7 @@ def _retry_media_queue(max_tasks: int | None) -> int:
 Запускает непрерывный воркер с graceful shutdown.
 
 **Опции:**
+
 | Опция | Сокращение | Описание | Default |
 |-------|------------|----------|---------|
 | `--batch-size` | `-b` | Размер батча | 10 |
@@ -494,6 +499,7 @@ def get_module_emoji(module_name: str) -> str:
 ```
 
 **Пример:**
+
 ```python
 module = "semantic_core.cli.commands.queue"
 
@@ -536,6 +542,7 @@ def worker_start():
 ```
 
 **Альтернатива (не использовали):** Threading Event:
+
 ```python
 shutdown_event = threading.Event()
 # shutdown_event.set() в handler
@@ -609,6 +616,7 @@ tests/unit/cli/test_cli_phase_8_1.py  # ~490 строк, 30 тестов
 ### 7.2 Классы тестов
 
 **TestQueueStatusCommand (7 тестов):**
+
 - `test_queue_status_help` — справка содержит опции
 - `test_queue_status_text_only` — фильтр --type text
 - `test_queue_status_media_only` — фильтр --type media
@@ -618,6 +626,7 @@ tests/unit/cli/test_cli_phase_8_1.py  # ~490 строк, 30 тестов
 - `test_queue_status_empty_db` — пустая БД (skipped)
 
 **TestQueueFlushCommand (5 тестов):**
+
 - `test_queue_flush_help`
 - `test_queue_flush_no_confirm` — запрос подтверждения
 - `test_queue_flush_with_confirm` — --confirm/-y
@@ -625,12 +634,14 @@ tests/unit/cli/test_cli_phase_8_1.py  # ~490 строк, 30 тестов
 - `test_queue_flush_media_only`
 
 **TestQueueRetryCommand (4 теста):**
+
 - `test_queue_retry_help`
 - `test_queue_retry_text_only`
 - `test_queue_retry_media_only`
 - `test_queue_retry_with_max_tasks`
 
 **TestWorkerRunOnceCommand (5 тестов):**
+
 - `test_worker_run_once_help`
 - `test_worker_run_once_default` — стандартный запуск
 - `test_worker_run_once_max_tasks` — с --max-tasks
@@ -638,17 +649,20 @@ tests/unit/cli/test_cli_phase_8_1.py  # ~490 строк, 30 тестов
 - `test_worker_run_once_json_output` — JSON формат
 
 **TestWorkerStartCommand (4 теста):**
+
 - `test_worker_start_help`
 - `test_worker_start_default_options`
 - `test_worker_start_custom_options`
 - `test_worker_start_signal_handler` — регистрация SIGINT
 
 **TestEmojiMapUpdates (3 теста):**
+
 - `test_emoji_map_has_cli_entries` — cli, worker, commands
 - `test_get_module_emoji_for_cli` — приоритет паттернов
 - `test_get_module_emoji_for_worker` — worker эмодзи
 
 **TestHelpersAndUtilities (3 теста):**
+
 - `test_get_text_stats_function_exists`
 - `test_get_media_stats_function_exists`
 - `test_render_stats_table_function_exists`
@@ -789,6 +803,7 @@ echo "✅ Очередь пуста"
 ### 11.1 Почему глобальный флаг?
 
 **Альтернативы:**
+
 1. **Threading Event** — overkill для single-threaded CLI
 2. **Class-based worker** — слишком сложно для простого use case
 3. **asyncio cancellation** — Typer не async по умолчанию
@@ -798,6 +813,7 @@ echo "✅ Очередь пуста"
 ### 11.2 Почему separate commands?
 
 **Альтернатива:** Один `worker` с подкомандами inline:
+
 ```bash
 semantic worker --mode once|continuous
 ```
@@ -830,11 +846,13 @@ semantic worker --mode once|continuous
 Phase 8.1 добавила операционный слой к CLI:
 
 **Queue Management:**
+
 - `status` — полный обзор очередей
 - `flush` — очистка с гранулярным контролем
 - `retry` — восстановление failed задач
 
 **Worker:**
+
 - `run-once` — для cron/CI
 - `start` — для постоянной работы с graceful shutdown
 

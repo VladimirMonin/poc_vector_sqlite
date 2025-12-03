@@ -18,6 +18,7 @@
 **Проблема:** Это создавало высокий барьер входа. Нельзя было просто "поиграться" с библиотекой из терминала. Нельзя было быстро проиндексировать папку с документами. Нельзя было проверить что всё работает без написания кода.
 
 **Решение Phase 8:** Создать полноценный CLI-интерфейс `semantic`, который позволит:
+
 - Интерактивно настроить проект (`semantic init`)
 - Просматривать и проверять конфигурацию (`semantic config show/check`)
 - Диагностировать окружение (`semantic doctor`)
@@ -154,12 +155,14 @@ level = "DEBUG"
 ### 3.1 Почему Typer?
 
 Рассматривались варианты:
+
 - **Click** — низкоуровневый, много boilerplate
 - **Argparse** — ещё более низкоуровневый
 - **Fire** — слишком магический, плохо контролируется
 - **Typer** ✅ — декларативный, поддержка Rich, автогенерация --help
 
 **Typer** выигрывает благодаря:
+
 - Аннотациям типов для параметров
 - Интеграции с Rich для красивого вывода
 - Автоматической генерации --help
@@ -233,10 +236,10 @@ semantic = "semantic_core.cli:main"
 После `poetry install` можно запускать:
 
 ```bash
-$ semantic --help
-$ semantic init
-$ semantic config show
-$ semantic doctor
+semantic --help
+semantic init
+semantic config show
+semantic doctor
 ```
 
 ---
@@ -248,11 +251,13 @@ $ semantic doctor
 **Назначение:** Интерактивно создать `semantic.toml` в текущей директории.
 
 **Логика:**
+
 1. Проверить что `semantic.toml` не существует (или спросить о перезаписи)
 2. Интерактивно запросить основные параметры
 3. Записать TOML файл
 
 **Интерактивные вопросы:**
+
 - Путь к базе данных (default: `semantic.db`)
 - Уровень логирования (TRACE/DEBUG/INFO/WARNING/ERROR)
 - Тип сплиттера (simple/smart)
@@ -274,6 +279,7 @@ $ semantic init
 ```
 
 **Особенности реализации:**
+
 - Typer `prompt=True` для интерактивного ввода
 - `typer.confirm()` для да/нет вопросов
 - Валидация ввода через callback
@@ -283,6 +289,7 @@ $ semantic init
 **Назначение:** Показать текущую конфигурацию в виде таблицы.
 
 **Логика:**
+
 1. Загрузить `SemanticConfig`
 2. Определить источник (TOML / env / defaults)
 3. Вывести таблицу с маскировкой секретов
@@ -319,6 +326,7 @@ def mask_secret(value: str) -> str:
 **Назначение:** Проверить валидность конфигурации и доступность ресурсов.
 
 **Проверки:**
+
 1. ✅ База данных: файл существует или может быть создан
 2. ✅/❌ API ключ: настроен или нет
 3. ⚠️ Batch API ключ: опционален, но без него async недоступен
@@ -344,6 +352,7 @@ def mask_secret(value: str) -> str:
 **Назначение:** Диагностика окружения — проверка зависимостей, версий, ресурсов.
 
 **Проверки:**
+
 1. **Python version** — минимум 3.11
 2. **sqlite-vec extension** — установлена и работает
 3. **GEMINI_API_KEY** — настроен (env или config)
@@ -462,6 +471,7 @@ tests/unit/cli/
 ### 6.2 test_config.py (22 теста)
 
 **TestSemanticConfigDefaults (7 тестов):**
+
 - `test_default_db_path` — `Path("semantic.db")`
 - `test_default_gemini_api_key_none` — None без env
 - `test_default_splitter` — "smart"
@@ -471,6 +481,7 @@ tests/unit/cli/
 - `test_default_log_level` — "INFO"
 
 **TestSemanticConfigFromToml (6 тестов):**
+
 - `test_load_from_toml_database_section`
 - `test_load_from_toml_gemini_section`
 - `test_load_from_toml_processing_section`
@@ -479,24 +490,29 @@ tests/unit/cli/
 - `test_load_from_toml_logging_section`
 
 **TestSemanticConfigEnvVars (3 теста):**
+
 - `test_env_var_semantic_db_path`
 - `test_env_var_semantic_log_level`
 - `test_direct_override_gemini_api_key`
 
 **TestSemanticConfigPriority (2 теста):**
+
 - `test_kwargs_override_toml`
 - `test_toml_overrides_defaults`
 
 **TestFindConfigFile (3 теста):**
+
 - `test_find_semantic_toml_in_cwd`
 - `test_returns_none_if_no_config`
 - `test_searches_parent_directories`
 
 **TestGetConfigSingleton (2 теста):**
+
 - `test_get_config_returns_same_instance`
 - `test_reset_config_clears_singleton`
 
 **TestConfigValidators (6 тестов):**
+
 - `test_db_path_string_converted_to_path`
 - `test_api_key_whitespace_stripped`
 - `test_empty_api_key_becomes_none`
@@ -507,27 +523,32 @@ tests/unit/cli/
 ### 6.3 test_cli_commands.py (21 тест)
 
 **TestCliApp (3 теста):**
+
 - `test_app_has_help`
 - `test_version_flag`
 - `test_no_args_shows_help`
 
 **TestInitCommand (2 теста):**
+
 - `test_init_creates_toml_file`
 - `test_init_default_values`
 
 **TestConfigCommand (4 теста):**
+
 - `test_config_show_displays_table`
 - `test_config_show_masks_api_key`
 - `test_config_check_validates`
 - `test_config_check_warns_missing_batch_key`
 
 **TestDoctorCommand (4 теста):**
+
 - `test_doctor_shows_table`
 - `test_doctor_checks_python_version`
 - `test_doctor_checks_sqlite_vec`
 - `test_doctor_checks_api_key`
 
 **TestCliContext (5 тестов):**
+
 - `test_context_lazy_initialization`
 - `test_context_get_config_immediate`
 - `test_context_get_core_lazy`
@@ -535,6 +556,7 @@ tests/unit/cli/
 - `test_context_verbose_flag`
 
 **TestCliEdgeCases (3 теста):**
+
 - `test_invalid_toml_graceful_degradation`
 - `test_missing_db_path_uses_default`
 - `test_empty_api_key_treated_as_none`
