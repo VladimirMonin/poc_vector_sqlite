@@ -136,10 +136,8 @@ class CLIContext:
             PeeweeVectorStore,
             init_peewee_database,
         )
-        from semantic_core.infrastructure.text_processing import (
-            SimpleSplitter,
-            BasicContextStrategy,
-        )
+        from semantic_core.processing.splitters import SmartSplitter
+        from semantic_core.processing.context import HierarchicalContextStrategy
 
         # Database
         db = init_peewee_database(config.db_path, config.embedding_dimension)
@@ -155,13 +153,11 @@ class CLIContext:
         # Store
         store = PeeweeVectorStore(database=db)
 
-        # Splitter (пока только simple, smart будет добавлен позже)
-        # TODO: Добавить SmartSplitter когда он будет в публичном API
-        splitter = SimpleSplitter()
+        # Splitter
+        splitter = SmartSplitter()
 
-        # Context Strategy (пока только basic)
-        # TODO: Добавить HierarchicalContextStrategy
-        context_strategy = BasicContextStrategy()
+        # Context Strategy
+        context_strategy = HierarchicalContextStrategy()
 
         return SemanticCore(
             embedder=embedder,
