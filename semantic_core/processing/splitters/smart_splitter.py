@@ -109,8 +109,12 @@ class SmartSplitter(BaseSplitter):
                             "headers": segment.headers,
                             "start_line": segment.start_line,
                             "end_line": segment.end_line,
-                            "alt": segment.metadata.get("alt", "") if segment.metadata else "",
-                            "title": segment.metadata.get("title", "") if segment.metadata else "",
+                            "alt": segment.metadata.get("alt", "")
+                            if segment.metadata
+                            else "",
+                            "title": segment.metadata.get("title", "")
+                            if segment.metadata
+                            else "",
                         },
                     )
                 )

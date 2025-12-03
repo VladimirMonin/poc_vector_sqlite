@@ -108,7 +108,16 @@ class TestRealVideoAnalysis:
         # Для диаграммы ожидаем распознавание схемы/диаграммы
         description_lower = result.description.lower()
         # Должно содержать упоминание диаграммы, схемы или OAuth
-        diagram_words = ["diagram", "диаграмм", "схем", "oauth", "sequence", "flow", "authorization", "авториз"]
+        diagram_words = [
+            "diagram",
+            "диаграмм",
+            "схем",
+            "oauth",
+            "sequence",
+            "flow",
+            "authorization",
+            "авториз",
+        ]
         assert any(w in description_lower for w in diagram_words), (
             f"Expected diagram-related words in: {result.description}"
         )
@@ -153,13 +162,22 @@ class TestRealVideoAnalysis:
         # Ожидаем упоминание человека/спикера
         assert any(
             word in description_lower
-            for word in ["person", "speaker", "man", "woman", "someone", "talking", "человек", "говорит"]
+            for word in [
+                "person",
+                "speaker",
+                "man",
+                "woman",
+                "someone",
+                "talking",
+                "человек",
+                "говорит",
+            ]
         ), f"Expected person/speaker mention in: {result.description}"
 
         # Проверяем транскрипцию - должны быть слова Джунгли/Обезьянка/Пальма
         assert result.transcription is not None
         assert len(result.transcription) > 0
-        
+
         transcription_lower = result.transcription.lower()
         # Проверяем наличие хотя бы одного ключевого слова
         key_words = ["джунгли", "обезьян", "пальм", "jungle", "monkey", "palm"]
@@ -222,7 +240,15 @@ class TestRealVideoAnalysis:
         # Хотя бы одно слово из контекста должно появиться
         assert any(
             word in combined_text
-            for word in ["oauth", "django", "авториз", "диаграмм", "sequence", "diagram", "authentication"]
+            for word in [
+                "oauth",
+                "django",
+                "авториз",
+                "диаграмм",
+                "sequence",
+                "diagram",
+                "authentication",
+            ]
         ), f"Expected context-aware words in: {combined_text}"
 
 

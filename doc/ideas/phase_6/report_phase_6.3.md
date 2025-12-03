@@ -9,6 +9,7 @@
 ## 1. Цель фазы
 
 Комплексное тестирование инфраструктуры медиа-анализа:
+
 - Unit-тесты утилит (`audio.py`, `video.py`) с моками
 - Integration-тесты Markdown+медиа обогащения
 - E2E тесты с реальными медиа-файлами и Gemini API
@@ -87,22 +88,26 @@ tests/fixtures/media/
 ### 4.1 test_audio_utils.py
 
 #### Группа: TestEnsureFfmpeg (3 теста)
+
 - `test_ffmpeg_found` — ffmpeg в PATH, нет исключения
 - `test_ffmpeg_missing_raises_dependency_error` — DependencyError при отсутствии
 - `test_dependency_error_has_install_instructions` — сообщение содержит brew/apt
 
 #### Группа: TestIsAudioSupported (3 теста)
+
 - Параметризованные тесты для 7 поддерживаемых MIME-типов
 - Параметризованные тесты для 5 неподдерживаемых типов
 - `test_supported_types_constant_not_empty`
 
 #### Группа: TestDefaults (4 теста)
+
 - `test_default_bitrate_is_32` — проверка константы
 - `test_default_codec_is_libvorbis`
 - `test_default_sample_rate_is_16000`
 - `test_default_mono_is_true`
 
 #### Группа: TestExtractAudioFromVideo (6 тестов)
+
 - `test_file_not_found_raises` — FileNotFoundError
 - `test_ffmpeg_missing_raises` — DependencyError
 - `test_output_path_auto_generated` — имя файла без output_path
@@ -111,17 +116,20 @@ tests/fixtures/media/
 - `test_stereo_preserved_when_mono_false` — set_channels не вызывается
 
 #### Группа: TestOptimizeAudioToBytes (2 теста)
+
 - `test_returns_bytes_and_mime_type` — возвращает tuple
 - `test_different_formats` — ogg → audio/ogg, mp3 → audio/mp3
 
 ### 4.2 test_video_utils.py
 
 #### Группа: TestIsVideoSupported (3 теста)
+
 - Параметризованные тесты для 6 поддерживаемых типов (mp4, webm, quicktime...)
 - Параметризованные тесты для 5 неподдерживаемых
 - `test_supported_types_constant_not_empty`
 
 #### Группа: TestQualityPresets (5 тестов)
+
 - `test_fhd_preset_is_1024` — намеренно занижен
 - `test_hd_preset_is_768`
 - `test_balanced_preset_is_512`
@@ -129,12 +137,14 @@ tests/fixtures/media/
 - `test_all_presets_below_2000` — защита от случайного увеличения
 
 #### Группа: TestResizeFrame (4 теста)
+
 - `test_small_image_not_resized` — 500x300 остаётся
 - `test_large_image_resized` — 2000x1500 → max 1024
 - `test_exact_max_dim_not_resized` — 1024x768 остаётся
 - `test_tall_image_resized_by_height` — 1000x3000 ресайз по высоте
 
 #### Группа: TestExtractFrames (7 тестов)
+
 - `test_file_not_found_raises`
 - `test_ffmpeg_missing_raises`
 - `test_unknown_mode_raises` — ValueError для mode="unknown"
@@ -144,6 +154,7 @@ tests/fixtures/media/
 - `test_max_frames_limit` — не более max_frames кадров
 
 #### Группа: TestFramesToBytes (5 тестов)
+
 - `test_returns_list_of_tuples`
 - `test_jpeg_format` — image/jpeg
 - `test_png_format` — image/png
@@ -208,6 +219,7 @@ tests/fixtures/media/
 ### 6.1 test_markdown_media_enrichment.py
 
 #### TestMarkdownImageDetection (8 тестов)
+
 - `test_single_image_detected_as_image_ref` — изолированное изображение
 - `test_inline_image_stays_in_text` — `text ![img](url) more text` → TEXT
 - `test_multiple_images_create_multiple_segments` — 2 изображения → 2 сегмента
@@ -218,6 +230,7 @@ tests/fixtures/media/
 - `test_nested_list_with_image` — изображение в списке (edge case)
 
 #### TestSmartSplitterMediaHandling (6 тестов)
+
 - `test_image_ref_becomes_separate_chunk` — IMAGE_REF изолирован
 - `test_image_ref_not_merged_with_text` — не смешивается с текстом
 - `test_multiple_images_multiple_chunks` — каждый в своём чанке
@@ -226,6 +239,7 @@ tests/fixtures/media/
 - `test_large_text_with_images` — изображения не теряются в длинном тексте
 
 #### TestEndToEndMediaEnrichment (4 теста)
+
 - `test_full_pipeline_image_detection` — Document → Chunks с IMAGE_REF
 - `test_real_world_readme_structure` — реалистичный README.md
 - `test_image_searchable_by_alt` — можно искать по alt-тексту

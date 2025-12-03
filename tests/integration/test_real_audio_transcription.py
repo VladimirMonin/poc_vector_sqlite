@@ -131,7 +131,16 @@ class TestRealAudioTranscription:
         description_lower = result.description.lower()
         assert any(
             word in description_lower
-            for word in ["python", "вектор", "vector", "semantic", "семантик", "поиск", "search", "embedding"]
+            for word in [
+                "python",
+                "вектор",
+                "vector",
+                "semantic",
+                "семантик",
+                "поиск",
+                "search",
+                "embedding",
+            ]
         )
 
     def test_transcription_returns_duration(self, audio_analyzer, speech_audio_path):
@@ -151,7 +160,9 @@ class TestRealAudioTranscription:
         assert result.duration_seconds is not None
         assert result.duration_seconds > 0
         # Для тестового файла ~15 секунд
-        assert 10 < result.duration_seconds < 30, f"Expected 10-30 sec, got {result.duration_seconds}"
+        assert 10 < result.duration_seconds < 30, (
+            f"Expected 10-30 sec, got {result.duration_seconds}"
+        )
 
     def test_noise_audio_handled_gracefully(self, audio_analyzer, noise_audio_path):
         """Шум/тишина обрабатывается без падения.

@@ -9,6 +9,7 @@
 ## 1. Цель фазы
 
 Создать полноценную инфраструктуру для мультимодального анализа медиа-контента:
+
 - Транскрипция и анализ аудио через Gemini API
 - Мультимодальный анализ видео (кадры + аудио)
 - Утилиты для оптимизации и извлечения медиа-данных
@@ -39,6 +40,7 @@
 ```
 
 Обоснование:
+
 - Gemini не различает стерео (внутренне конвертирует в mono)
 - Для speech recognition 16kHz достаточно (телефонное качество)
 - OGG/Vorbis лучше MP3 по качеству на низких битрейтах
@@ -142,6 +144,7 @@ result = analyzer.analyze(MediaRequest(...), config)
 ### 5.1 usage_metadata — Pydantic вместо dict
 
 **Проблема:** При тестировании получили ошибку:
+
 ```
 AttributeError: 'GenerateContentResponseUsageMetadata' object has no attribute 'get'
 ```
@@ -149,11 +152,13 @@ AttributeError: 'GenerateContentResponseUsageMetadata' object has no attribute '
 **Причина:** Google GenAI SDK возвращает Pydantic-модель, а код ожидал dict.
 
 **Было:**
+
 ```python
 token_count = response.usage_metadata.get("total_token_count")
 ```
 
 **Стало:**
+
 ```python
 token_count = getattr(response.usage_metadata, "total_token_count", None)
 ```
@@ -167,12 +172,14 @@ token_count = getattr(response.usage_metadata, "total_token_count", None)
 **Причина:** Неверная логика проверки. Код проверял `inline_token.content.strip()`, но у изображения `content` содержит полный markdown `![alt](path)`, а не пустую строку.
 
 **Было:**
+
 ```python
 if images and not inline_token.content.strip():
     # Только изображение
 ```
 
 **Стало:**
+
 ```python
 # Считаем не-image детей
 text_nodes = [c for c in children if c.type == "text" and c.content.strip()]
@@ -211,6 +218,7 @@ elif segment.segment_type == ChunkType.IMAGE_REF:
 **Причина:** В `.env` ключ называется `GEMINI_API_KEY`, а тесты ожидают `GOOGLE_API_KEY`.
 
 **Решение:** Экспорт с правильным именем:
+
 ```bash
 export GOOGLE_API_KEY=$(grep GEMINI_API_KEY .env | cut -d= -f2)
 ```
@@ -251,10 +259,12 @@ export GOOGLE_API_KEY=$(grep GEMINI_API_KEY .env | cut -d= -f2)
 ### 8.1 FFmpeg (обязательно)
 
 FFmpeg требуется для:
+
 - `pydub` — аудио конвертация
 - `imageio[pyav]` — видео декодирование
 
 Установка:
+
 ```bash
 # macOS
 brew install ffmpeg
