@@ -19,47 +19,72 @@ from typing import Any
 from .levels import TRACE
 
 # Маппинг паттернов имени модуля на эмодзи
+# ВАЖНО: Этот маппинг уже содержит все паттерны для Phase 7.1, 7.2, 7.3
+# Агентам НЕ нужно его модифицировать!
 EMOJI_MAP: dict[str, str] = {
     # Pipeline & Orchestration
     "pipeline": "📥",
     "core": "📥",
-    # Text Processing
+    # Text Processing (Phase 7.1)
     "parser": "🧶",
     "parsers": "🧶",
     "markdown": "🧶",
     "splitter": "✂️",
     "splitters": "✂️",
     "context": "🧬",
-    "enricher": "🧬",
-    "enrichers": "🧬",
-    # Media Analysis
+    "hierarchy": "🧬",
+    "hierarchical": "🧬",
+    "enricher": "🖼️",
+    "enrichers": "🖼️",
+    "asset": "🖼️",
+    "assets": "🖼️",
+    # Media Analysis (Phase 7.2)
     "image": "👁️",
+    "images": "👁️",
     "vision": "👁️",
     "audio": "🎙️",
     "video": "🎬",
     "media": "🎞️",
-    # AI & Embeddings
+    "frame": "🎞️",
+    "frames": "🎞️",
+    "optimize": "⚡",
+    "optimization": "⚡",
+    # AI & Embeddings (Phase 7.2)
     "embed": "🧠",
     "embedder": "🧠",
     "embeddings": "🧠",
     "gemini": "🧠",
-    # Batching & Queues
+    "api": "🌐",
+    # Batching & Queues (Phase 7.2)
     "batch": "📦",
     "batching": "📦",
     "queue": "📦",
-    # Storage & Database
+    # Storage & Database (Phase 7.2)
     "storage": "💾",
     "adapter": "💾",
     "peewee": "💾",
     "database": "🗄️",
+    "engine": "🗄️",
+    "model": "🗄️",
+    "models": "🗄️",
     # Search
     "search": "🔍",
-    # Security & Rate Limiting
+    # Security & Rate Limiting (Phase 7.2)
     "rate": "🛡️",
     "limit": "🛡️",
     "limiter": "🛡️",
     "auth": "🛡️",
     "resilience": "🛡️",
+    "retry": "🔄",
+    # File & Token utilities (Phase 7.2)
+    "file": "📁",
+    "files": "📁",
+    "token": "🔢",
+    "tokens": "🔢",
+    # Diagnostics (Phase 7.3)
+    "diagnostic": "🩺",
+    "diagnostics": "🩺",
+    "config": "⚙️",
 }
 
 # Эмодзи для уровней логирования
