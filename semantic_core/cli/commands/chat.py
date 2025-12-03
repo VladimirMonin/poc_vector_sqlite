@@ -1,7 +1,7 @@
 """Команда chat для интерактивного RAG-чата.
 
 Запускает REPL-режим с Retrieval-Augmented Generation.
-Поддерживает разные режимы поиска и настройки LLM.
+Поддерживает разные режимы поиска, настройки LLM и slash-команды.
 
 Usage:
     semantic chat                     # Гибридный поиск, gemini-2.0-flash
@@ -10,6 +10,14 @@ Usage:
     semantic chat --context 10        # Больше контекста
     semantic chat --history-limit 20  # Хранить 20 сообщений
     semantic chat --token-budget 10000  # Лимит по токенам
+
+Slash-команды в чате:
+    /help           Справка по командам
+    /search <query> Поиск в базе знаний
+    /sources        Источники последнего ответа
+    /model          Показать/сменить модель
+    /tokens         Статистика токенов
+    /quit           Выход
 """
 
 from typing import Optional
@@ -201,6 +209,63 @@ def chat(
         history_manager = ChatHistoryManager(LastNMessages(n=history_limit))
         history_label = f"до {history_limit} сообщений"
 
+    # Инициализируем систему slash-команд
+    from semantic_core.cli.chat.slash import (
+        SlashCommandHandler,
+        ChatContext,
+        SlashAction,
+        # Basic commands
+        HelpCommand,
+        ClearCommand,
+        QuitCommand,
+        TokensCommand,
+        HistoryCommand,
+        CompressCommand,
+        # Search commands
+        SearchCommand,
+        SearchModeCommand,
+        SourcesCommand,
+        SourceCommand,
+        # Settings commands
+        ModelCommand,
+        ContextCommand,
+    )
+
+    # Создаем контекст чата
+    chat_context = ChatContext(
+        console=console,
+        core=core,
+        rag=rag,
+        llm=llm,
+        history_manager=history_manager,
+        last_result=None,
+        search_mode=search_mode,
+        context_chunks=context_chunks,
+        temperature=temperature,
+    )
+    # Сохраняем дополнительные настройки в extra_context
+    chat_context.extra_context["_show_sources"] = str(show_sources)
+    chat_context.extra_context["_full_docs"] = str(full_docs)
+    chat_context.extra_context["_max_tokens"] = str(max_tokens) if max_tokens else ""
+    chat_context.extra_context["_model"] = model
+
+    # Создаем обработчик slash-команд
+    slash_handler = SlashCommandHandler()
+
+    # Регистрируем команды (HelpCommand требует handler)
+    slash_handler.register(HelpCommand(slash_handler))
+    slash_handler.register(ClearCommand())
+    slash_handler.register(QuitCommand())
+    slash_handler.register(TokensCommand())
+    slash_handler.register(HistoryCommand())
+    slash_handler.register(CompressCommand())
+    slash_handler.register(SearchCommand())
+    slash_handler.register(SearchModeCommand())
+    slash_handler.register(SourcesCommand())
+    slash_handler.register(SourceCommand())
+    slash_handler.register(ModelCommand())
+    slash_handler.register(ContextCommand())
+
     # Приветствие
     _show_welcome(console, model, search_mode, context_chunks, full_docs, history_label)
 
@@ -210,14 +275,41 @@ def chat(
             # Получаем ввод
             query = Prompt.ask("\n[bold blue]You[/bold blue]")
 
-            # Проверка на выход
-            if query.lower() in ("exit", "quit", "/exit", "/quit", "q"):
-                console.print("[dim]До свидания! 👋[/dim]")
-                break
-
             # Пустой ввод
             if not query.strip():
                 continue
+
+            # Обработка slash-команд
+            if query.startswith("/"):
+                result = slash_handler.handle(query, chat_context)
+
+                # Выводим сообщение если есть
+                if result.message:
+                    console.print(result.message)
+
+                # Обрабатываем действие
+                if result.action == SlashAction.EXIT:
+                    console.print("[dim]До свидания! 👋[/dim]")
+                    break
+                elif result.action == SlashAction.CLEAR:
+                    console.clear()
+                    current_model = chat_context.extra_context.get("_model", model)
+                    current_full_docs = chat_context.extra_context.get("_full_docs", "False") == "True"
+                    _show_welcome(
+                        console,
+                        current_model,
+                        chat_context.search_mode,
+                        chat_context.context_chunks,
+                        current_full_docs,
+                        history_label,
+                    )
+                    console.print("[green]✓ Экран очищен[/green]")
+                continue
+
+            # Проверка на устаревшие команды выхода (без слеша)
+            if query.lower() in ("exit", "quit", "q"):
+                console.print("[dim]До свидания! 👋[/dim]")
+                break
 
             # Выполняем RAG запрос
             with console.status("[bold green]Думаю...[/bold green]", spinner="dots"):
@@ -225,14 +317,22 @@ def chat(
                     # Получаем историю для RAG (если есть)
                     history = history_manager.get_history() if history_manager else None
 
+                    # Читаем настройки из контекста
+                    current_max_tokens_str = chat_context.extra_context.get("_max_tokens", "")
+                    current_max_tokens = int(current_max_tokens_str) if current_max_tokens_str else max_tokens
+                    current_full_docs = chat_context.extra_context.get("_full_docs", "False") == "True"
+
                     result = rag.ask(
                         query=query,
-                        search_mode=search_mode,  # type: ignore
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                        full_docs=full_docs,
+                        search_mode=chat_context.search_mode,
+                        temperature=chat_context.temperature,
+                        max_tokens=current_max_tokens,
+                        full_docs=current_full_docs,
                         history=history,
                     )
+
+                    # Сохраняем результат в контекст
+                    chat_context.last_result = result
 
                     # Сохраняем в историю
                     if history_manager:
@@ -259,8 +359,10 @@ def chat(
             console.print(Markdown(result.answer))
 
             # Показываем источники
-            if show_sources and result.has_sources:
-                _show_sources(console, result.sources, result.full_docs)
+            current_show_sources = chat_context.extra_context.get("_show_sources", "True") == "True"
+            current_full_docs = chat_context.extra_context.get("_full_docs", "False") == "True"
+            if current_show_sources and result.has_sources:
+                _show_sources(console, result.sources, current_full_docs)
 
             # Показываем токены
             if result.total_tokens:
@@ -281,7 +383,7 @@ def chat(
                 )
 
         except KeyboardInterrupt:
-            console.print("\n[dim]Прервано. Введите 'exit' для выхода.[/dim]")
+            console.print("\n[dim]Прервано. Введите '/quit' для выхода.[/dim]")
             continue
 
         except EOFError:
@@ -317,7 +419,9 @@ def _show_welcome(
     if full_docs:
         welcome_text += f"Режим: [yellow]полные документы[/yellow]\n"
 
-    welcome_text += f"\n[dim]Введите вопрос или 'exit' для выхода.[/dim]"
+    welcome_text += (
+        f"\n[dim]Введите вопрос или /help для списка команд.[/dim]"
+    )
 
     console.print(
         Panel(
