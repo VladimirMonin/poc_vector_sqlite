@@ -160,10 +160,11 @@ class GeminiEmbedder(BaseEmbedder):
             embedding = self._normalize_vector(embedding)
 
             # Логируем AI вызов
+            prompt_preview = text[:100] + "..." if len(text) > 100 else text
             logger.trace_ai(
-                operation="embedding",
+                prompt=prompt_preview,
                 model=self.model_name,
-                prompt_preview=text[:100] + "..." if len(text) > 100 else text,
+                operation="embedding",
                 task_type=task_type,
                 dimension=self.dimension,
             )
