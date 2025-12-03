@@ -773,3 +773,124 @@ def large_wallpaper_path(assets_dir):
     if not path.exists():
         pytest.skip(f"Asset not found: {path}")
     return path
+
+
+# ============================================================================
+# Фикстуры для Phase 6.3 (Audio/Video Testing)
+# ============================================================================
+
+
+@pytest.fixture
+def media_fixtures_dir(fixtures_dir):
+    """Путь к директории с медиа-ассетами для тестов."""
+    return fixtures_dir / "media"
+
+
+@pytest.fixture
+def audio_fixtures_dir(media_fixtures_dir):
+    """Путь к директории с аудио-ассетами."""
+    return media_fixtures_dir / "audio"
+
+
+@pytest.fixture
+def video_fixtures_dir(media_fixtures_dir):
+    """Путь к директории с видео-ассетами."""
+    return media_fixtures_dir / "video"
+
+
+@pytest.fixture
+def speech_audio_path(audio_fixtures_dir):
+    """Путь к тестовому аудио с речью.
+
+    Ожидается файл ~10 сек с фразой:
+    "This is a test of semantic core audio analysis"
+    """
+    path = audio_fixtures_dir / "speech.mp3"
+    if not path.exists():
+        pytest.skip(f"Audio file not found: {path}")
+    return path
+
+
+@pytest.fixture
+def noise_audio_path(audio_fixtures_dir):
+    """Путь к аудио с шумом/тишиной (~3 сек)."""
+    path = audio_fixtures_dir / "noise.wav"
+    if not path.exists():
+        pytest.skip(f"Noise audio not found: {path}")
+    return path
+
+
+@pytest.fixture
+def slides_video_path(video_fixtures_dir):
+    """Путь к видео со слайдами/презентацией (~10-15 сек)."""
+    path = video_fixtures_dir / "slides.mp4"
+    if not path.exists():
+        pytest.skip(f"Video file not found: {path}")
+    return path
+
+
+@pytest.fixture
+def talking_head_video_path(video_fixtures_dir):
+    """Путь к видео с говорящим человеком (~10 сек)."""
+    path = video_fixtures_dir / "talking_head.mp4"
+    if not path.exists():
+        pytest.skip(f"Talking head video not found: {path}")
+    return path
+
+
+@pytest.fixture
+def mock_audio_analyzer(mock_analysis_result):
+    """Mock GeminiAudioAnalyzer для unit-тестов."""
+    from unittest.mock import MagicMock
+    from semantic_core.domain.media import MediaAnalysisResult
+
+    analyzer = MagicMock()
+    analyzer.analyze.return_value = MediaAnalysisResult(
+        description="Audio analysis result",
+        alt_text="Audio",
+        keywords=["speech", "test"],
+        transcription="This is a test transcription",
+        participants=["Speaker 1"],
+        action_items=[],
+        duration_seconds=10.0,
+    )
+    return analyzer
+
+
+@pytest.fixture
+def mock_video_analyzer(mock_analysis_result):
+    """Mock GeminiVideoAnalyzer для unit-тестов."""
+    from unittest.mock import MagicMock
+    from semantic_core.domain.media import MediaAnalysisResult
+
+    analyzer = MagicMock()
+    analyzer.analyze.return_value = MediaAnalysisResult(
+        description="Video analysis result with multiple frames",
+        alt_text=None,
+        keywords=["presentation", "slides"],
+        ocr_text="Sample text from slides",
+        transcription="Welcome to the tutorial",
+        participants=["Presenter"],
+        action_items=["Review the slides"],
+        duration_seconds=15.0,
+    )
+    return analyzer
+
+
+@pytest.fixture
+def full_media_queue_processor(
+    media_db,
+    mock_image_analyzer,
+    mock_audio_analyzer,
+    mock_video_analyzer,
+    rate_limiter,
+):
+    """MediaQueueProcessor со всеми анализаторами для Phase 6.3 тестов."""
+    from semantic_core.core.media_queue import MediaQueueProcessor
+
+    return MediaQueueProcessor(
+        image_analyzer=mock_image_analyzer,
+        audio_analyzer=mock_audio_analyzer,
+        video_analyzer=mock_video_analyzer,
+        rate_limiter=rate_limiter,
+    )
