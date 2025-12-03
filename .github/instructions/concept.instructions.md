@@ -34,6 +34,7 @@ Production-ready библиотека для локального семанти
 | `Pillow`         | Обработка изображений             | `/python-pillow/pillow`           |
 | `pydub`          | Извлечение/оптимизация аудио      | `/jiaaro/pydub`                   |
 | `imageio[pyav]`  | Извлечение кадров из видео        | `/imageio/imageio`                |
+| `rich`           | Console logging с цветами         | `/textualize/rich`                |
 
 ### 🗺 Дорожная Карта
 
@@ -41,6 +42,7 @@ Production-ready библиотека для локального семанти
 
 - **Phase 1-5:** Core, Storage, Integration, Markdown, Batching — {DONE}
 - **Phase 6:** Multimodality (Images/Audio/Video) — {DONE}
+- **Phase 7.0:** Logging Core Infrastructure — {DONE}
 
 ### 📂 Структура Проекта
 
@@ -52,6 +54,8 @@ semantic_core/
 │   └── peewee/               # PeeweeAdapter, SearchProxy
 ├── core/                     # Высокоуровневая оркестрация
 │   └── media_queue.py        # MediaQueueProcessor
+├── utils/                    # Утилиты
+│   └── logger/               # Semantic logging (TRACE, эмодзи, bind, secrets)
 ├── infrastructure/
 │   ├── gemini/               # GeminiEmbedder, ImageAnalyzer, AudioAnalyzer, VideoAnalyzer
 │   │   ├── embedder.py       # Embeddings API
@@ -90,13 +94,14 @@ tests/                        # 470+ тестов
 └── fixtures/                 # Тестовые данные
 ```
 
-**Подробнее о тестах:** [tests/README.md](tests/README.md)
+**Подробнее о тестах:** [tests/README.md](tests/README.md)  
+**Подробнее о логировании:** [semantic_core/utils/logger/README.md](semantic_core/utils/logger/README.md)
 
 ### 📚 Документация и Тестирование
 
 **Архитектурные документы:**
 
-- [Оглавление документации](doc/architecture/00_overview.md) — обзор всех 34 концепций проекта
+- [Оглавление документации](doc/architecture/00_overview.md) — обзор всех 38 концепций проекта
 - [Стайл-гайд документации](doc/architecture/00_documentation_style_guide.md) — правила написания доков
 
 **Workflow разработки:**
