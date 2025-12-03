@@ -5,6 +5,7 @@
 - Изоляция блоков кода
 - Извлечение языка программирования
 - Детекция медиа-ссылок (изображения, аудио, видео)
+- Определение типа медиа по расширению файла
 - Edge cases (код внутри списков, заголовки в комментариях)
 """
 
@@ -12,6 +13,13 @@ import pytest
 
 from semantic_core.domain import ChunkType
 from semantic_core.interfaces.parser import ParsingSegment
+from semantic_core.processing.parsers.markdown_parser import (
+    MarkdownNodeParser,
+    _get_media_type_by_extension,
+    AUDIO_EXTENSIONS,
+    VIDEO_EXTENSIONS,
+    IMAGE_EXTENSIONS,
+)
 
 
 def test_headers_stack_tracking(markdown_parser):
@@ -232,3 +240,274 @@ def test_mixed_content(evil_md_content, markdown_parser):
     # Все сегменты должны иметь контент
     for segment in segments:
         assert segment.content.strip(), f"Empty segment: {segment}"
+
+
+# ============================================================================
+# Phase 6.5: Детекция типа медиа по расширению файла
+# ============================================================================
+
+
+class TestMediaTypeDetectionFunction:
+    """Тесты для _get_media_type_by_extension()."""
+
+    def test_audio_mp3(self):
+        """MP3 → AUDIO_REF."""
+        assert _get_media_type_by_extension("audio/speech.mp3") == ChunkType.AUDIO_REF
+
+    def test_audio_wav(self):
+        """WAV → AUDIO_REF."""
+        assert _get_media_type_by_extension("sounds/noise.wav") == ChunkType.AUDIO_REF
+
+    def test_audio_ogg(self):
+        """OGG → AUDIO_REF."""
+        assert _get_media_type_by_extension("music.ogg") == ChunkType.AUDIO_REF
+
+    def test_audio_flac(self):
+        """FLAC → AUDIO_REF."""
+        assert _get_media_type_by_extension("lossless.flac") == ChunkType.AUDIO_REF
+
+    def test_audio_aac(self):
+        """AAC → AUDIO_REF."""
+        assert _get_media_type_by_extension("voice.aac") == ChunkType.AUDIO_REF
+
+    def test_audio_aiff(self):
+        """AIFF → AUDIO_REF."""
+        assert _get_media_type_by_extension("studio.aiff") == ChunkType.AUDIO_REF
+
+    def test_video_mp4(self):
+        """MP4 → VIDEO_REF."""
+        assert _get_media_type_by_extension("video/slides.mp4") == ChunkType.VIDEO_REF
+
+    def test_video_mov(self):
+        """MOV → VIDEO_REF."""
+        assert _get_media_type_by_extension("screen.mov") == ChunkType.VIDEO_REF
+
+    def test_video_avi(self):
+        """AVI → VIDEO_REF."""
+        assert _get_media_type_by_extension("old_video.avi") == ChunkType.VIDEO_REF
+
+    def test_video_mkv(self):
+        """MKV → VIDEO_REF."""
+        assert _get_media_type_by_extension("movie.mkv") == ChunkType.VIDEO_REF
+
+    def test_video_webm(self):
+        """WEBM → VIDEO_REF."""
+        assert _get_media_type_by_extension("web_video.webm") == ChunkType.VIDEO_REF
+
+    def test_image_png(self):
+        """PNG → IMAGE_REF."""
+        assert _get_media_type_by_extension("diagram.png") == ChunkType.IMAGE_REF
+
+    def test_image_jpg(self):
+        """JPG → IMAGE_REF."""
+        assert _get_media_type_by_extension("photo.jpg") == ChunkType.IMAGE_REF
+
+    def test_image_jpeg(self):
+        """JPEG → IMAGE_REF."""
+        assert _get_media_type_by_extension("photo.jpeg") == ChunkType.IMAGE_REF
+
+    def test_image_gif(self):
+        """GIF → IMAGE_REF."""
+        assert _get_media_type_by_extension("animation.gif") == ChunkType.IMAGE_REF
+
+    def test_image_webp(self):
+        """WEBP → IMAGE_REF."""
+        assert _get_media_type_by_extension("modern.webp") == ChunkType.IMAGE_REF
+
+    def test_image_svg(self):
+        """SVG → IMAGE_REF."""
+        assert _get_media_type_by_extension("vector.svg") == ChunkType.IMAGE_REF
+
+    def test_image_bmp(self):
+        """BMP → IMAGE_REF."""
+        assert _get_media_type_by_extension("bitmap.bmp") == ChunkType.IMAGE_REF
+
+    def test_unknown_extension(self):
+        """Неизвестное расширение → None."""
+        assert _get_media_type_by_extension("document.pdf") is None
+
+    def test_no_extension(self):
+        """Файл без расширения → None."""
+        assert _get_media_type_by_extension("README") is None
+
+    def test_empty_path(self):
+        """Пустой путь → None."""
+        assert _get_media_type_by_extension("") is None
+
+    def test_case_insensitive(self):
+        """Расширения case-insensitive."""
+        assert _get_media_type_by_extension("video.MP4") == ChunkType.VIDEO_REF
+        assert _get_media_type_by_extension("audio.MP3") == ChunkType.AUDIO_REF
+        assert _get_media_type_by_extension("image.PNG") == ChunkType.IMAGE_REF
+
+    def test_query_string_stripped(self):
+        """Query string отбрасывается при определении расширения."""
+        assert _get_media_type_by_extension("video.mp4?v=123") == ChunkType.VIDEO_REF
+
+    def test_fragment_stripped(self):
+        """Fragment (#) отбрасывается при определении расширения."""
+        assert _get_media_type_by_extension("audio.mp3#t=30") == ChunkType.AUDIO_REF
+
+    def test_relative_path_with_dots(self):
+        """Относительный путь с точками обрабатывается корректно."""
+        assert _get_media_type_by_extension("../audio/speech.mp3") == ChunkType.AUDIO_REF
+        assert _get_media_type_by_extension("./video/demo.mp4") == ChunkType.VIDEO_REF
+
+
+class TestMediaTypeDetectionConstants:
+    """Тесты для констант расширений."""
+
+    def test_audio_extensions_frozenset(self):
+        """AUDIO_EXTENSIONS — неизменяемое множество."""
+        assert isinstance(AUDIO_EXTENSIONS, frozenset)
+        assert ".mp3" in AUDIO_EXTENSIONS
+        assert ".wav" in AUDIO_EXTENSIONS
+
+    def test_video_extensions_frozenset(self):
+        """VIDEO_EXTENSIONS — неизменяемое множество."""
+        assert isinstance(VIDEO_EXTENSIONS, frozenset)
+        assert ".mp4" in VIDEO_EXTENSIONS
+        assert ".webm" in VIDEO_EXTENSIONS
+
+    def test_image_extensions_frozenset(self):
+        """IMAGE_EXTENSIONS — неизменяемое множество."""
+        assert isinstance(IMAGE_EXTENSIONS, frozenset)
+        assert ".png" in IMAGE_EXTENSIONS
+        assert ".jpg" in IMAGE_EXTENSIONS
+
+    def test_no_overlap_between_types(self):
+        """Нет пересечений между типами расширений."""
+        assert AUDIO_EXTENSIONS.isdisjoint(VIDEO_EXTENSIONS)
+        assert AUDIO_EXTENSIONS.isdisjoint(IMAGE_EXTENSIONS)
+        assert VIDEO_EXTENSIONS.isdisjoint(IMAGE_EXTENSIONS)
+
+
+class TestMediaTypeDetectionInParser:
+    """Тесты интеграции детекции типов в парсере."""
+
+    @pytest.fixture
+    def parser(self):
+        return MarkdownNodeParser()
+
+    def test_image_syntax_with_audio_extension(self, parser):
+        """![Audio](file.mp3) → AUDIO_REF."""
+        md = "![Audio Recording](podcast.mp3)"
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.AUDIO_REF
+        assert segments[0].metadata.get("alt") == "Audio Recording"
+
+    def test_image_syntax_with_video_extension(self, parser):
+        """![Video](file.mp4) → VIDEO_REF."""
+        md = "![Tutorial Video](tutorial.mp4)"
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.VIDEO_REF
+        assert segments[0].metadata.get("alt") == "Tutorial Video"
+
+    def test_image_syntax_with_image_extension(self, parser):
+        """![Image](file.png) → IMAGE_REF."""
+        md = "![Diagram](architecture.png)"
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.IMAGE_REF
+
+    def test_image_syntax_unknown_extension_fallback(self, parser):
+        """![Unknown](file.xyz) → IMAGE_REF (fallback)."""
+        md = "![Unknown](document.xyz)"
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.IMAGE_REF  # fallback
+
+    def test_link_syntax_with_audio_extension(self, parser):
+        """[text](file.mp3) → AUDIO_REF."""
+        md = "[Послушать запись](recording.mp3)"
+        segments = list(parser.parse(md))
+
+        audio_segments = [s for s in segments if s.segment_type == ChunkType.AUDIO_REF]
+        assert len(audio_segments) == 1
+        assert audio_segments[0].metadata.get("alt") == "Послушать запись"
+
+    def test_link_syntax_with_video_extension(self, parser):
+        """[text](file.mp4) → VIDEO_REF."""
+        md = "[Смотреть видео](demo.mp4)"
+        segments = list(parser.parse(md))
+
+        video_segments = [s for s in segments if s.segment_type == ChunkType.VIDEO_REF]
+        assert len(video_segments) == 1
+
+    def test_link_syntax_with_image_extension_not_media(self, parser):
+        """[text](file.png) → НЕ создаёт медиа-сегмент."""
+        md = "[Click here](image.png)"
+        segments = list(parser.parse(md))
+
+        # Обычные ссылки на картинки не создают медиа-сегменты
+        media_types = (ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF)
+        media_segments = [s for s in segments if s.segment_type in media_types]
+        assert len(media_segments) == 0
+
+    def test_link_syntax_regular_url_not_media(self, parser):
+        """[text](https://...) → НЕ создаёт медиа-сегмент."""
+        md = "[Website](https://example.com)"
+        segments = list(parser.parse(md))
+
+        media_types = (ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF)
+        media_segments = [s for s in segments if s.segment_type in media_types]
+        assert len(media_segments) == 0
+
+    def test_headers_preserved_for_all_media_types(self, parser):
+        """Headers сохраняются для всех типов медиа."""
+        md = """
+# Chapter 1
+
+## Section 1.1
+
+![Image](diagram.png)
+
+![Audio](speech.mp3)
+
+![Video](demo.mp4)
+"""
+        segments = list(parser.parse(md))
+
+        media_types = (ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF)
+        media_segments = [s for s in segments if s.segment_type in media_types]
+
+        assert len(media_segments) == 3
+        for seg in media_segments:
+            assert seg.headers == ["Chapter 1", "Section 1.1"]
+
+    def test_mixed_document_all_types(self, parser):
+        """Документ со всеми типами медиа парсится корректно."""
+        md = """
+# Documentation
+
+## Overview
+
+![Architecture](arch.png)
+
+## Audio Materials
+
+[Listen to lecture](lecture.mp3)
+
+## Video Demos
+
+![Watch demo](demo.mp4)
+"""
+        segments = list(parser.parse(md))
+
+        image_segments = [s for s in segments if s.segment_type == ChunkType.IMAGE_REF]
+        audio_segments = [s for s in segments if s.segment_type == ChunkType.AUDIO_REF]
+        video_segments = [s for s in segments if s.segment_type == ChunkType.VIDEO_REF]
+
+        assert len(image_segments) == 1
+        assert len(audio_segments) == 1
+        assert len(video_segments) == 1
+
+        assert image_segments[0].headers == ["Documentation", "Overview"]
+        assert audio_segments[0].headers == ["Documentation", "Audio Materials"]
+        assert video_segments[0].headers == ["Documentation", "Video Demos"]

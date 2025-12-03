@@ -446,45 +446,99 @@ class TestMediaQueueRouting:
 
 
 # ============================================================================
-# Markdown с audio/video ссылками (TODO: будущая функциональность)
+# Markdown с audio/video ссылками (Phase 6.5)
 # ============================================================================
 
 
 class TestMarkdownAudioVideoLinks:
-    """Тесты для будущей функциональности audio/video в Markdown.
+    """Тесты для Phase 6.5: Audio/Video в Markdown.
 
-    NOTE: Текущий парсер не различает типы медиа в ![alt](path).
-    Все медиа-ссылки создают IMAGE_REF сегменты.
-    В будущем можно расширить для создания AUDIO_REF и VIDEO_REF.
+    Парсер определяет тип медиа по расширению файла:
+    - .mp3, .wav, .ogg, .flac, .aac, .aiff → AUDIO_REF
+    - .mp4, .mov, .avi, .mkv, .webm → VIDEO_REF
+    - .png, .jpg, .jpeg, .gif, .webp, .svg, .bmp → IMAGE_REF
     """
 
     @pytest.fixture
     def parser(self):
         return MarkdownNodeParser()
 
-    def test_audio_link_currently_parsed_as_image_ref(self, parser):
-        """Сейчас аудио-ссылки парсятся как IMAGE_REF.
-
-        TODO: В будущем можно добавить определение типа по расширению.
-        """
+    def test_audio_link_parsed_as_audio_ref(self, parser):
+        """Аудио-ссылка ![Audio](file.mp3) → AUDIO_REF."""
         md = "![Audio](audio/speech.mp3)"
 
         segments = list(parser.parse(md))
 
-        # Пока что это IMAGE_REF (т.к. синтаксис одинаковый)
         assert len(segments) == 1
-        assert segments[0].segment_type == ChunkType.IMAGE_REF
+        assert segments[0].segment_type == ChunkType.AUDIO_REF
         assert segments[0].content == "audio/speech.mp3"
+        assert segments[0].metadata.get("alt") == "Audio"
 
-    def test_video_link_currently_parsed_as_image_ref(self, parser):
-        """Сейчас видео-ссылки парсятся как IMAGE_REF."""
+    def test_video_link_parsed_as_video_ref(self, parser):
+        """Видео-ссылка ![Video](file.mp4) → VIDEO_REF."""
         md = "![Video](video/slides.mp4)"
 
         segments = list(parser.parse(md))
 
         assert len(segments) == 1
-        assert segments[0].segment_type == ChunkType.IMAGE_REF
+        assert segments[0].segment_type == ChunkType.VIDEO_REF
         assert segments[0].content == "video/slides.mp4"
+        assert segments[0].metadata.get("alt") == "Video"
+
+    def test_wav_audio_detected(self, parser):
+        """WAV аудио-файл определяется как AUDIO_REF."""
+        md = "![Noise](../audio/noise.wav)"
+
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.AUDIO_REF
+        assert segments[0].content == "../audio/noise.wav"
+
+    def test_mov_video_detected(self, parser):
+        """MOV видео-файл определяется как VIDEO_REF."""
+        md = "![Screen Recording](video/screen.mov)"
+
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.VIDEO_REF
+
+    def test_link_syntax_audio_detected(self, parser):
+        """Ссылка [text](file.mp3) → AUDIO_REF."""
+        md = "[Послушать запись](audio/speech.mp3)"
+
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.AUDIO_REF
+        assert segments[0].content == "audio/speech.mp3"
+        assert segments[0].metadata.get("alt") == "Послушать запись"
+
+    def test_link_syntax_video_detected(self, parser):
+        """Ссылка [text](file.mp4) → VIDEO_REF."""
+        md = "[Смотреть видео](video/slides.mp4)"
+
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.VIDEO_REF
+        assert segments[0].content == "video/slides.mp4"
+
+    def test_link_syntax_image_not_detected(self, parser):
+        """Ссылка [text](image.png) НЕ создаёт IMAGE_REF (только text)."""
+        md = "[Click here](images/diagram.png)"
+
+        segments = list(parser.parse(md))
+
+        # Обычная ссылка на картинку не создаёт медиа-сегмент
+        # (только ![](path) синтаксис создаёт IMAGE_REF)
+        media_segments = [
+            s for s in segments if s.segment_type in (
+                ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF
+            )
+        ]
+        assert len(media_segments) == 0
 
     def test_post_with_mixed_media_from_fixture(self, parser):
         """Парсинг тестового Markdown с аудио и видео ссылками."""
@@ -511,21 +565,57 @@ class TestMarkdownAudioVideoLinks:
 """
         segments = list(parser.parse(md))
 
-        # Находим все медиа-ссылки
-        media_segments = [s for s in segments if s.segment_type == ChunkType.IMAGE_REF]
-
-        assert len(media_segments) == 2
-
-        # Первый — аудио
-        assert media_segments[0].content == "../audio/speech.mp3"
-        assert media_segments[0].headers == [
+        # Находим аудио-сегменты
+        audio_segments = [s for s in segments if s.segment_type == ChunkType.AUDIO_REF]
+        assert len(audio_segments) == 1
+        assert audio_segments[0].content == "../audio/speech.mp3"
+        assert audio_segments[0].headers == [
             "Урок 1: Введение в Semantic Core",
             "Аудио-материалы",
         ]
 
-        # Второй — видео
-        assert media_segments[1].content == "../video/slides.mp4"
-        assert media_segments[1].headers == [
+        # Находим видео-сегменты
+        video_segments = [s for s in segments if s.segment_type == ChunkType.VIDEO_REF]
+        assert len(video_segments) == 1
+        assert video_segments[0].content == "../video/slides.mp4"
+        assert video_segments[0].headers == [
             "Урок 1: Введение в Semantic Core",
             "Видео-материалы",
         ]
+
+    def test_image_still_detected_as_image_ref(self, parser):
+        """Картинка ![](image.png) → IMAGE_REF (не перепутать с video/audio)."""
+        md = "![Diagram](images/architecture.png)"
+
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.IMAGE_REF
+        assert segments[0].content == "images/architecture.png"
+
+    def test_unknown_extension_fallback_to_image(self, parser):
+        """Неизвестное расширение в ![]() → IMAGE_REF fallback."""
+        md = "![Unknown](files/document.pdf)"
+
+        segments = list(parser.parse(md))
+
+        assert len(segments) == 1
+        assert segments[0].segment_type == ChunkType.IMAGE_REF  # fallback
+
+    def test_all_audio_extensions(self, parser):
+        """Все поддерживаемые аудио-расширения детектируются."""
+        extensions = [".mp3", ".wav", ".ogg", ".flac", ".aac", ".aiff"]
+
+        for ext in extensions:
+            md = f"![Audio](audio/file{ext})"
+            segments = list(parser.parse(md))
+            assert segments[0].segment_type == ChunkType.AUDIO_REF, f"Failed for {ext}"
+
+    def test_all_video_extensions(self, parser):
+        """Все поддерживаемые видео-расширения детектируются."""
+        extensions = [".mp4", ".mov", ".avi", ".mkv", ".webm"]
+
+        for ext in extensions:
+            md = f"![Video](video/file{ext})"
+            segments = list(parser.parse(md))
+            assert segments[0].segment_type == ChunkType.VIDEO_REF, f"Failed for {ext}"

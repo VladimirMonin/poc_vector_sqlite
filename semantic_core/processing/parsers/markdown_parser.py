@@ -66,6 +66,53 @@ class MarkdownNodeParser:
         """Инициализирует парсер с настройками CommonMark."""
         self.md = MarkdownIt("commonmark")
 
+    def _has_text_outside_media(self, children: list[Token]) -> bool:
+        """Проверяет, есть ли текст вне медиа-элементов (изображений/ссылок на аудио/видео).
+
+        Не считает текстом:
+        - Текст внутри медиа-ссылок (между link_open и link_close с медиа-расширением)
+        - Пустой текст (whitespace)
+
+        Args:
+            children: Список inline-токенов.
+
+        Returns:
+            True если есть текстовый контент вне медиа-ссылок.
+        """
+        inside_media_link = False
+        i = 0
+
+        while i < len(children):
+            child = children[i]
+
+            # Отслеживаем вход в медиа-ссылку
+            if child.type == "link_open":
+                href = child.attrGet("href") or ""
+                media_type = _get_media_type_by_extension(href)
+                if media_type in (ChunkType.AUDIO_REF, ChunkType.VIDEO_REF):
+                    inside_media_link = True
+                i += 1
+                continue
+
+            if child.type == "link_close":
+                inside_media_link = False
+                i += 1
+                continue
+
+            # Изображения - это медиа, их текст (alt) не считаем
+            if child.type == "image":
+                i += 1
+                continue
+
+            # Текст вне медиа-ссылок
+            if child.type == "text" and not inside_media_link:
+                if child.content.strip():
+                    return True
+
+            i += 1
+
+        return False
+
     def _process_inline_children(
         self,
         children: list[Token],
@@ -219,11 +266,8 @@ class MarkdownNodeParser:
                         )
                     )
 
-                    # Проверяем, есть ли текстовые ноды кроме медиа-элементов
-                    has_text = any(
-                        child.type == "text" and child.content.strip()
-                        for child in children
-                    )
+                    # Проверяем, есть ли текст ВНЕ медиа-элементов
+                    has_text = self._has_text_outside_media(children)
 
                     # Если есть только медиа (без текста), отдаём их как отдельные сегменты
                     if media_segments and not has_text:

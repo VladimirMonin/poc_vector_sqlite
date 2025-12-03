@@ -572,11 +572,20 @@ class SemanticCore:
         try:
             # Rate limiting
             self._ensure_media_queue()
-            self._rate_limiter.wait_if_needed()
+            self._rate_limiter.wait()
+
+            # Определяем тип медиа
+            media_type_map = {
+                ChunkType.IMAGE_REF: "image",
+                ChunkType.AUDIO_REF: "audio",
+                ChunkType.VIDEO_REF: "video",
+            }
+            media_type = media_type_map.get(chunk_type, "image")
 
             # Создаём запрос
             resource = MediaResource(
                 path=str(media_path),
+                media_type=media_type,
                 mime_type=self._get_mime_type(media_path),
             )
             request = MediaRequest(

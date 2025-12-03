@@ -1,9 +1,10 @@
 """Тесты для MarkdownAssetEnricher.
 
-Проверяем извлечение контекста для IMAGE_REF чанков:
+Проверяем извлечение контекста для IMAGE_REF, AUDIO_REF, VIDEO_REF чанков:
 - Breadcrumbs из headers
 - Surrounding text из соседних чанков
 - Alt и title из metadata
+- Корректный media_type и role для каждого типа
 """
 
 import pytest
@@ -30,10 +31,10 @@ class TestMediaContext:
         result = ctx.format_for_vision()
 
         assert "Document section: Setup > Nginx > Configuration" in result
-        assert "Image caption: Nginx config diagram" in result
+        assert "Caption: Nginx config diagram" in result
         assert "Title: Figure 1" in result
         assert "[Before]: ...install nginx..." in result
-        assert "Role: Illustration embedded in document" in result
+        assert "Role: Media embedded in document" in result
 
     def test_format_for_vision_minimal(self):
         """Минимальный контекст (только role)."""
@@ -41,7 +42,7 @@ class TestMediaContext:
 
         result = ctx.format_for_vision()
 
-        assert result == "Role: Illustration embedded in document"
+        assert result == "Role: Media embedded in document"
 
     def test_format_for_vision_partial(self):
         """Частичный контекст — пропускает пустые поля."""
@@ -53,7 +54,7 @@ class TestMediaContext:
         result = ctx.format_for_vision()
 
         assert "Document section: API Docs" in result
-        assert "Image caption: Diagram" in result
+        assert "Caption: Diagram" in result
         assert "Title:" not in result  # title пустой
         assert "Surrounding text:" not in result  # surrounding_text пустой
 
@@ -294,3 +295,267 @@ class TestMarkdownAssetEnricher:
         assert "Introduction" in ctx.surrounding_text
         assert "Conclusion" in ctx.surrounding_text
         assert "first.png" not in ctx.surrounding_text
+
+
+# ============================================================================
+# Phase 6.5: MediaContext для AUDIO_REF и VIDEO_REF
+# ============================================================================
+
+
+class TestMediaContextForAudioVideo:
+    """Тесты MediaContext для аудио и видео чанков."""
+
+    @pytest.fixture
+    def enricher(self):
+        return MarkdownAssetEnricher(context_window=100)
+
+    def test_audio_context_media_type(self, enricher):
+        """AUDIO_REF → media_type='audio'."""
+        chunk = Chunk(
+            content="audio/speech.mp3",
+            chunk_index=0,
+            chunk_type=ChunkType.AUDIO_REF,
+            metadata={"headers": ["Lecture"], "alt": "Recording"},
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+
+        assert ctx.media_type == "audio"
+
+    def test_video_context_media_type(self, enricher):
+        """VIDEO_REF → media_type='video'."""
+        chunk = Chunk(
+            content="video/demo.mp4",
+            chunk_index=0,
+            chunk_type=ChunkType.VIDEO_REF,
+            metadata={"headers": ["Tutorial"], "alt": "Demo video"},
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+
+        assert ctx.media_type == "video"
+
+    def test_image_context_media_type(self, enricher):
+        """IMAGE_REF → media_type='image'."""
+        chunk = Chunk(
+            content="images/diagram.png",
+            chunk_index=0,
+            chunk_type=ChunkType.IMAGE_REF,
+            metadata={"alt": "Architecture"},
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+
+        assert ctx.media_type == "image"
+
+    def test_audio_context_role(self, enricher):
+        """AUDIO_REF имеет соответствующую роль."""
+        chunk = Chunk(
+            content="audio/speech.mp3",
+            chunk_index=0,
+            chunk_type=ChunkType.AUDIO_REF,
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+
+        assert "Audio" in ctx.role or "audio" in ctx.role.lower()
+        assert "embedded" in ctx.role.lower() or "document" in ctx.role.lower()
+
+    def test_video_context_role(self, enricher):
+        """VIDEO_REF имеет соответствующую роль."""
+        chunk = Chunk(
+            content="video/demo.mp4",
+            chunk_index=0,
+            chunk_type=ChunkType.VIDEO_REF,
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+
+        assert "Video" in ctx.role or "video" in ctx.role.lower()
+        assert "embedded" in ctx.role.lower() or "document" in ctx.role.lower()
+
+    def test_audio_format_for_api(self, enricher):
+        """format_for_api() для аудио использует 'Description:' label."""
+        chunk = Chunk(
+            content="audio/lecture.mp3",
+            chunk_index=0,
+            chunk_type=ChunkType.AUDIO_REF,
+            metadata={"alt": "Lecture recording", "headers": ["Course"]},
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+        formatted = ctx.format_for_api()
+
+        # Проверяем структуру
+        assert "Document section: Course" in formatted
+        assert "Description: Lecture recording" in formatted
+        assert "Role:" in formatted
+
+    def test_video_format_for_api(self, enricher):
+        """format_for_api() для видео использует 'Description:' label."""
+        chunk = Chunk(
+            content="video/tutorial.mp4",
+            chunk_index=0,
+            chunk_type=ChunkType.VIDEO_REF,
+            metadata={"alt": "Tutorial demo", "headers": ["Guide"]},
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+        formatted = ctx.format_for_api()
+
+        assert "Document section: Guide" in formatted
+        assert "Description: Tutorial demo" in formatted
+        assert "Role:" in formatted
+
+    def test_image_format_for_api_uses_caption(self, enricher):
+        """format_for_api() для изображений использует 'Caption:' label."""
+        chunk = Chunk(
+            content="images/diagram.png",
+            chunk_index=0,
+            chunk_type=ChunkType.IMAGE_REF,
+            metadata={"alt": "Architecture diagram"},
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+        formatted = ctx.format_for_api()
+
+        # Для изображений используется "Caption:" (обратная совместимость)
+        assert "Caption: Architecture diagram" in formatted
+
+    def test_audio_with_neighbors(self, enricher):
+        """AUDIO_REF получает surrounding_text от соседей."""
+        chunks = [
+            Chunk(
+                content="Listen to the explanation:",
+                chunk_index=0,
+                chunk_type=ChunkType.TEXT,
+            ),
+            Chunk(
+                content="audio/explanation.mp3",
+                chunk_index=1,
+                chunk_type=ChunkType.AUDIO_REF,
+                metadata={"alt": "Explanation"},
+            ),
+            Chunk(
+                content="After listening, try the exercise.",
+                chunk_index=2,
+                chunk_type=ChunkType.TEXT,
+            ),
+        ]
+
+        ctx = enricher.get_context(chunks[1], chunks)
+
+        assert "[Before]:" in ctx.surrounding_text
+        assert "explanation" in ctx.surrounding_text.lower()
+        assert "[After]:" in ctx.surrounding_text
+        assert "exercise" in ctx.surrounding_text.lower()
+
+    def test_video_with_neighbors(self, enricher):
+        """VIDEO_REF получает surrounding_text от соседей."""
+        chunks = [
+            Chunk(
+                content="Watch this demonstration:",
+                chunk_index=0,
+                chunk_type=ChunkType.TEXT,
+            ),
+            Chunk(
+                content="video/demo.mp4",
+                chunk_index=1,
+                chunk_type=ChunkType.VIDEO_REF,
+                metadata={"alt": "Demo"},
+            ),
+            Chunk(
+                content="The video shows the complete workflow.",
+                chunk_index=2,
+                chunk_type=ChunkType.TEXT,
+            ),
+        ]
+
+        ctx = enricher.get_context(chunks[1], chunks)
+
+        assert "[Before]:" in ctx.surrounding_text
+        assert "demonstration" in ctx.surrounding_text.lower()
+        assert "[After]:" in ctx.surrounding_text
+        assert "workflow" in ctx.surrounding_text.lower()
+
+    def test_mixed_media_skips_other_media_as_neighbors(self, enricher):
+        """Медиа-чанки пропускают другие медиа при поиске соседей."""
+        chunks = [
+            Chunk(
+                content="Introduction text.",
+                chunk_index=0,
+                chunk_type=ChunkType.TEXT,
+            ),
+            Chunk(
+                content="images/diagram.png",
+                chunk_index=1,
+                chunk_type=ChunkType.IMAGE_REF,
+            ),
+            Chunk(
+                content="audio/speech.mp3",
+                chunk_index=2,
+                chunk_type=ChunkType.AUDIO_REF,
+            ),
+            Chunk(
+                content="video/demo.mp4",
+                chunk_index=3,
+                chunk_type=ChunkType.VIDEO_REF,
+            ),
+            Chunk(
+                content="Conclusion text.",
+                chunk_index=4,
+                chunk_type=ChunkType.TEXT,
+            ),
+        ]
+
+        # Контекст для аудио (index=2)
+        ctx = enricher.get_context(chunks[2], chunks)
+
+        # Должен найти TEXT, а не IMAGE_REF или VIDEO_REF
+        assert "Introduction" in ctx.surrounding_text
+        assert "Conclusion" in ctx.surrounding_text
+        assert "diagram.png" not in ctx.surrounding_text
+        assert "demo.mp4" not in ctx.surrounding_text
+
+    def test_format_for_vision_backward_compatibility(self, enricher):
+        """format_for_vision() — алиас для format_for_api()."""
+        ctx = MediaContext(
+            breadcrumbs="Chapter > Section",
+            alt_text="Test",
+            media_type="audio",
+        )
+
+        # format_for_vision() должен работать как format_for_api()
+        assert ctx.format_for_vision() == ctx.format_for_api()
+
+    def test_audio_headers_become_breadcrumbs(self, enricher):
+        """Headers аудио-чанка становятся breadcrumbs."""
+        chunk = Chunk(
+            content="audio/lecture.mp3",
+            chunk_index=0,
+            chunk_type=ChunkType.AUDIO_REF,
+            metadata={
+                "headers": ["Course 101", "Module 1", "Lesson 1"],
+                "alt": "Lecture",
+            },
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+
+        assert ctx.breadcrumbs == "Course 101 > Module 1 > Lesson 1"
+
+    def test_video_headers_become_breadcrumbs(self, enricher):
+        """Headers видео-чанка становятся breadcrumbs."""
+        chunk = Chunk(
+            content="video/tutorial.mp4",
+            chunk_index=0,
+            chunk_type=ChunkType.VIDEO_REF,
+            metadata={
+                "headers": ["Tutorial", "Setup", "Installation"],
+                "alt": "Install guide",
+            },
+        )
+
+        ctx = enricher.get_context(chunk, [chunk])
+
+        assert ctx.breadcrumbs == "Tutorial > Setup > Installation"
