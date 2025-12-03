@@ -134,6 +134,15 @@
 29. [**Media Queue Processor**](29_media_queue_processor.md)  
     Персистентная очередь задач: MediaTaskModel, пакетная обработка и мониторинг
 
+30. [**Audio Analysis Architecture**](30_audio_analysis_architecture.md)  
+    GeminiAudioAnalyzer: транскрипция, 32kbps оптимизация, 83 минуты в одном запросе
+
+31. [**Video Multimodal Analysis**](31_video_multimodal_analysis.md)  
+    GeminiVideoAnalyzer: кадры + аудио в одном запросе, режимы извлечения кадров
+
+32. [**Media Optimization Strategies**](32_media_optimization_strategies.md)  
+    Утилиты audio.py/video.py: сжатие, пресеты качества, FFmpeg dependency
+
 ---
 
 ## 🚀 Быстрый старт
