@@ -2,27 +2,257 @@
 # 📋 Phase 8.3: Config & Init — Управление конфигурацией
 
 **Статус:** 🔲 Планируется  
-**Зависимости:** Phase 8.0 (Core CLI) ✅
+**Зависимости:** Phase 7.0 (Logging Core) ✅  
+**Приоритет:** 🔴 Высокий (ПЕРВАЯ фаза CLI — фундамент для остальных)
 
 ---
 
 ## 🎯 Цель
 
-Добавить команды для управления конфигурацией и диагностики:
+Создать **фундамент CLI** — единую систему конфигурации и диагностики:
+- **SemanticConfig** — единый Pydantic Settings класс для всей библиотеки
 - **init** — создание конфиг-файла в проекте
 - **config** — просмотр и валидация настроек
 - **doctor** — диагностика окружения
+
+> **Почему это первая фаза?**  
+> Все остальные CLI команды (ingest, search, queue, chat) зависят от конфигурации.
+> Без единого `SemanticConfig` каждая команда создавала бы компоненты по-своему.
 
 ---
 
 ## 📦 Новые модули
 
 ```text
-semantic_core/cli/commands/
-├── init.py               # semantic init
-├── config.py             # semantic config show/check
-└── doctor.py             # semantic doctor
+semantic_core/
+├── config.py             # SemanticConfig (Pydantic Settings)
+└── cli/
+    ├── __init__.py       # main() entry point
+    ├── app.py            # Typer приложение
+    ├── context.py        # CLIContext (использует SemanticConfig)
+    ├── console.py        # Rich Console singleton
+    └── commands/
+        ├── __init__.py
+        ├── init.py       # semantic init
+        ├── config.py     # semantic config show/check
+        └── doctor.py     # semantic doctor
 ```
+
+---
+
+## 🔧 Единый SemanticConfig
+
+**Файл:** `semantic_core/config.py`
+
+Это **центральный модуль конфигурации** всей библиотеки. Заменяет legacy `config.py` в корне проекта.
+
+```python
+"""Единая конфигурация Semantic Core.
+
+Загружает настройки из (в порядке приоритета):
+1. CLI аргументы (--db-path, --log-level)
+2. Environment variables (SEMANTIC_*, GEMINI_API_KEY)
+3. semantic.toml в текущей директории
+4. Default values
+"""
+
+from pathlib import Path
+from typing import Literal, Optional
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class SemanticConfig(BaseSettings):
+    """Единая конфигурация Semantic Core.
+    
+    Все секции объединены в один flat namespace для простоты.
+    TOML-файл может использовать вложенные секции, они будут
+    преобразованы через env_nested_delimiter.
+    
+    Attributes:
+        db_path: Путь к SQLite базе данных.
+        gemini_api_key: API ключ для Gemini (обязательный).
+        gemini_batch_key: Отдельный ключ для Batch API (опционально).
+        embedding_model: Модель для эмбеддингов.
+        embedding_dimension: Размерность векторов.
+        splitter: Тип сплиттера (simple/smart).
+        context_strategy: Стратегия контекста (basic/hierarchical).
+        media_enabled: Включить обработку медиа.
+        media_rpm_limit: Rate limit для Vision API.
+        search_limit: Лимит результатов по умолчанию.
+        search_type: Тип поиска по умолчанию.
+        log_level: Уровень логирования.
+        log_file: Путь к файлу логов.
+    
+    Environment Variables:
+        GEMINI_API_KEY: API ключ (без префикса SEMANTIC_)
+        GEMINI_BATCH_KEY: Batch API ключ
+        SEMANTIC_DB_PATH: Путь к БД
+        SEMANTIC_LOG_LEVEL: Уровень логов
+        SEMANTIC_SPLITTER: Тип сплиттера
+        ... и другие с префиксом SEMANTIC_
+    """
+    
+    # === Database ===
+    db_path: Path = Field(
+        default=Path("semantic.db"),
+        description="Путь к SQLite базе данных",
+    )
+    
+    # === Gemini API ===
+    gemini_api_key: str = Field(
+        ...,  # Обязательный
+        description="API ключ для Google Gemini",
+    )
+    
+    gemini_batch_key: Optional[str] = Field(
+        default=None,
+        description="Отдельный ключ для Batch API (опционально)",
+    )
+    
+    embedding_model: str = Field(
+        default="text-embedding-004",
+        description="Модель для генерации эмбеддингов",
+    )
+    
+    embedding_dimension: int = Field(
+        default=768,
+        ge=256,
+        le=3072,
+        description="Размерность векторов",
+    )
+    
+    # === Processing ===
+    splitter: Literal["simple", "smart"] = Field(
+        default="smart",
+        description="Тип сплиттера документов",
+    )
+    
+    context_strategy: Literal["basic", "hierarchical"] = Field(
+        default="hierarchical",
+        description="Стратегия формирования контекста",
+    )
+    
+    # === Media ===
+    media_enabled: bool = Field(
+        default=True,
+        description="Включить обработку изображений/аудио/видео",
+    )
+    
+    media_rpm_limit: int = Field(
+        default=15,
+        ge=1,
+        le=100,
+        description="Rate limit для Vision/Audio API (запросов/мин)",
+    )
+    
+    # === Search ===
+    search_limit: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Количество результатов по умолчанию",
+    )
+    
+    search_type: Literal["vector", "fts", "hybrid"] = Field(
+        default="hybrid",
+        description="Тип поиска по умолчанию",
+    )
+    
+    # === Logging ===
+    log_level: Literal["TRACE", "DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="INFO",
+        description="Уровень логирования",
+    )
+    
+    log_file: Optional[Path] = Field(
+        default=None,
+        description="Путь к файлу логов (None = только консоль)",
+    )
+    
+    # === Validators ===
+    @field_validator("db_path", mode="before")
+    @classmethod
+    def resolve_db_path(cls, v) -> Path:
+        """Преобразует строку в Path."""
+        return Path(v).resolve() if isinstance(v, str) else v
+    
+    @field_validator("log_file", mode="before")
+    @classmethod
+    def resolve_log_file(cls, v) -> Optional[Path]:
+        """Преобразует строку в Path."""
+        if v is None or v == "":
+            return None
+        return Path(v).resolve() if isinstance(v, str) else v
+    
+    model_config = SettingsConfigDict(
+        # Префикс для env variables
+        env_prefix="SEMANTIC_",
+        
+        # Gemini ключи БЕЗ префикса (обратная совместимость)
+        # Поддержка GEMINI_API_KEY вместо SEMANTIC_GEMINI_API_KEY
+        
+        # Читаем .env файл
+        env_file=".env",
+        env_file_encoding="utf-8",
+        
+        # TOML поддержка (Pydantic v2.6+)
+        # toml_file="semantic.toml",
+        
+        # Разрешаем extra поля (для будущих расширений)
+        extra="ignore",
+        
+        # Замораживаем после создания
+        frozen=False,  # Позволяем CLI override
+        
+        # Case-insensitive для env
+        case_sensitive=False,
+    )
+
+
+# === Глобальный singleton (опционально) ===
+_config: Optional[SemanticConfig] = None
+
+
+def get_config(**overrides) -> SemanticConfig:
+    """Получить конфигурацию с возможными override'ами.
+    
+    Args:
+        **overrides: CLI аргументы для переопределения.
+        
+    Returns:
+        SemanticConfig с учётом всех источников.
+    """
+    global _config
+    
+    if overrides or _config is None:
+        _config = SemanticConfig(**overrides)
+    
+    return _config
+```
+
+### Приоритет настроек
+
+```
+CLI args (--db-path)
+    ↓
+Environment (SEMANTIC_DB_PATH, GEMINI_API_KEY)
+    ↓
+semantic.toml (если существует)
+    ↓
+Default values
+```
+
+### Разделение секретов
+
+| Источник | Что хранить |
+|----------|-------------|
+| `semantic.toml` | paths, limits, features (несекретное) |
+| `.env` / environment | API ключи (GEMINI_API_KEY, GEMINI_BATCH_KEY) |
+| CLI args | runtime overrides |
+
+> **Важно:** `semantic init` НИКОГДА не записывает API ключи в TOML.
 
 ---
 
@@ -311,8 +541,9 @@ Storage:
 
 ## 🔗 Связанные документы
 
-- **Предыдущая:** [Phase 8.2 — RAG Chat](phase_8.2.md)
+- **Основной план:** [Phase 8 — CLI Architecture](phase_8.md)
+- **Следующая:** [Phase 8.0 — Core CLI](phase_8.0.md) (зависит от этой фазы)
 - **API Keys:** [19_api_key_management.md](../../architecture/19_api_key_management.md)
-- **Config:** [domain/config.py](../../../semantic_core/domain/config.py)
+- **Logging:** [Phase 7.0 — Logging Core](../phase_7/phase_7.0.md)
 
 ````

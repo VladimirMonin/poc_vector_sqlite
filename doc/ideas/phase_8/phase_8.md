@@ -29,10 +29,74 @@ CLI имеет два "лица":
 
 | Фаза | Название | Команды | Приоритет |
 |------|----------|---------|-----------|
+| **8.3** | Config & Init | `init`, `config`, `doctor` | 🔴 Высокий (фундамент) |
 | **8.0** | Core CLI | `ingest`, `search`, `docs` | 🔴 Высокий |
 | **8.1** | Operations | `queue`, `worker` | 🟡 Средний |
 | **8.2** | RAG Chat | `chat` (REPL + LLM) | 🟡 Средний |
-| **8.3** | Config | `init`, `config`, `doctor` | 🟢 Низкий |
+
+> **Порядок реализации:** 8.3 → 8.0 → 8.1 → 8.2
+> 
+> Phase 8.3 идёт первой, так как конфигурация — фундамент для всех остальных команд.
+
+---
+
+## 🔧 Архитектура конфигурации (Phase 8.3)
+
+### Единый SemanticConfig
+
+Все настройки библиотеки объединены в один Pydantic Settings класс:
+
+```python
+# semantic_core/config.py
+from pydantic_settings import BaseSettings
+
+class SemanticConfig(BaseSettings):
+    """Единая конфигурация Semantic Core."""
+    
+    # Database
+    db_path: Path = Path("semantic.db")
+    
+    # Gemini API
+    gemini_api_key: str  # Из GEMINI_API_KEY
+    gemini_batch_key: str | None = None  # Опционально
+    embedding_model: str = "text-embedding-004"
+    embedding_dimension: int = 768
+    
+    # Media
+    media_enabled: bool = True
+    media_rpm_limit: int = 15
+    
+    # Processing
+    splitter: Literal["simple", "smart"] = "smart"
+    context_strategy: Literal["basic", "hierarchical"] = "hierarchical"
+    
+    # Search defaults
+    search_limit: int = 10
+    search_type: Literal["vector", "fts", "hybrid"] = "hybrid"
+    
+    # Logging (делегирует в LoggingConfig)
+    log_level: str = "INFO"
+    log_file: Path | None = None
+    
+    model_config = SettingsConfigDict(
+        env_prefix="SEMANTIC_",
+        env_file=".env",
+        toml_file="semantic.toml",  # Pydantic v2.6+
+    )
+```
+
+### Приоритет настроек
+
+1. CLI аргументы (`--db-path`, `--log-level`)
+2. Environment variables (`SEMANTIC_DB_PATH`, `GEMINI_API_KEY`)
+3. `semantic.toml` в текущей директории
+4. Default values
+
+### Разделение секретов
+
+- **semantic.toml** — несекретные настройки (paths, limits, features)
+- **.env / environment** — только API ключи
+- CLI никогда не сохраняет секреты в TOML
 
 ---
 
@@ -129,10 +193,10 @@ Commands:
 
 ## 🔗 Детальные планы
 
-1. **[Phase 8.0 — Core CLI](phase_8.0.md)** — ingest, search, docs
-2. **[Phase 8.1 — Operations CLI](phase_8.1.md)** — queue, worker
-3. **[Phase 8.2 — RAG Chat](phase_8.2.md)** — интерактивный чат
-4. **[Phase 8.3 — Config & Init](phase_8.3.md)** — конфигурация, диагностика
+1. **[Phase 8.3 — Config & Init](phase_8.3.md)** — конфигурация, диагностика (ПЕРВАЯ!)
+2. **[Phase 8.0 — Core CLI](phase_8.0.md)** — ingest, search, docs
+3. **[Phase 8.1 — Operations CLI](phase_8.1.md)** — queue, worker
+4. **[Phase 8.2 — RAG Chat](phase_8.2.md)** — интерактивный чат
 
 ---
 

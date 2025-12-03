@@ -2,7 +2,7 @@
 # 📋 Phase 8.0: Core CLI — Базовый интерфейс
 
 **Статус:** 🔲 Планируется  
-**Зависимости:** Phase 7.0 (Logging Core) ✅
+**Зависимости:** Phase 8.3 (Config & Init) ✅, Phase 7.0 (Logging Core) ✅
 
 ---
 
@@ -137,43 +137,131 @@ from pathlib import Path
 from rich.console import Console
 
 from semantic_core import SemanticCore
-from semantic_core.domain import GeminiSettings
+from semantic_core.config import SemanticConfig
+from semantic_core.batch_manager import BatchManager
 from semantic_core.utils.logger import setup_logging, LoggingConfig
 
 @dataclass
 class CLIContext:
-    """Контейнер зависимостей для CLI команд."""
+    """Контейнер зависимостей для CLI команд.
     
+    Использует SemanticConfig (Phase 8.3) для загрузки настроек.
+    Все компоненты создаются лениво для быстрого --help.
+    """
+    
+    # CLI overrides (приоритет над config)
     db_path: Optional[Path] = None
-    log_level: str = "WARNING"
+    log_level: Optional[str] = None
     json_output: bool = False
     console: Console = field(default_factory=Console)
     
-    # Ленивая инициализация (чтобы --help работал мгновенно)
+    # Ленивая инициализация
+    _config: Optional[SemanticConfig] = field(default=None, init=False)
     _core: Optional[SemanticCore] = field(default=None, init=False)
-    _initialized: bool = field(default=False, init=False)
+    _batch_manager: Optional[BatchManager] = field(default=None, init=False)
+    
+    def get_config(self) -> SemanticConfig:
+        """Загрузить конфигурацию (с учётом CLI overrides)."""
+        if self._config is None:
+            # CLI аргументы имеют приоритет
+            overrides = {}
+            if self.db_path:
+                overrides["db_path"] = self.db_path
+            if self.log_level:
+                overrides["log_level"] = self.log_level
+            
+            self._config = SemanticConfig(**overrides)
+        return self._config
     
     def get_core(self) -> SemanticCore:
         """Получить или создать экземпляр SemanticCore."""
-        if not self._initialized:
-            self._init_core()
+        if self._core is None:
+            config = self.get_config()
+            self._init_logging(config)
+            self._core = self._build_core(config)
         return self._core
     
-    def _init_core(self) -> None:
-        """Инициализация ядра и логгера."""
-        # 1. Настройка логгера
-        config = LoggingConfig(level=self.log_level)
-        setup_logging(config)
-        
-        # 2. Загрузка настроек
-        settings = GeminiSettings()  # Из .env или переменных окружения
-        
-        # 3. Создание ядра
-        self._core = SemanticCore(
-            db_path=str(self.db_path) if self.db_path else "semantic.db",
-            settings=settings,
+    def get_batch_manager(self) -> BatchManager:
+        """Получить BatchManager (для queue команд)."""
+        if self._batch_manager is None:
+            config = self.get_config()
+            if not config.gemini_batch_key:
+                raise RuntimeError(
+                    "GEMINI_BATCH_KEY not configured. "
+                    "Run 'semantic doctor' for diagnostics."
+                )
+            self._batch_manager = self._build_batch_manager(config)
+        return self._batch_manager
+    
+    def _init_logging(self, config: SemanticConfig) -> None:
+        """Настройка логирования из конфига."""
+        log_config = LoggingConfig(
+            level=config.log_level,
+            log_file=config.log_file,
         )
-        self._initialized = True
+        setup_logging(log_config)
+    
+    def _build_core(self, config: SemanticConfig) -> SemanticCore:
+        """Сборка SemanticCore из конфига."""
+        # Выбор компонентов по конфигу
+        from semantic_core.infrastructure.gemini import GeminiEmbedder
+        from semantic_core.infrastructure.storage.peewee import (
+            PeeweeVectorStore,
+            init_peewee_database,
+        )
+        from semantic_core.processing.splitters import SmartSplitter, SimpleSplitter
+        from semantic_core.processing.context import (
+            HierarchicalContextStrategy,
+            BasicContextStrategy,
+        )
+        
+        # Database
+        db = init_peewee_database(config.db_path, config.embedding_dimension)
+        
+        # Embedder
+        embedder = GeminiEmbedder(
+            api_key=config.gemini_api_key,
+            model_name=config.embedding_model,
+            dimension=config.embedding_dimension,
+        )
+        
+        # Store
+        store = PeeweeVectorStore(database=db)
+        
+        # Splitter (по конфигу)
+        splitter = (
+            SmartSplitter() if config.splitter == "smart"
+            else SimpleSplitter()
+        )
+        
+        # Context Strategy (по конфигу)
+        context_strategy = (
+            HierarchicalContextStrategy() if config.context_strategy == "hierarchical"
+            else BasicContextStrategy()
+        )
+        
+        return SemanticCore(
+            embedder=embedder,
+            store=store,
+            splitter=splitter,
+            context_strategy=context_strategy,
+        )
+    
+    def _build_batch_manager(self, config: SemanticConfig) -> BatchManager:
+        """Сборка BatchManager из конфига."""
+        from semantic_core.domain import GoogleKeyring
+        
+        keyring = GoogleKeyring(
+            default=config.gemini_api_key,
+            batch=config.gemini_batch_key,
+        )
+        
+        return BatchManager(
+            keyring=keyring,
+            vector_store=self.get_core().store,
+            model_name=config.embedding_model,
+            dimension=config.embedding_dimension,
+        )
 ```
 
 ---
@@ -451,6 +539,7 @@ def progress_bar(console: Console, total: int, description: str):
 
 ## 🔗 Связанные документы
 
+- **Предыдущая:** [Phase 8.3 — Config & Init](phase_8.3.md) (обязательная зависимость)
 - **Исходный план:** [Phase 8 — CLI Architecture](phase_8.md)
 - **Следующая:** [Phase 8.1 — Operations CLI](phase_8.1.md)
 - **Logging:** [Phase 7.0 — Logging Core](../phase_7/phase_7.0.md)
