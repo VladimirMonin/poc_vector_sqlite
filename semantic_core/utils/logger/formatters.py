@@ -319,5 +319,82 @@ class FileFormatter(logging.Formatter):
         return result
 
 
+class JSONFormatter(logging.Formatter):
+    """JSON-форматтер для логов.
+
+    Формирует структурированный JSON для интеграции с log aggregators
+    (Elasticsearch, Loki, CloudWatch, etc.).
+
+    Формат:
+        {
+            "timestamp": "2024-12-03T14:30:00.123Z",
+            "level": "INFO",
+            "logger": "semantic_core.pipeline",
+            "message": "Document processed",
+            "context": {"doc_id": "doc-123"},
+            "extra": {"chunk_count": 15},
+            "location": {"file": "pipeline.py", "line": 42, "function": "ingest"}
+        }
+    """
+
+    def __init__(self, include_location: bool = True) -> None:
+        """Инициализирует форматтер.
+
+        Args:
+            include_location: Включать информацию о месте в коде.
+        """
+        super().__init__()
+        self.include_location = include_location
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Форматирует запись как JSON.
+
+        Args:
+            record: Запись лога.
+
+        Returns:
+            JSON-строка.
+        """
+        # Базовые поля
+        data: dict[str, Any] = {
+            "timestamp": datetime.fromtimestamp(record.created).isoformat() + "Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+
+        # Context IDs (batch_id, doc_id, etc.)
+        context: dict[str, Any] = {}
+        for key in CONTEXT_ID_KEYS:
+            value = getattr(record, key, None)
+            if value is not None:
+                context[key] = value
+        if context:
+            data["context"] = context
+
+        # Extra fields
+        extra = format_extra_context(record)
+        if extra:
+            data["extra"] = extra
+
+        # Location info
+        if self.include_location:
+            data["location"] = {
+                "file": record.filename,
+                "line": record.lineno,
+                "function": record.funcName,
+            }
+
+        # Exception info
+        if record.exc_info:
+            data["exception"] = {
+                "type": record.exc_info[0].__name__ if record.exc_info[0] else None,
+                "message": str(record.exc_info[1]) if record.exc_info[1] else None,
+                "traceback": self.formatException(record.exc_info),
+            }
+
+        return json.dumps(data, ensure_ascii=False, default=str)
+
+
 # Алиас для обратной совместимости
 EmojiFormatter = ConsoleFormatter

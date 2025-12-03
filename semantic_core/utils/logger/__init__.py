@@ -7,16 +7,28 @@
     setup_logging(config: LoggingConfig | None = None) -> None
         Инициализировать систему логирования.
 
+    dump_debug_info(config: LoggingConfig | None = None) -> str
+        Собрать диагностическую информацию для баг-репортов.
+
+    check_config(config: LoggingConfig | None = None) -> list[str]
+        Валидировать конфигурацию логирования.
+
 Классы:
     SemanticLogger
         Адаптер с поддержкой контекста (bind) и специальных методов.
 
     LoggingConfig
-        Pydantic-модель конфигурации.
+        Pydantic-модель конфигурации с поддержкой environment variables.
 
 Константы:
     TRACE: int
         Уровень TRACE (5), ниже DEBUG.
+
+Environment Variables:
+    SEMANTIC_LOG_LEVEL: Уровень консольного вывода (DEBUG/INFO/WARNING/ERROR).
+    SEMANTIC_LOG_FILE: Путь к файлу логов.
+    SEMANTIC_LOG_JSON: JSON-формат для файла (true/false).
+    SEMANTIC_LOG_REDACT: Маскировать API-ключи (true/false).
 
 Example:
     >>> from semantic_core.utils.logger import get_logger, setup_logging
@@ -31,19 +43,23 @@ Example:
     >>> # С привязкой контекста
     >>> log = logger.bind(batch_id="batch-123")
     >>> log.info("Processing batch")  # -> 📦 [batch-123] Processing batch
+    >>>
+    >>> # Диагностика
+    >>> from semantic_core.utils.logger import dump_debug_info
+    >>> print(dump_debug_info())
 """
 
 import logging
-import sys
 from typing import TYPE_CHECKING
 
 from rich.logging import RichHandler
 
 from .config import LoggingConfig
 from .filters import SensitiveDataFilter
-from .formatters import ConsoleFormatter, FileFormatter
+from .formatters import ConsoleFormatter, FileFormatter, JSONFormatter
 from .levels import TRACE, install_trace_level
 from .logger import SemanticLogger
+from .diagnostics import dump_debug_info, check_config, get_handlers_info
 
 if TYPE_CHECKING:
     pass
@@ -184,12 +200,17 @@ __all__ = [
     "get_logger",
     "setup_logging",
     "get_current_config",
+    # Диагностика
+    "dump_debug_info",
+    "check_config",
+    "get_handlers_info",
     # Классы
     "SemanticLogger",
     "LoggingConfig",
     # Форматтеры (для кастомизации)
     "ConsoleFormatter",
     "FileFormatter",
+    "JSONFormatter",
     # Фильтры (для кастомизации)
     "SensitiveDataFilter",
 ]
