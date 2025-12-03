@@ -291,7 +291,7 @@ Episode 42 (CLI Commands)
 
 ## ⏭️ Next Episode
 
-**Episode 43: Batch Commands** — асинхронная обработка через CLI: `semantic queue status`, `semantic batch submit`, `semantic queue process`.
+**[Episode 43: Queue & Worker Commands](43_queue_worker_commands.md)** — асинхронная обработка через CLI: `semantic queue status`, `semantic worker start`, graceful shutdown.
 
 ---
 
