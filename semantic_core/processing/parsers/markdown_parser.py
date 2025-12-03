@@ -95,21 +95,22 @@ class MarkdownNodeParser:
                 # Получаем содержимое из inline токена
                 inline_token = tokens[i + 1] if i + 1 < len(tokens) else None
                 if inline_token and inline_token.type == "inline":
-                    text_content = inline_token.content
+                    children = inline_token.children or []
 
                     # Проверяем на наличие изображений в inline токенах
-                    has_images = any(
-                        child.type == "image" for child in inline_token.children or []
-                    )
+                    images = [child for child in children if child.type == "image"]
 
-                    # Если есть только изображение, пометим как IMAGE_REF
-                    if has_images and not text_content.strip():
-                        # Извлекаем информацию об изображении
-                        img_token = next(
-                            (t for t in inline_token.children if t.type == "image"),
-                            None,
-                        )
-                        if img_token:
+                    # Проверяем, есть ли текстовые ноды кроме изображений
+                    text_nodes = [
+                        child
+                        for child in children
+                        if child.type == "text" and child.content.strip()
+                    ]
+
+                    # Если есть только изображение (без текста рядом), пометим как IMAGE_REF
+                    if images and not text_nodes:
+                        # Для каждого изображения создаём отдельный сегмент
+                        for img_token in images:
                             yield ParsingSegment(
                                 content=img_token.attrGet("src") or "",
                                 segment_type=ChunkType.IMAGE_REF,
@@ -123,6 +124,7 @@ class MarkdownNodeParser:
                             )
                     else:
                         # Обычный текстовый параграф
+                        text_content = inline_token.content
                         yield ParsingSegment(
                             content=text_content,
                             segment_type=ChunkType.TEXT,
