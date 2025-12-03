@@ -170,6 +170,16 @@
 
 ---
 
+### 🖥 CLI & Configuration (Фаза 8)
+
+40. [**Unified Configuration**](40_unified_configuration.md)  
+    SemanticConfig: Pydantic Settings с TOML + env, единый источник правды
+
+41. [**CLI Architecture**](41_cli_architecture.md)  
+    Typer + Rich: быстрый --help, lazy initialization, красивый вывод
+
+---
+
 ## 🚀 Быстрый старт
 
 ```bash
