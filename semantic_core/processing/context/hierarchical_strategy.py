@@ -7,6 +7,9 @@
 
 from semantic_core.domain import Chunk, ChunkType, Document, MEDIA_CHUNK_TYPES
 from semantic_core.interfaces.context import BaseContextStrategy
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class HierarchicalContextStrategy(BaseContextStrategy):
@@ -55,6 +58,9 @@ class HierarchicalContextStrategy(BaseContextStrategy):
         Returns:
             Структурированный промпт для эмбеддинга.
         """
+        log = logger.bind(chunk_id=f"chunk-{chunk.chunk_index}")
+        log.trace(f"Формирование контекста для типа {chunk.chunk_type.name}")
+
         parts: list[str] = []
 
         # Добавляем название документа
@@ -64,12 +70,15 @@ class HierarchicalContextStrategy(BaseContextStrategy):
 
         # Извлекаем иерархию заголовков из метаданных
         headers = chunk.metadata.get("headers", [])
+        breadcrumbs = " > ".join(headers) if headers else ""
+
+        if breadcrumbs:
+            log.trace(f"Breadcrumbs: {breadcrumbs}")
 
         # Формируем контекст в зависимости от типа чанка
         if chunk.chunk_type == ChunkType.CODE:
             # Для кода используем специальный формат
             if headers:
-                breadcrumbs = " > ".join(headers)
                 parts.append(f"Context: {breadcrumbs}")
 
             # Указываем тип контента
@@ -85,7 +94,6 @@ class HierarchicalContextStrategy(BaseContextStrategy):
         elif chunk.chunk_type == ChunkType.IMAGE_REF:
             # Для изображений добавляем контекст и метаданные
             if headers:
-                breadcrumbs = " > ".join(headers)
                 parts.append(f"Section: {breadcrumbs}")
 
             # Проверяем, было ли обогащение через Vision API
@@ -108,6 +116,8 @@ class HierarchicalContextStrategy(BaseContextStrategy):
                 original_path = chunk.metadata.get("_original_path", "")
                 if original_path:
                     parts.append(f"Source: {original_path}")
+
+                log.trace("Обогащённое изображение с Vision API")
             else:
                 # НЕ обогащённый чанк: content = путь к файлу
                 parts.append("Type: Image Reference")
@@ -126,7 +136,6 @@ class HierarchicalContextStrategy(BaseContextStrategy):
         elif chunk.chunk_type == ChunkType.AUDIO_REF:
             # Для аудио добавляем транскрипцию или ссылку
             if headers:
-                breadcrumbs = " > ".join(headers)
                 parts.append(f"Section: {breadcrumbs}")
 
             if chunk.metadata.get("_enriched"):
@@ -154,6 +163,8 @@ class HierarchicalContextStrategy(BaseContextStrategy):
                 original_path = chunk.metadata.get("_original_path", "")
                 if original_path:
                     parts.append(f"Source: {original_path}")
+
+                log.trace("Обогащённое аудио с Audio API")
             else:
                 # НЕ обогащённый чанк: content = путь к файлу
                 parts.append("Type: Audio Reference")
@@ -167,7 +178,6 @@ class HierarchicalContextStrategy(BaseContextStrategy):
         elif chunk.chunk_type == ChunkType.VIDEO_REF:
             # Для видео добавляем описание или ссылку
             if headers:
-                breadcrumbs = " > ".join(headers)
                 parts.append(f"Section: {breadcrumbs}")
 
             if chunk.metadata.get("_enriched"):
@@ -196,6 +206,8 @@ class HierarchicalContextStrategy(BaseContextStrategy):
                 original_path = chunk.metadata.get("_original_path", "")
                 if original_path:
                     parts.append(f"Source: {original_path}")
+
+                log.trace("Обогащённое видео с Video API")
             else:
                 # НЕ обогащённый чанк: content = путь к файлу
                 parts.append("Type: Video Reference")
@@ -209,7 +221,6 @@ class HierarchicalContextStrategy(BaseContextStrategy):
         else:
             # Для обычного текста
             if headers:
-                breadcrumbs = " > ".join(headers)
                 parts.append(f"Section: {breadcrumbs}")
 
             # Проверяем, является ли это цитатой
@@ -219,4 +230,11 @@ class HierarchicalContextStrategy(BaseContextStrategy):
             parts.append("Content:")
             parts.append(chunk.content)
 
-        return "\n".join(parts)
+        result = "\n".join(parts)
+        context_size = len(result) - len(chunk.content)
+        log.info(
+            f"Контекст сформирован: type={chunk.chunk_type.name}, "
+            f"добавлено +{context_size} символов контекста"
+        )
+
+        return result

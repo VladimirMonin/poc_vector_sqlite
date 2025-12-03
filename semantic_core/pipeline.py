@@ -20,6 +20,7 @@ from semantic_core.interfaces import (
 from semantic_core.domain import Document, SearchResult, MediaConfig, MediaType
 from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
+from semantic_core.utils.logger import get_logger, setup_logging, LoggingConfig
 
 if TYPE_CHECKING:
     from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from semantic_core.core.media_queue import MediaQueueProcessor
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 IngestionMode = Literal["sync", "async"]
 
@@ -79,6 +80,9 @@ class SemanticCore:
         audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
         video_analyzer: Optional["GeminiVideoAnalyzer"] = None,
         media_config: Optional[MediaConfig] = None,
+        log_level: Optional[str] = None,
+        log_file: Optional[str | Path] = None,
+        logging_config: Optional[LoggingConfig] = None,
     ):
         """Инициализация оркестратора.
 
@@ -91,7 +95,23 @@ class SemanticCore:
             audio_analyzer: Анализатор аудио (опционально).
             video_analyzer: Анализатор видео (опционально).
             media_config: Конфигурация обработки медиа.
+            log_level: Уровень логирования (DEBUG/INFO/WARNING/ERROR).
+            log_file: Путь к файлу логов.
+            logging_config: Полная конфигурация логирования (приоритет над log_level/log_file).
         """
+        # === Настройка логирования ===
+        if logging_config:
+            setup_logging(logging_config)
+        elif log_level or log_file:
+            # Создаём конфиг из отдельных параметров
+            config_kwargs: dict = {}
+            if log_level:
+                config_kwargs["level"] = log_level
+            if log_file:
+                config_kwargs["log_file"] = Path(log_file)
+            setup_logging(LoggingConfig(**config_kwargs))
+
+        # === Основные компоненты ===
         self.embedder = embedder
         self.store = store
         self.splitter = splitter
@@ -104,6 +124,8 @@ class SemanticCore:
         # Lazy-инициализация компонентов для медиа
         self._rate_limiter: Optional["RateLimiter"] = None
         self._media_queue: Optional["MediaQueueProcessor"] = None
+
+        logger.debug("SemanticCore initialized")
 
     def ingest(
         self,

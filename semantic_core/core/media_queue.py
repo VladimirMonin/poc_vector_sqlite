@@ -21,12 +21,15 @@ from semantic_core.domain.media import (
 from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
 from semantic_core.infrastructure.media.utils.audio import is_audio_supported
 from semantic_core.infrastructure.media.utils.video import is_video_supported
+from semantic_core.utils.logger import get_logger
 
 if TYPE_CHECKING:
     from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
     from semantic_core.infrastructure.gemini.audio_analyzer import GeminiAudioAnalyzer
     from semantic_core.infrastructure.gemini.video_analyzer import GeminiVideoAnalyzer
     from semantic_core.infrastructure.gemini.rate_limiter import RateLimiter
+
+logger = get_logger(__name__)
 
 
 class MediaQueueProcessor:
@@ -103,6 +106,15 @@ class MediaQueueProcessor:
         # Для обратной совместимости
         self.analyzer = image_analyzer
 
+        logger.info(
+            "MediaQueueProcessor initialized",
+            has_image_analyzer=True,
+            has_audio_analyzer=audio_analyzer is not None,
+            has_video_analyzer=video_analyzer is not None,
+            has_embedder=embedder is not None,
+            has_store=store is not None,
+        )
+
     def process_one(self) -> bool:
         """Обрабатывает одну задачу из очереди.
 
@@ -113,7 +125,11 @@ class MediaQueueProcessor:
         # Получаем pending задачу
         task = self._get_pending_task()
         if not task:
+            logger.trace("No pending tasks in queue")
             return False
+
+        task_logger = logger.bind(task_id=task.id, mime_type=task.mime_type)
+        task_logger.debug("Processing task", media_path=task.media_path)
 
         # Обновляем статус
         self._update_status(task.id, TaskStatus.PROCESSING)
@@ -131,11 +147,22 @@ class MediaQueueProcessor:
             # Сохраняем результат
             self._save_result(task.id, result)
 
+            task_logger.info(
+                "Task completed successfully",
+                has_description=bool(result.description),
+                keywords_count=len(result.keywords) if result.keywords else 0,
+            )
+
             return True
 
         except Exception as e:
             # Обновляем статус с ошибкой
             self._update_status(task.id, TaskStatus.FAILED, error=str(e))
+            task_logger.error_with_context(
+                "Task processing failed",
+                e,
+                media_path=task.media_path,
+            )
             return True
 
     def _route_and_analyze(
@@ -157,22 +184,28 @@ class MediaQueueProcessor:
         """
         if is_audio_supported(mime_type):
             if self.audio_analyzer is None:
+                logger.error("Audio analyzer not configured", mime_type=mime_type)
                 raise ValueError(
                     f"Audio analyzer not configured, cannot process {mime_type}"
                 )
+            logger.debug("Routing to audio analyzer", mime_type=mime_type)
             return self.audio_analyzer.analyze(request)
 
         elif is_video_supported(mime_type):
             if self.video_analyzer is None:
+                logger.error("Video analyzer not configured", mime_type=mime_type)
                 raise ValueError(
                     f"Video analyzer not configured, cannot process {mime_type}"
                 )
+            logger.debug("Routing to video analyzer", mime_type=mime_type)
             return self.video_analyzer.analyze(request, self.video_config)
 
         elif mime_type.startswith("image/"):
+            logger.debug("Routing to image analyzer", mime_type=mime_type)
             return self.image_analyzer.analyze(request)
 
         else:
+            logger.error("Unsupported media type", mime_type=mime_type)
             raise ValueError(f"Unsupported media type: {mime_type}")
 
     def process_batch(self, max_tasks: int = 10) -> int:
@@ -184,11 +217,13 @@ class MediaQueueProcessor:
         Returns:
             Количество обработанных задач.
         """
+        logger.info("Starting batch processing", max_tasks=max_tasks)
         processed = 0
         for _ in range(max_tasks):
             if not self.process_one():
                 break
             processed += 1
+        logger.info("Batch processing completed", processed=processed)
         return processed
 
     def process_task(self, task_id: str) -> bool:
@@ -200,10 +235,13 @@ class MediaQueueProcessor:
         Returns:
             True если успешно, False при ошибке.
         """
+        task_logger = logger.bind(task_id=task_id)
         task = MediaTaskModel.get_or_none(MediaTaskModel.id == task_id)
         if not task:
+            task_logger.warning("Task not found")
             return False
 
+        task_logger.debug("Processing specific task", mime_type=task.mime_type)
         self._update_status(task.id, TaskStatus.PROCESSING)
 
         try:
@@ -211,9 +249,11 @@ class MediaQueueProcessor:
             request = self._to_request(task)
             result = self._route_and_analyze(request, task.mime_type)
             self._save_result(task.id, result)
+            task_logger.info("Task completed successfully")
             return True
         except Exception as e:
             self._update_status(task.id, TaskStatus.FAILED, error=str(e))
+            task_logger.error_with_context("Task processing failed", e)
             return False
 
     def get_pending_count(self) -> int:
@@ -222,11 +262,13 @@ class MediaQueueProcessor:
         Returns:
             Количество pending задач.
         """
-        return (
+        count = (
             MediaTaskModel.select()
             .where(MediaTaskModel.status == TaskStatus.PENDING.value)
             .count()
         )
+        logger.trace("Got pending count", count=count)
+        return count
 
     def _get_pending_task(self) -> Optional[MediaTaskModel]:
         """Получает одну pending задачу.
