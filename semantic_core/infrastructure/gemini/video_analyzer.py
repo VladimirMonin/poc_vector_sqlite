@@ -243,6 +243,11 @@ class GeminiVideoAnalyzer:
 
         data = json.loads(response.text)
 
+        # Извлекаем usage_metadata (это Pydantic модель, не словарь)
+        tokens_used = None
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            tokens_used = getattr(response.usage_metadata, "total_token_count", None)
+
         return MediaAnalysisResult(
             description=data["description"],
             alt_text=None,  # Видео не имеют alt-text
@@ -252,7 +257,5 @@ class GeminiVideoAnalyzer:
             participants=data.get("participants", []),
             action_items=data.get("action_items", []),
             duration_seconds=duration,
-            tokens_used=getattr(response, "usage_metadata", {}).get(
-                "total_token_count"
-            ),
+            tokens_used=tokens_used,
         )
