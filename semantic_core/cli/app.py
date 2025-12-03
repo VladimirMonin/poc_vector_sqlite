@@ -42,6 +42,15 @@ def get_cli_context() -> CLIContext:
     return _cli_context
 
 
+def version_callback(value: bool) -> None:
+    """Показать версию и выйти."""
+    if value:
+        from semantic_core import __version__
+
+        typer.echo(f"Semantic Core CLI v{__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
 def main_callback(
     ctx: typer.Context,
@@ -70,8 +79,16 @@ def main_callback(
         "-v",
         help="Подробный вывод (эквивалент --log-level INFO).",
     ),
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Показать версию и выйти.",
+        callback=version_callback,
+        is_eager=True,
+    ),
 ) -> None:
-    """Инициализация контекста для всех команд."""
+    """🧠 Semantic Core CLI — Ваш второй мозг в терминале."""
     global _cli_context
 
     _cli_context = CLIContext(
@@ -94,34 +111,12 @@ app.add_typer(init_cmd.app, name="init")
 app.add_typer(config_cmd.app, name="config")
 app.add_typer(doctor_cmd.app, name="doctor")
 
+# Phase 8.0: Core commands
+from semantic_core.cli.commands import ingest_cmd, search_cmd, docs_cmd
 
-# === Утилиты ===
-
-
-def version_callback(value: bool) -> None:
-    """Показать версию и выйти."""
-    if value:
-        from semantic_core import __version__
-
-        typer.echo(f"Semantic Core CLI v{__version__}")
-        raise typer.Exit()
-
-
-# Добавляем --version
-@app.callback(invoke_without_command=True)
-def main_with_version(
-    ctx: typer.Context,
-    version: bool = typer.Option(
-        False,
-        "--version",
-        "-V",
-        help="Показать версию и выйти.",
-        callback=version_callback,
-        is_eager=True,
-    ),
-) -> None:
-    """🧠 Semantic Core CLI — Ваш второй мозг в терминале."""
-    pass
+app.add_typer(ingest_cmd, name="ingest")
+app.add_typer(search_cmd, name="search")
+app.add_typer(docs_cmd, name="docs")
 
 
 __all__ = ["app", "get_cli_context"]
