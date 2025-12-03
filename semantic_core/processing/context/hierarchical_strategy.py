@@ -5,7 +5,7 @@
         Формирует обогащенный контекст с учетом структуры документа.
 """
 
-from semantic_core.domain import Chunk, ChunkType, Document
+from semantic_core.domain import Chunk, ChunkType, Document, MEDIA_CHUNK_TYPES
 from semantic_core.interfaces.context import BaseContextStrategy
 
 
@@ -88,18 +88,123 @@ class HierarchicalContextStrategy(BaseContextStrategy):
                 breadcrumbs = " > ".join(headers)
                 parts.append(f"Section: {breadcrumbs}")
 
-            parts.append("Type: Image Reference")
+            # Проверяем, было ли обогащение через Vision API
+            if chunk.metadata.get("_enriched"):
+                # Обогащённый чанк: content = описание от Vision
+                parts.append("Type: Image")
+                parts.append(f"Description: {chunk.content}")
 
-            # Добавляем alt-текст и title если есть
-            alt_text = chunk.metadata.get("alt", "")
-            title_text = chunk.metadata.get("title", "")
+                # Добавляем OCR если есть
+                ocr_text = chunk.metadata.get("_vision_ocr")
+                if ocr_text:
+                    parts.append(f"Visible text: {ocr_text}")
 
-            if alt_text:
-                parts.append(f"Description: {alt_text}")
-            if title_text:
-                parts.append(f"Title: {title_text}")
+                # Добавляем ключевые слова
+                keywords = chunk.metadata.get("_vision_keywords", [])
+                if keywords:
+                    parts.append(f"Keywords: {', '.join(keywords)}")
 
-            parts.append(f"Source: {chunk.content}")
+                # Оригинальный путь
+                original_path = chunk.metadata.get("_original_path", "")
+                if original_path:
+                    parts.append(f"Source: {original_path}")
+            else:
+                # НЕ обогащённый чанк: content = путь к файлу
+                parts.append("Type: Image Reference")
+
+                # Добавляем alt-текст и title если есть
+                alt_text = chunk.metadata.get("alt", "")
+                title_text = chunk.metadata.get("title", "")
+
+                if alt_text:
+                    parts.append(f"Description: {alt_text}")
+                if title_text:
+                    parts.append(f"Title: {title_text}")
+
+                parts.append(f"Source: {chunk.content}")
+
+        elif chunk.chunk_type == ChunkType.AUDIO_REF:
+            # Для аудио добавляем транскрипцию или ссылку
+            if headers:
+                breadcrumbs = " > ".join(headers)
+                parts.append(f"Section: {breadcrumbs}")
+
+            if chunk.metadata.get("_enriched"):
+                # Обогащённый чанк: content = транскрипция
+                parts.append("Type: Audio")
+                parts.append(f"Transcription: {chunk.content}")
+
+                # Дополнительные метаданные от Audio API
+                participants = chunk.metadata.get("_audio_participants", [])
+                if participants:
+                    parts.append(f"Speakers: {', '.join(participants)}")
+
+                action_items = chunk.metadata.get("_audio_action_items", [])
+                if action_items:
+                    parts.append(f"Action items: {'; '.join(action_items)}")
+
+                keywords = chunk.metadata.get("_audio_keywords", [])
+                if keywords:
+                    parts.append(f"Keywords: {', '.join(keywords)}")
+
+                duration = chunk.metadata.get("_audio_duration")
+                if duration:
+                    parts.append(f"Duration: {duration:.1f}s")
+
+                original_path = chunk.metadata.get("_original_path", "")
+                if original_path:
+                    parts.append(f"Source: {original_path}")
+            else:
+                # НЕ обогащённый чанк: content = путь к файлу
+                parts.append("Type: Audio Reference")
+
+                alt_text = chunk.metadata.get("alt", "")
+                if alt_text:
+                    parts.append(f"Description: {alt_text}")
+
+                parts.append(f"Source: {chunk.content}")
+
+        elif chunk.chunk_type == ChunkType.VIDEO_REF:
+            # Для видео добавляем описание или ссылку
+            if headers:
+                breadcrumbs = " > ".join(headers)
+                parts.append(f"Section: {breadcrumbs}")
+
+            if chunk.metadata.get("_enriched"):
+                # Обогащённый чанк: content = описание от Video API
+                parts.append("Type: Video")
+                parts.append(f"Description: {chunk.content}")
+
+                # Транскрипция аудио-дорожки
+                transcription = chunk.metadata.get("_video_transcription")
+                if transcription:
+                    parts.append(f"Audio transcription: {transcription}")
+
+                # OCR текст с кадров
+                ocr_text = chunk.metadata.get("_video_ocr")
+                if ocr_text:
+                    parts.append(f"Visible text: {ocr_text}")
+
+                keywords = chunk.metadata.get("_video_keywords", [])
+                if keywords:
+                    parts.append(f"Keywords: {', '.join(keywords)}")
+
+                duration = chunk.metadata.get("_video_duration")
+                if duration:
+                    parts.append(f"Duration: {duration:.1f}s")
+
+                original_path = chunk.metadata.get("_original_path", "")
+                if original_path:
+                    parts.append(f"Source: {original_path}")
+            else:
+                # НЕ обогащённый чанк: content = путь к файлу
+                parts.append("Type: Video Reference")
+
+                alt_text = chunk.metadata.get("alt", "")
+                if alt_text:
+                    parts.append(f"Description: {alt_text}")
+
+                parts.append(f"Source: {chunk.content}")
 
         else:
             # Для обычного текста

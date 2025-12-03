@@ -14,6 +14,37 @@ from semantic_core.domain import ChunkType
 from semantic_core.interfaces.parser import ParsingSegment
 
 
+# Расширения медиа-файлов (case-insensitive)
+AUDIO_EXTENSIONS = frozenset({".mp3", ".wav", ".ogg", ".flac", ".aac", ".aiff"})
+VIDEO_EXTENSIONS = frozenset({".mp4", ".mov", ".avi", ".mkv", ".webm"})
+IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"})
+
+
+def _get_media_type_by_extension(path: str) -> ChunkType | None:
+    """Определяет тип медиа по расширению файла.
+
+    Args:
+        path: Путь к файлу или URL.
+
+    Returns:
+        ChunkType или None если расширение не медийное.
+    """
+    if not path:
+        return None
+
+    # Убираем query string и fragment
+    clean_path = path.split("?")[0].split("#")[0]
+    ext = "." + clean_path.rsplit(".", 1)[-1].lower() if "." in clean_path else ""
+
+    if ext in AUDIO_EXTENSIONS:
+        return ChunkType.AUDIO_REF
+    if ext in VIDEO_EXTENSIONS:
+        return ChunkType.VIDEO_REF
+    if ext in IMAGE_EXTENSIONS:
+        return ChunkType.IMAGE_REF
+    return None
+
+
 class MarkdownNodeParser:
     """AST-парсер для Markdown документов.
 
@@ -24,7 +55,8 @@ class MarkdownNodeParser:
         - Отслеживание иерархии заголовков (breadcrumbs)
         - Изоляция блоков кода с определением языка
         - Сохранение номеров строк для навигации
-        - Определение типов контента (TEXT/CODE/TABLE/IMAGE_REF)
+        - Определение типов контента (TEXT/CODE/TABLE/IMAGE_REF/AUDIO_REF/VIDEO_REF)
+        - Детекция медиа-ссылок по расширению файла
 
     Attributes:
         md: Экземпляр MarkdownIt парсера.
@@ -33,6 +65,133 @@ class MarkdownNodeParser:
     def __init__(self):
         """Инициализирует парсер с настройками CommonMark."""
         self.md = MarkdownIt("commonmark")
+
+    def _has_text_outside_media(self, children: list[Token]) -> bool:
+        """Проверяет, есть ли текст вне медиа-элементов (изображений/ссылок на аудио/видео).
+
+        Не считает текстом:
+        - Текст внутри медиа-ссылок (между link_open и link_close с медиа-расширением)
+        - Пустой текст (whitespace)
+
+        Args:
+            children: Список inline-токенов.
+
+        Returns:
+            True если есть текстовый контент вне медиа-ссылок.
+        """
+        inside_media_link = False
+        i = 0
+
+        while i < len(children):
+            child = children[i]
+
+            # Отслеживаем вход в медиа-ссылку
+            if child.type == "link_open":
+                href = child.attrGet("href") or ""
+                media_type = _get_media_type_by_extension(href)
+                if media_type in (ChunkType.AUDIO_REF, ChunkType.VIDEO_REF):
+                    inside_media_link = True
+                i += 1
+                continue
+
+            if child.type == "link_close":
+                inside_media_link = False
+                i += 1
+                continue
+
+            # Изображения - это медиа, их текст (alt) не считаем
+            if child.type == "image":
+                i += 1
+                continue
+
+            # Текст вне медиа-ссылок
+            if child.type == "text" and not inside_media_link:
+                if child.content.strip():
+                    return True
+
+            i += 1
+
+        return False
+
+    def _process_inline_children(
+        self,
+        children: list[Token],
+        headers: list[str],
+        start_line: int | None,
+        end_line: int | None,
+    ) -> Iterator[ParsingSegment]:
+        """Обрабатывает inline-токены и извлекает медиа-ссылки.
+
+        Детектирует:
+        - Изображения: ![alt](path) → IMAGE_REF (или VIDEO_REF по расширению)
+        - Ссылки на аудио: [text](file.mp3) → AUDIO_REF
+        - Ссылки на видео: [text](file.mp4) → VIDEO_REF
+
+        Args:
+            children: Список inline-токенов.
+            headers: Текущий стек заголовков.
+            start_line: Начальная строка параграфа.
+            end_line: Конечная строка параграфа.
+
+        Yields:
+            ParsingSegment для найденных медиа-элементов.
+        """
+        i = 0
+        while i < len(children):
+            child = children[i]
+
+            # Обработка изображений: ![alt](src)
+            if child.type == "image":
+                src = child.attrGet("src") or ""
+                alt = child.content or ""
+                title = child.attrGet("title") or ""
+
+                # Определяем тип по расширению (может быть VIDEO!)
+                media_type = _get_media_type_by_extension(src)
+                if media_type is None:
+                    media_type = ChunkType.IMAGE_REF  # fallback
+
+                yield ParsingSegment(
+                    content=src,
+                    segment_type=media_type,
+                    headers=headers,
+                    start_line=start_line,
+                    end_line=end_line,
+                    metadata={"alt": alt, "title": title},
+                )
+                i += 1
+                continue
+
+            # Обработка ссылок: [text](href)
+            if child.type == "link_open":
+                href = child.attrGet("href") or ""
+                media_type = _get_media_type_by_extension(href)
+
+                if media_type in (ChunkType.AUDIO_REF, ChunkType.VIDEO_REF):
+                    # Собираем текст ссылки (между link_open и link_close)
+                    link_text_parts = []
+                    j = i + 1
+                    while j < len(children) and children[j].type != "link_close":
+                        if children[j].type == "text":
+                            link_text_parts.append(children[j].content)
+                        j += 1
+
+                    link_text = "".join(link_text_parts)
+
+                    yield ParsingSegment(
+                        content=href,
+                        segment_type=media_type,
+                        headers=headers,
+                        start_line=start_line,
+                        end_line=end_line,
+                        metadata={"alt": link_text},
+                    )
+
+                    # Пропускаем до link_close включительно
+                    i = j + 1
+                    continue
+
+            i += 1
 
     def parse(self, content: str) -> Iterator[ParsingSegment]:
         """Парсит Markdown и возвращает поток сегментов.
@@ -96,41 +255,32 @@ class MarkdownNodeParser:
                 inline_token = tokens[i + 1] if i + 1 < len(tokens) else None
                 if inline_token and inline_token.type == "inline":
                     children = inline_token.children or []
+                    current_headers = [txt for _, txt in headers_stack]
+                    start_line = token.map[0] + 1 if token.map else None
+                    end_line = token.map[1] if token.map else None
 
-                    # Проверяем на наличие изображений в inline токенах
-                    images = [child for child in children if child.type == "image"]
+                    # Извлекаем медиа-элементы из inline-токенов
+                    media_segments = list(
+                        self._process_inline_children(
+                            children, current_headers, start_line, end_line
+                        )
+                    )
 
-                    # Проверяем, есть ли текстовые ноды кроме изображений
-                    text_nodes = [
-                        child
-                        for child in children
-                        if child.type == "text" and child.content.strip()
-                    ]
+                    # Проверяем, есть ли текст ВНЕ медиа-элементов
+                    has_text = self._has_text_outside_media(children)
 
-                    # Если есть только изображение (без текста рядом), пометим как IMAGE_REF
-                    if images and not text_nodes:
-                        # Для каждого изображения создаём отдельный сегмент
-                        for img_token in images:
-                            yield ParsingSegment(
-                                content=img_token.attrGet("src") or "",
-                                segment_type=ChunkType.IMAGE_REF,
-                                headers=[txt for _, txt in headers_stack],
-                                start_line=token.map[0] + 1 if token.map else None,
-                                end_line=token.map[1] if token.map else None,
-                                metadata={
-                                    "alt": img_token.content or "",
-                                    "title": img_token.attrGet("title") or "",
-                                },
-                            )
+                    # Если есть только медиа (без текста), отдаём их как отдельные сегменты
+                    if media_segments and not has_text:
+                        yield from media_segments
                     else:
                         # Обычный текстовый параграф
                         text_content = inline_token.content
                         yield ParsingSegment(
                             content=text_content,
                             segment_type=ChunkType.TEXT,
-                            headers=[txt for _, txt in headers_stack],
-                            start_line=token.map[0] + 1 if token.map else None,
-                            end_line=token.map[1] if token.map else None,
+                            headers=current_headers,
+                            start_line=start_line,
+                            end_line=end_line,
                         )
 
                 # Пропускаем paragraph_open, inline, paragraph_close

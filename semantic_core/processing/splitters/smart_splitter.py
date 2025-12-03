@@ -7,7 +7,7 @@
 
 from typing import Optional
 
-from semantic_core.domain import Chunk, ChunkType, Document
+from semantic_core.domain import Chunk, ChunkType, Document, MEDIA_CHUNK_TYPES
 from semantic_core.interfaces.parser import DocumentParser, ParsingSegment
 from semantic_core.interfaces.splitter import BaseSplitter
 
@@ -20,6 +20,7 @@ class SmartSplitter(BaseSplitter):
 
     - Группирует мелкие текстовые параграфы до достижения chunk_size
     - Изолирует блоки кода в отдельные чанки (даже маленькие)
+    - Изолирует медиа-ссылки (IMAGE/AUDIO/VIDEO_REF) в отдельные чанки
     - Сохраняет метаданные иерархии заголовков
     - Режет большие блоки кода построчно с дублированием метаданных
 
@@ -91,7 +92,7 @@ class SmartSplitter(BaseSplitter):
                 chunk_index += len(code_chunks)
 
             # Обработка изображений/медиа - всегда отдельный чанк
-            elif segment.segment_type == ChunkType.IMAGE_REF:
+            elif segment.segment_type in MEDIA_CHUNK_TYPES:
                 # Сначала сбрасываем накопленный текст
                 if text_buffer:
                     text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
@@ -104,7 +105,7 @@ class SmartSplitter(BaseSplitter):
                     Chunk(
                         content=segment.content,
                         chunk_index=chunk_index,
-                        chunk_type=ChunkType.IMAGE_REF,
+                        chunk_type=segment.segment_type,  # IMAGE/AUDIO/VIDEO_REF
                         metadata={
                             "headers": segment.headers,
                             "start_line": segment.start_line,

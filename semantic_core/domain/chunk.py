@@ -22,13 +22,27 @@ class ChunkType(str, Enum):
         TEXT: Обычный текстовый контент.
         CODE: Блок кода.
         TABLE: Таблица (Markdown/HTML).
-        IMAGE_REF: Ссылка на изображение (для будущей мультимодальности).
+        IMAGE_REF: Ссылка на изображение.
+        AUDIO_REF: Ссылка на аудиофайл.
+        VIDEO_REF: Ссылка на видеофайл.
     """
 
     TEXT = "text"
     CODE = "code"
     TABLE = "table"
     IMAGE_REF = "image_ref"
+    AUDIO_REF = "audio_ref"
+    VIDEO_REF = "video_ref"
+
+
+# Множество медиа-типов для удобной проверки
+MEDIA_CHUNK_TYPES = frozenset(
+    {
+        ChunkType.IMAGE_REF,
+        ChunkType.AUDIO_REF,
+        ChunkType.VIDEO_REF,
+    }
+)
 
 
 @dataclass
@@ -41,7 +55,7 @@ class Chunk:
     Attributes:
         content: Текст фрагмента.
         chunk_index: Порядковый номер в документе (начиная с 0).
-        chunk_type: Тип контента (TEXT/CODE/TABLE/IMAGE_REF).
+        chunk_type: Тип контента (TEXT/CODE/TABLE/IMAGE_REF/AUDIO_REF/VIDEO_REF).
         language: Язык программирования для блоков кода (например, "python").
         embedding: Векторное представление (numpy array).
         parent_doc_id: ID родительского документа.
