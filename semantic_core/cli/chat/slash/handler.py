@@ -105,8 +105,8 @@ class SlashCommandHandler:
 
         logger.debug(
             "Command registered",
-            name=command.name,
-            aliases=command.aliases,
+            cmd_name=command.name,
+            cmd_aliases=command.aliases,
         )
 
     def get_command(self, name: str) -> Optional[BaseSlashCommand]:
@@ -144,7 +144,7 @@ class SlashCommandHandler:
         text = input_text.strip()[1:]  # Убираем /
         parts = text.split(maxsplit=1)
         cmd_name = parts[0].lower() if parts else ""
-        args = parts[1] if len(parts) > 1 else ""
+        cmd_args = parts[1] if len(parts) > 1 else ""
 
         # Ищем команду
         command = self.get_command(cmd_name)
@@ -153,10 +153,10 @@ class SlashCommandHandler:
             ctx.console.print("[dim]Type /help for available commands[/dim]")
             return SlashResult(action=SlashAction.CONTINUE)
 
-        logger.debug("Executing slash command", command=cmd_name, args=args)
+        logger.debug("Executing slash command", command=cmd_name, cmd_args=cmd_args)
 
         try:
-            result = command.execute(ctx, args)
+            result = command.execute(ctx, cmd_args)
             return result
         except Exception as e:
             logger.error("Slash command failed", command=cmd_name, error=str(e))
