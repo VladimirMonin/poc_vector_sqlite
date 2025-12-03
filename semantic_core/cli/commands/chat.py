@@ -90,6 +90,16 @@ def chat(
         "--token-budget",
         help="Лимит токенов для истории (переопределяет --history-limit)",
     ),
+    compress_at: Optional[int] = typer.Option(
+        None,
+        "--compress-at",
+        help="Порог токенов для автоматического сжатия истории через LLM",
+    ),
+    compress_target: int = typer.Option(
+        10000,
+        "--compress-target",
+        help="Целевое количество токенов после сжатия (используется с --compress-at)",
+    ),
     no_history: bool = typer.Option(
         False,
         "--no-history",
@@ -105,6 +115,7 @@ def chat(
         semantic chat --full-docs  # Использовать полные документы
         semantic chat --history-limit 20  # Хранить 20 сообщений
         semantic chat --token-budget 10000  # Лимит по токенам
+        semantic chat --compress-at 30000  # Сжимать при 30k токенов
         semantic chat --no-history  # Без истории
     """
     from semantic_core.cli.app import get_cli_context
@@ -163,12 +174,24 @@ def chat(
         LastNMessages,
         TokenBudget,
         Unlimited,
+        AdaptiveWithCompression,
+        ContextCompressor,
     )
 
     if no_history:
         # Без истории — Unlimited, но не будем передавать в RAG
         history_manager = None
         history_label = "отключена"
+    elif compress_at:
+        # Адаптивное сжатие через LLM
+        compressor = ContextCompressor(llm)
+        strategy = AdaptiveWithCompression(
+            compressor=compressor,
+            threshold_tokens=compress_at,
+            target_tokens=compress_target,
+        )
+        history_manager = ChatHistoryManager(strategy)
+        history_label = f"сжатие при {compress_at} токенов"
     elif token_budget:
         # По токенам
         history_manager = ChatHistoryManager(TokenBudget(max_tokens=token_budget))
@@ -247,7 +270,13 @@ def chat(
             if result.total_tokens:
                 history_info = ""
                 if history_manager:
-                    history_info = f" | история: {len(history_manager)} сообщ."
+                    msg_count = len(history_manager)
+                    total_history_tokens = history_manager.total_tokens()
+                    history_info = f" | история: {msg_count} сообщ., {total_history_tokens} токенов"
+
+                    # Показываем информацию о сжатии
+                    if history_manager.has_summary:
+                        history_info += " (сжато)"
 
                 console.print(
                     f"\n[dim]Токены: {result.total_tokens} "

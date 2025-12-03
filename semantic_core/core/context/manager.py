@@ -19,6 +19,9 @@ class ChatHistoryManager:
     Хранит список сообщений и автоматически обрезает историю
     согласно выбранной стратегии при добавлении новых сообщений.
 
+    Поддерживает стратегии со сжатием (AdaptiveWithCompression):
+    метод get_messages_for_llm() автоматически добавляет summary.
+
     Attributes:
         strategy: Стратегия управления историей.
         messages: Текущий список сообщений.
@@ -93,9 +96,17 @@ class ChatHistoryManager:
     def get_messages_for_llm(self) -> list[dict]:
         """Возвращает историю в формате для LLM API.
 
+        Если стратегия поддерживает get_full_context() (например,
+        AdaptiveWithCompression), включает summary в начало.
+
         Returns:
             Список словарей с role и content.
         """
+        # Проверяем есть ли у стратегии get_full_context
+        if hasattr(self.strategy, "get_full_context"):
+            full_messages = self.strategy.get_full_context(self._messages)
+            return [{"role": m.role, "content": m.content} for m in full_messages]
+
         return [{"role": m.role, "content": m.content} for m in self._messages]
 
     def clear(self) -> None:
@@ -105,8 +116,17 @@ class ChatHistoryManager:
         logger.debug("History cleared", cleared_count=count)
 
     def total_tokens(self) -> int:
-        """Возвращает общее количество токенов в истории."""
-        return sum(m.tokens for m in self._messages)
+        """Возвращает общее количество токенов в истории.
+
+        Включает токены из summary, если стратегия его имеет.
+        """
+        total = sum(m.tokens for m in self._messages)
+
+        # Добавляем токены summary если есть
+        if hasattr(self.strategy, "summary") and self.strategy.summary:
+            total += self.strategy.summary.tokens
+
+        return total
 
     def __len__(self) -> int:
         """Количество сообщений в истории."""
@@ -116,6 +136,11 @@ class ChatHistoryManager:
     def is_empty(self) -> bool:
         """Пустая ли история."""
         return len(self._messages) == 0
+
+    @property
+    def has_summary(self) -> bool:
+        """Есть ли сжатое summary в стратегии."""
+        return hasattr(self.strategy, "summary") and self.strategy.summary is not None
 
 
 __all__ = ["ChatHistoryManager"]
