@@ -49,6 +49,7 @@ class MockLLMProvider(BaseLLMProvider):
         system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        history: list[dict] | None = None,
     ) -> GenerationResult:
         # Сохраняем вызов
         self.calls.append(
@@ -57,6 +58,7 @@ class MockLLMProvider(BaseLLMProvider):
                 "system_prompt": system_prompt,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "history": history,
             }
         )
 
@@ -503,3 +505,40 @@ class TestBaseLLMProvider:
         with pytest.raises(TypeError):
             # Нельзя создать экземпляр абстрактного класса
             BaseLLMProvider()  # type: ignore
+
+
+class TestRAGEngineWithHistory:
+    """Тесты RAGEngine с историей чата."""
+
+    def test_ask_without_history(self, rag_engine, mock_llm):
+        """Запрос без истории (по умолчанию)."""
+        rag_engine.ask("question")
+
+        call = mock_llm.calls[0]
+        assert call["history"] is None
+
+    def test_ask_with_history(self, rag_engine, mock_llm):
+        """Запрос с историей чата."""
+        from semantic_core.interfaces.chat_history import ChatMessage
+
+        history = [
+            ChatMessage("user", "Hello", tokens=5),
+            ChatMessage("assistant", "Hi there!", tokens=10),
+        ]
+
+        rag_engine.ask("What is RAG?", history=history)
+
+        call = mock_llm.calls[0]
+        assert call["history"] is not None
+        assert len(call["history"]) == 2
+        assert call["history"][0]["role"] == "user"
+        assert call["history"][0]["content"] == "Hello"
+        assert call["history"][1]["role"] == "assistant"
+
+    def test_ask_with_empty_history(self, rag_engine, mock_llm):
+        """Запрос с пустой историей."""
+        rag_engine.ask("question", history=[])
+
+        call = mock_llm.calls[0]
+        # Пустой список конвертируется в None или пустой список
+        assert call["history"] == [] or call["history"] is None
