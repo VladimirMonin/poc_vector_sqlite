@@ -165,6 +165,9 @@
 38. [**Secret Redaction in Logs**](38_secret_redaction.md)  
     SensitiveDataFilter: автоматическое маскирование API-ключей
 
+39. [**Diagnostics & Debugging**](39_diagnostics_debugging.md)  
+    dump_debug_info(), check_config(), trace_ai() и error_with_context()
+
 ---
 
 ## 🚀 Быстрый старт
