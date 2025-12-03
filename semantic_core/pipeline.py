@@ -17,7 +17,7 @@ from semantic_core.interfaces import (
     BaseSplitter,
     BaseContextStrategy,
 )
-from semantic_core.domain import Document, SearchResult, MediaConfig, MediaType
+from semantic_core.domain import Document, SearchResult, ChunkResult, MediaConfig, MediaType
 from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
 from semantic_core.utils.logger import get_logger, setup_logging, LoggingConfig
@@ -240,6 +240,55 @@ class SemanticCore:
             limit=limit,
             mode=mode,
             k=k,
+        )
+
+        return results
+
+    def search_chunks(
+        self,
+        query: str,
+        filters: Optional[dict] = None,
+        limit: int = 10,
+        mode: str = "hybrid",
+        k: int = 60,
+        chunk_type_filter: Optional[str] = None,
+    ) -> list[ChunkResult]:
+        """Выполняет гранулярный поиск по отдельным чанкам.
+
+        В отличие от search(), который группирует результаты по документам,
+        этот метод возвращает конкретные фрагменты (чанки).
+
+        Args:
+            query: Поисковый запрос.
+            filters: Фильтры по метаданным документа.
+            limit: Максимальное количество результатов.
+            mode: Режим поиска ('vector', 'fts', 'hybrid').
+            k: Константа для RRF алгоритма (по умолчанию 60).
+            chunk_type_filter: Фильтр по типу чанка ('text', 'code', 'table', 'image_ref').
+
+        Returns:
+            Список ChunkResult с чанками и их скорами.
+
+        Raises:
+            ValueError: Если query пустой.
+        """
+        if not query or not query.strip():
+            raise ValueError("Запрос не может быть пустым")
+
+        # Генерируем вектор для поиска (для vector/hybrid режимов)
+        query_vector = None
+        if mode in ("vector", "hybrid"):
+            query_vector = self.embedder.embed_query(query)
+
+        # Выполняем гранулярный поиск
+        results = self.store.search_chunks(
+            query_vector=query_vector,
+            query_text=query if mode in ("fts", "hybrid") else None,
+            filters=filters,
+            limit=limit,
+            mode=mode,
+            k=k,
+            chunk_type_filter=chunk_type_filter,
         )
 
         return results
