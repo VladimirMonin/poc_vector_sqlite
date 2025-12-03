@@ -17,6 +17,10 @@
         Абстрактный интерфейс для LLM провайдеров.
     GenerationResult
         DTO с результатом генерации от LLM.
+    BaseChatHistoryStrategy
+        Абстрактная стратегия управления историей чата.
+    ChatMessage
+        DTO сообщения в истории чата.
 """
 
 from semantic_core.interfaces.embedder import BaseEmbedder
@@ -25,6 +29,7 @@ from semantic_core.interfaces.splitter import BaseSplitter
 from semantic_core.interfaces.context import BaseContextStrategy
 from semantic_core.interfaces.parser import DocumentParser, ParsingSegment
 from semantic_core.interfaces.llm import BaseLLMProvider, GenerationResult
+from semantic_core.interfaces.chat_history import BaseChatHistoryStrategy, ChatMessage
 
 __all__ = [
     "BaseEmbedder",
@@ -35,4 +40,6 @@ __all__ = [
     "ParsingSegment",
     "BaseLLMProvider",
     "GenerationResult",
+    "BaseChatHistoryStrategy",
+    "ChatMessage",
 ]
