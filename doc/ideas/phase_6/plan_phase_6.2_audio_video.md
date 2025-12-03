@@ -8,6 +8,44 @@
 
 ---
 
+## 🎯 Ключевые решения архитектора
+
+### Optimization First: Агрессивные дефолты
+
+**Проблема:** Gemini inline лимит — 20 MB. Без оптимизации влезает только ~14 минут MP3 192kbps.
+
+**Решение:** Жёсткие дефолты для максимальной вместимости:
+
+| Параметр | Дефолт | Обоснование |
+|----------|--------|-------------|
+| **audio_bitrate** | 32 kbps | 20 MB / (32k/8) = **~83 минуты** аудио! |
+| **audio_codec** | libvorbis | Самый совместимый с pydub/ffmpeg |
+| **audio_mono** | True | Gemini не различает стерео |
+| **video_max_dimension** | 1024 px | Экономия токенов без потери качества |
+| **audio_model** | gemini-2.5-flash-lite | Самый дешёвый для транскрипции |
+
+**Киллер-фича:** Любой подкаст или лекция до 1.5 часов влезает в ОДИН запрос Gemini. Без нарезки. Без батчинга.
+
+### Sane Defaults, Soft Override
+
+- **Жёстко в коде:** 32kbps, mono, libvorbis, 1024px — работает для 99% случаев
+- **Мягко в MediaConfig:** Продвинутый пользователь может переопределить через `MediaConfig(audio_bitrate=64)`
+
+### Обязательная проверка ffmpeg
+
+```python
+def _ensure_ffmpeg():
+    """Проверяет наличие ffmpeg при первом обращении к аудио/видео."""
+    import shutil
+    if shutil.which("ffmpeg") is None:
+        raise DependencyError(
+            "System ffmpeg is required for audio/video processing.\n"
+            "Install: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)"
+        )
+```
+
+---
+
 ## 📐 Архитектура (Расширение 6.0)
 
 ```
@@ -20,9 +58,17 @@
                         ▼                                ▼                                ▼
                ┌─────────────────┐              ┌─────────────────┐              ┌─────────────────┐
                │ ImageAnalyzer   │              │ AudioAnalyzer   │              │ VideoAnalyzer   │
-               │ gemini-2.5-flash│              │ gemini-2.5-flash│              │ gemini-2.5-pro  │
+               │ gemini-2.5-flash│              │ flash-lite ★    │              │ gemini-2.5-pro  │
+               │ 15 RPM          │              │ 10 RPM          │              │ 5 RPM           │
                └─────────────────┘              └─────────────────┘              └─────────────────┘
+                                                        │
+                                                ┌───────┴───────┐
+                                                │ 32kbps mono   │
+                                                │ = 83 мин/20MB │
+                                                └───────────────┘
 ```
+
+★ **flash-lite** — в 4 раза дешевле flash, достаточно для транскрипции
 
 **Новое в 6.2:**
 
@@ -90,27 +136,32 @@ class VideoAnalysisConfig:
 class MediaConfig:
     """Конфигурация для обработки медиа."""
     
-    # Модели Gemini
+    # Модели Gemini (flash-lite для аудио — дёшево и сердито)
     image_model: str = "gemini-2.5-flash"
-    audio_model: str = "gemini-2.5-flash"     # Обновлено
-    video_model: str = "gemini-2.5-pro"       # Для сложного контента
+    audio_model: str = "gemini-2.5-flash-lite"  # Самый дешёвый для транскрипции
+    video_model: str = "gemini-2.5-pro"         # Для сложного контента
     
     # Rate Limiting (разные лимиты для разных типов)
     image_rpm: int = 15
     audio_rpm: int = 10   # Аудио тяжелее
     video_rpm: int = 5    # Видео самое тяжёлое
     
-    # Оптимизация
+    # Оптимизация изображений
     max_image_dimension: int = 1920
-    max_audio_duration_sec: int = 600   # 10 минут
+    
+    # Лимиты длительности (по умолчанию щедрые благодаря оптимизации)
+    max_audio_duration_sec: int = 4800  # 80 минут (влезает в 20MB при 32kbps)
     max_video_duration_sec: int = 300   # 5 минут
     
-    # Аудио
-    audio_format: str = "ogg"
+    # Аудио оптимизация (агрессивные дефолты)
+    audio_bitrate: int = 32       # kbps — ключ к 83 минутам в 20MB!
+    audio_format: str = "ogg"     # Формат контейнера
+    audio_codec: str = "libvorbis" # Кодек для ffmpeg
     audio_sample_rate: int = 16000
-    audio_mono: bool = True
+    audio_mono: bool = True       # Gemini не различает стерео
     
-    # Видео
+    # Видео оптимизация (экономия токенов)
+    video_max_dimension: int = 1024  # Уменьшено с 1280 — экономия ~40% токенов
     video_frame_mode: str = "total"
     video_frame_count: int = 10
 ```
@@ -124,6 +175,7 @@ class MediaConfig:
 ```python
 """Утилиты для работы с аудио."""
 
+import shutil
 from pydub import AudioSegment
 from pathlib import Path
 from typing import Optional
@@ -133,26 +185,56 @@ SUPPORTED_AUDIO_TYPES = [
     "audio/ogg", "audio/flac", "audio/aac"
 ]
 
+# Агрессивные дефолты для максимальной вместимости
+DEFAULT_BITRATE = 32        # kbps — 20MB / (32k/8) = ~83 минуты!
+DEFAULT_CODEC = "libvorbis" # Совместим с pydub/ffmpeg
+DEFAULT_SAMPLE_RATE = 16000 # Достаточно для speech
+DEFAULT_MONO = True         # Gemini не различает стерео
+
+
+class DependencyError(Exception):
+    """Отсутствует системная зависимость."""
+    pass
+
+
+def _ensure_ffmpeg() -> None:
+    """Проверяет наличие ffmpeg. Вызывается при первом обращении."""
+    if shutil.which("ffmpeg") is None:
+        raise DependencyError(
+            "System ffmpeg is required for audio/video processing.\n"
+            "Install: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)"
+        )
+
+
 def extract_audio_from_video(
     video_path: str,
     output_path: Optional[str] = None,
     format: str = "ogg",
-    sample_rate: int = 16000,
-    mono: bool = True,
+    codec: str = DEFAULT_CODEC,
+    bitrate: int = DEFAULT_BITRATE,
+    sample_rate: int = DEFAULT_SAMPLE_RATE,
+    mono: bool = DEFAULT_MONO,
 ) -> str:
     """
-    Извлекает аудио-дорожку из видео.
+    Извлекает аудио-дорожку из видео с агрессивной оптимизацией.
     
     Args:
         video_path: Путь к видео
         output_path: Путь для сохранения (auto если None)
-        format: Формат выхода (ogg, mp3, wav)
+        format: Формат контейнера (ogg, mp3, wav)
+        codec: Кодек ffmpeg (libvorbis, libmp3lame)
+        bitrate: Битрейт kbps (32 = ~83 мин в 20MB!)
         sample_rate: Частота дискретизации
         mono: Конвертировать в моно
         
     Returns:
         Путь к аудио-файлу
+        
+    Raises:
+        DependencyError: Если ffmpeg не установлен
     """
+    _ensure_ffmpeg()
+    
     video = AudioSegment.from_file(video_path)
     
     if mono:
@@ -202,11 +284,15 @@ SUPPORTED_VIDEO_TYPES = [
     "video/x-msvideo", "video/x-matroska"
 ]
 
+# Уменьшенные пресеты — экономия ~40% токенов без потери качества
 QUALITY_PRESETS = {
-    "fhd": 1920,   # 1080p
-    "hd": 1280,    # 720p
-    "balanced": 960,
+    "fhd": 1024,   # Было 1920 → 1024 (достаточно для Gemini Vision)
+    "hd": 768,     # Было 1280 → 768
+    "balanced": 512,  # Было 960 → 512
 }
+
+# Максимум по умолчанию — из MediaConfig
+DEFAULT_MAX_DIMENSION = 1024
 
 
 def extract_frames(
@@ -228,7 +314,13 @@ def extract_frames(
     
     Returns:
         Список PIL.Image
+        
+    Raises:
+        DependencyError: Если ffmpeg не установлен
     """
+    from .audio import _ensure_ffmpeg
+    _ensure_ffmpeg()  # Видео тоже требует ffmpeg
+    
     # Получаем метаданные
     meta = iio.immeta(video_path)
     duration = meta.get("duration", 0)
@@ -252,7 +344,7 @@ def extract_frames(
     
     # Извлекаем
     frames = []
-    max_dim = QUALITY_PRESETS.get(quality, 1280)
+    max_dim = QUALITY_PRESETS.get(quality, DEFAULT_MAX_DIMENSION)
     
     for idx in indices:
         frame = iio.imread(video_path, index=idx, plugin="pyav")
@@ -309,9 +401,17 @@ Output JSON: {transcription, description, participants, keywords, action_items}"
 
 
 class GeminiAudioAnalyzer:
-    """Анализатор аудио через Gemini."""
+    """
+    Анализатор аудио через Gemini.
     
-    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
+    По умолчанию использует flash-lite — самую дешёвую модель.
+    При 32kbps mono OGG обрабатывает до 83 минут аудио в одном запросе.
+    """
+    
+    # flash-lite: дешевле flash в ~4 раза, достаточно для транскрипции
+    DEFAULT_MODEL = "gemini-2.5-flash-lite"
+    
+    def __init__(self, api_key: str, model: str = DEFAULT_MODEL):
         self.api_key = api_key
         self.model = model
         self._client = None
@@ -341,7 +441,7 @@ class GeminiAudioAnalyzer:
         
         prompt = "\n".join(prompt_parts)
         
-        # 3. Inline audio (до 20MB)
+        # 3. Inline audio (до 20MB = ~83 мин при 32kbps)
         audio_part = types.Part.from_bytes(
             data=audio_bytes,
             mime_type=request.resource.mime_type,

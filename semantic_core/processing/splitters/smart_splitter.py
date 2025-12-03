@@ -90,8 +90,38 @@ class SmartSplitter(BaseSplitter):
                 chunks.extend(code_chunks)
                 chunk_index += len(code_chunks)
 
-            # Обработка текста и изображений
-            elif segment.segment_type in (ChunkType.TEXT, ChunkType.IMAGE_REF):
+            # Обработка изображений/медиа - всегда отдельный чанк
+            elif segment.segment_type == ChunkType.IMAGE_REF:
+                # Сначала сбрасываем накопленный текст
+                if text_buffer:
+                    text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
+                    chunks.extend(text_chunks)
+                    chunk_index += len(text_chunks)
+                    text_buffer.clear()
+
+                # Создаём отдельный чанк для медиа-ссылки
+                chunks.append(
+                    Chunk(
+                        content=segment.content,
+                        chunk_index=chunk_index,
+                        chunk_type=ChunkType.IMAGE_REF,
+                        metadata={
+                            "headers": segment.headers,
+                            "start_line": segment.start_line,
+                            "end_line": segment.end_line,
+                            "alt": segment.metadata.get("alt", "")
+                            if segment.metadata
+                            else "",
+                            "title": segment.metadata.get("title", "")
+                            if segment.metadata
+                            else "",
+                        },
+                    )
+                )
+                chunk_index += 1
+
+            # Обработка текста
+            elif segment.segment_type == ChunkType.TEXT:
                 text_buffer.append(segment)
 
                 # Проверяем, не переполнен ли буфер

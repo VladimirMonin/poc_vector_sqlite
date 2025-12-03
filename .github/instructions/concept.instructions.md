@@ -11,16 +11,14 @@ Production-ready библиотека для локального семанти
 **Философия:**
 
 - **Local-First:** SQLite (`vec0` + `fts5`) вместо векторных БД. Zero-dependency (без Docker).
-- **Gemini-Powered:** Интеллект через Google Gemini (Text/Vision), экономия через **Batch API**.
+- **Gemini-Powered:** Интеллект через Google Gemini (Text/Vision/Audio), экономия через **Batch API**.
 - **Modular:** SOLID архитектура, готовая к замене компонентов (ORM, AI Provider).
 
 ### 🔍 Режимы Поиска
 
-Библиотека реализует три стратегии через единый интерфейс:
-
 1.  **Vector Search:** Семантический поиск по смыслу (через `sqlite-vec`).
-2.  **Exact/SQL Search:** Жесткая фильтрация по метаданным и FTS5 (ключевые слова).
-3.  **Hybrid Search (RRF):** Объединение результатов 1 и 2 через Reciprocal Rank Fusion.
+2.  **Exact/SQL Search:** Жесткая фильтрация по метаданным и FTS5.
+3.  **Hybrid Search (RRF):** Объединение 1 и 2 через Reciprocal Rank Fusion.
 
 ### 🛠 Стек и Зависимости
 
@@ -33,40 +31,31 @@ Production-ready библиотека для локального семанти
 | `google-genai`   | SDK для Embeddings, Vision, Batch | `/googleapis/python-genai`        |
 | `pydantic`       | Валидация DTO и настроек          | `/pydantic/pydantic`              |
 | `markdown-it-py` | AST-парсинг Markdown              | `/executablebooks/markdown-it-py` |
+| `Pillow`         | Обработка изображений             | `/python-pillow/pillow`           |
+| `pydub`          | Извлечение/оптимизация аудио      | `/jiaaro/pydub`                   |
+| `imageio[pyav]`  | Извлечение кадров из видео        | `/imageio/imageio`                |
 
 ### 🗺 Дорожная Карта
 
-Общая дорожна карта тут:
-[full_plan.md](doc/ideas/full_plan.md)
+[full_plan.md](doc/ideas/full_plan.md) — общий план. Детали в `doc/ideas/phase_N/`.
 
-Детали реализации смотри в соответствующих файлах планов в подпапках.:
-
-- **Phase 1: Core & Contracts** (`plan_phase_1.md`) — DTO, Интерфейсы, Базовая структура. {DONE}
-- **Phase 2: Storage Layer** (`plan_phase_2.md`) — Peewee Adapter, Parent-Child схема. {DONE}
-- **Phase 3: Integration API** (`plan_phase_3.md`) — Дескрипторы `SemanticIndex`, DocumentBuilder. {DONE}
-- **Phase 3.1: Testing** (`plan_phase_3.1.md`) — Моки, Фикстуры, Unit/Integration тесты. {DONE}
-- **Phase 4: Smart Markdown** (`plan_phase_4.md`) — AST парсинг, Иерархический контекст. {DONE}
-- **Phase 5: Async Batching** (`plan_phase_5.md`) — Очереди `BatchJob`, отложенная обработка. {WE ARE HERE}
-- **Phase 6: Multimodality** (`plan_phase_6.md`) — Vision стратегии, OCR, Media Processing. {PLANNED}
+- **Phase 1-5:** Core, Storage, Integration, Markdown, Batching — {DONE}
+- **Phase 6:** Multimodality (Images/Audio/Video) — {WE ARE HERE}
 
 ### 📂 Структура Проекта
 
 ```text
 semantic_core/
-├── __init__.py               # Фасад (SemanticFactory)
-├── domain/                   # DTO (Document, Chunk, SearchResult)
-├── interfaces/               # Контракты (VectorStore, Embedder, Splitter, Context)
-├── integrations/             # Интеграции с ORM
-│   ├── base.py               # SemanticIndex (descriptor), DocumentBuilder
-│   ├── peewee/               # PeeweeAdapter (method patching)
-│   └── search_proxy.py       # SearchProxy для семантического поиска
-├── infrastructure/           # Реализация (Adapters)
-│   ├── gemini/               # GeminiEmbedder, Batch API
-│   ├── storage/peewee/       # PeeweeVectorStore, Models
-│   └── text_processing/      # SimpleSplitter, BasicContext
-├── processing/               # Логика (Business Logic) [PLANNED]
-│   ├── parsers/              # MarkdownNodeParser (AST)
-│   └── context/              # ContextStrategies
+├── domain/                   # DTO (Document, Chunk, SearchResult, MediaAnalysisResult)
+├── interfaces/               # Контракты (VectorStore, Embedder, Splitter)
+├── integrations/             # ORM интеграции (SemanticIndex, PeeweeAdapter)
+├── infrastructure/
+│   ├── gemini/               # GeminiEmbedder, ImageAnalyzer, AudioAnalyzer
+│   ├── media/utils/          # image.py, audio.py, video.py
+│   ├── storage/peewee/       # PeeweeVectorStore, MediaTaskModel
+│   └── text_processing/      # SimpleSplitter, MarkdownNodeParser
+├── processing/               # Parsers, ContextStrategies
+├── batch_manager.py          # Очередь задач, RateLimiter
 └── pipeline.py               # Orchestrator
 
 tests/

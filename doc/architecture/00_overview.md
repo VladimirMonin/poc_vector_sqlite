@@ -117,6 +117,34 @@
 
 ---
 
+### 🖼️ Multimodal Processing (Фаза 6)
+
+25. [**Media Processing Architecture**](25_media_processing_architecture.md)  
+    Архитектура обработки изображений: sync/async режимы, DTO и интеграция в SemanticCore
+
+26. [**Gemini Vision Integration**](26_gemini_vision_integration.md)  
+    Анализ изображений через Gemini Vision API: structured JSON output и расчёт токенов
+
+27. [**Resilience Patterns**](27_resilience_patterns.md)  
+    Паттерны устойчивости: retry с backoff, классификация ошибок и graceful degradation
+
+28. [**Rate Limiting**](28_rate_limiting.md)  
+    Token Bucket алгоритм для контроля RPM и защиты от 429
+
+29. [**Media Queue Processor**](29_media_queue_processor.md)  
+    Персистентная очередь задач: MediaTaskModel, пакетная обработка и мониторинг
+
+30. [**Audio Analysis Architecture**](30_audio_analysis_architecture.md)  
+    GeminiAudioAnalyzer: транскрипция, 32kbps оптимизация, 83 минуты в одном запросе
+
+31. [**Video Multimodal Analysis**](31_video_multimodal_analysis.md)  
+    GeminiVideoAnalyzer: кадры + аудио в одном запросе, режимы извлечения кадров
+
+32. [**Media Optimization Strategies**](32_media_optimization_strategies.md)  
+    Утилиты audio.py/video.py: сжатие, пресеты качества, FFmpeg dependency
+
+---
+
 ## 🚀 Быстрый старт
 
 ```bash

@@ -6,7 +6,8 @@
 """
 
 import json
-from typing import Optional, Literal
+import uuid
+from typing import Optional, Literal, TYPE_CHECKING
 
 from semantic_core.interfaces import (
     BaseEmbedder,
@@ -14,8 +15,13 @@ from semantic_core.interfaces import (
     BaseSplitter,
     BaseContextStrategy,
 )
-from semantic_core.domain import Document, SearchResult
+from semantic_core.domain import Document, SearchResult, MediaConfig, MediaType
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
+
+if TYPE_CHECKING:
+    from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
+    from semantic_core.infrastructure.gemini.rate_limiter import RateLimiter
+    from semantic_core.core.media_queue import MediaQueueProcessor
 
 
 IngestionMode = Literal["sync", "async"]
@@ -62,6 +68,8 @@ class SemanticCore:
         store: BaseVectorStore,
         splitter: BaseSplitter,
         context_strategy: BaseContextStrategy,
+        image_analyzer: Optional["GeminiImageAnalyzer"] = None,
+        media_config: Optional[MediaConfig] = None,
     ):
         """Инициализация оркестратора.
 
@@ -70,11 +78,19 @@ class SemanticCore:
             store: Хранилище векторов.
             splitter: Сплиттер документов.
             context_strategy: Стратегия формирования контекста.
+            image_analyzer: Анализатор изображений (опционально).
+            media_config: Конфигурация обработки медиа.
         """
         self.embedder = embedder
         self.store = store
         self.splitter = splitter
         self.context_strategy = context_strategy
+        self.image_analyzer = image_analyzer
+        self.media_config = media_config or MediaConfig()
+
+        # Lazy-инициализация компонентов для медиа
+        self._rate_limiter: Optional["RateLimiter"] = None
+        self._media_queue: Optional["MediaQueueProcessor"] = None
 
     def ingest(
         self,
@@ -209,3 +225,151 @@ class SemanticCore:
             Количество удалённых чанков.
         """
         return self.store.delete_by_metadata(filters)
+
+    # =========================================================================
+    # Media Processing (Phase 6)
+    # =========================================================================
+
+    def ingest_image(
+        self,
+        path: str,
+        user_prompt: Optional[str] = None,
+        context_text: Optional[str] = None,
+        mode: IngestionMode = "sync",
+    ) -> str:
+        """Индексирует изображение.
+
+        Создаёт задачу на анализ изображения. В sync режиме
+        обрабатывает сразу, в async — помещает в очередь.
+
+        Args:
+            path: Путь к файлу изображения.
+            user_prompt: Пользовательский промпт для анализа.
+            context_text: Контекст из метаданных (заголовки).
+            mode: Режим обработки ('sync' или 'async').
+
+        Returns:
+            sync: chunk_id (ID созданного чанка).
+            async: task_id (ID задачи в очереди).
+
+        Raises:
+            ValueError: Если файл не является поддерживаемым изображением.
+            RuntimeError: Если image_analyzer не настроен.
+        """
+        from semantic_core.infrastructure.media.utils import (
+            is_image_valid,
+            get_media_type,
+            get_file_mime_type,
+        )
+        from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+
+        # Проверяем, что image_analyzer настроен
+        if self.image_analyzer is None:
+            raise RuntimeError(
+                "image_analyzer not configured. "
+                "Pass GeminiImageAnalyzer to SemanticCore constructor."
+            )
+
+        # Валидация файла
+        if not is_image_valid(path):
+            raise ValueError(f"Unsupported image format: {path}")
+
+        # Создаём задачу в БД
+        task_id = self._create_media_task(
+            path=path,
+            user_prompt=user_prompt,
+            context_text=context_text,
+        )
+
+        if mode == "sync":
+            # Обрабатываем сразу
+            self._ensure_media_queue()
+            success = self._media_queue.process_task(task_id)
+
+            if not success:
+                task = MediaTaskModel.get_by_id(task_id)
+                raise RuntimeError(
+                    f"Failed to process image: {task.error_message or 'Unknown error'}"
+                )
+
+            # Возвращаем task_id (chunk_id будет добавлен в Phase 6.1)
+            return task_id
+
+        else:  # async
+            return task_id
+
+    def process_media_queue(self, max_tasks: int = 10) -> int:
+        """Обрабатывает очередь медиа-задач.
+
+        Args:
+            max_tasks: Максимальное количество задач за раз.
+
+        Returns:
+            Количество обработанных задач.
+        """
+        self._ensure_media_queue()
+        return self._media_queue.process_batch(max_tasks)
+
+    def get_media_queue_size(self) -> int:
+        """Возвращает размер очереди медиа-задач.
+
+        Returns:
+            Количество pending задач.
+        """
+        self._ensure_media_queue()
+        return self._media_queue.get_pending_count()
+
+    def _ensure_media_queue(self) -> None:
+        """Lazy-инициализация Rate Limiter и MediaQueueProcessor."""
+        if self._rate_limiter is None:
+            from semantic_core.infrastructure.gemini.rate_limiter import RateLimiter
+
+            self._rate_limiter = RateLimiter(rpm_limit=self.media_config.rpm_limit)
+
+        if self._media_queue is None:
+            from semantic_core.core.media_queue import MediaQueueProcessor
+
+            self._media_queue = MediaQueueProcessor(
+                analyzer=self.image_analyzer,
+                rate_limiter=self._rate_limiter,
+                embedder=self.embedder,
+                store=self.store,
+            )
+
+    def _create_media_task(
+        self,
+        path: str,
+        user_prompt: Optional[str] = None,
+        context_text: Optional[str] = None,
+    ) -> str:
+        """Создаёт задачу на обработку медиа в БД.
+
+        Args:
+            path: Путь к файлу.
+            user_prompt: Пользовательский промпт.
+            context_text: Контекст.
+
+        Returns:
+            ID созданной задачи (UUID).
+        """
+        from semantic_core.infrastructure.media.utils import (
+            get_media_type,
+            get_file_mime_type,
+        )
+        from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+
+        task_id = str(uuid.uuid4())
+        media_type = get_media_type(path)
+        mime_type = get_file_mime_type(path)
+
+        MediaTaskModel.create(
+            id=task_id,
+            media_path=path,
+            media_type=media_type,
+            mime_type=mime_type,
+            user_prompt=user_prompt,
+            context_text=context_text,
+            status="pending",
+        )
+
+        return task_id
