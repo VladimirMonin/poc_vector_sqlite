@@ -203,6 +203,9 @@
 48. [**Context Compression**](48_context_compression.md)  
     Сжатие истории через LLM summarization: ContextCompressor и AdaptiveWithCompression
 
+49. [**Slash Commands**](49_slash_commands.md)  
+    Интерактивные команды чата: /search, /sources, /model и управление сессией
+
 ---
 
 ## 🚀 Быстрый старт
