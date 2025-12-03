@@ -3,8 +3,28 @@
 import pytest
 
 from semantic_core.interfaces.chat_history import ChatMessage
+from semantic_core.interfaces.llm import GenerationResult
 from semantic_core.core.context.strategies import LastNMessages, TokenBudget, Unlimited
 from semantic_core.core.context.manager import ChatHistoryManager
+
+
+class MockLLMProvider:
+    """Mock LLM провайдер для тестов."""
+
+    def __init__(self, response_text: str = "Summary", output_tokens: int = 50):
+        self.response_text = response_text
+        self.output_tokens = output_tokens
+
+    @property
+    def model_name(self) -> str:
+        return "mock-model"
+
+    def generate(self, prompt: str, **kwargs) -> GenerationResult:
+        return GenerationResult(
+            text=self.response_text,
+            model="mock-model",
+            output_tokens=self.output_tokens,
+        )
 
 
 class TestChatHistoryManager:
@@ -208,3 +228,123 @@ class TestChatHistoryManagerConversation:
         assert history[0].role == "system"
         assert history[1].role == "user"
         assert history[2].role == "assistant"
+
+
+class TestChatHistoryManagerWithCompression:
+    """Тесты интеграции с AdaptiveWithCompression."""
+
+    def test_has_summary_false_for_simple_strategies(self):
+        """has_summary возвращает False для простых стратегий."""
+        manager = ChatHistoryManager(LastNMessages(n=10))
+        assert manager.has_summary is False
+
+        manager = ChatHistoryManager(TokenBudget(max_tokens=1000))
+        assert manager.has_summary is False
+
+        manager = ChatHistoryManager(Unlimited())
+        assert manager.has_summary is False
+
+    def test_has_summary_false_before_compression(self):
+        """has_summary возвращает False до сжатия."""
+        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+
+        llm = MockLLMProvider()
+        compressor = ContextCompressor(llm)
+        strategy = AdaptiveWithCompression(
+            compressor=compressor,
+            threshold_tokens=1000,
+            target_tokens=500,
+        )
+        manager = ChatHistoryManager(strategy)
+
+        # До сжатия
+        manager.add_user("test", tokens=100)
+        assert manager.has_summary is False
+
+    def test_has_summary_true_after_compression(self):
+        """has_summary возвращает True после сжатия."""
+        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+
+        llm = MockLLMProvider(output_tokens=50)
+        compressor = ContextCompressor(llm)
+        strategy = AdaptiveWithCompression(
+            compressor=compressor,
+            threshold_tokens=500,
+            target_tokens=100,
+        )
+        manager = ChatHistoryManager(strategy)
+
+        # Добавляем много сообщений чтобы триггернуть сжатие
+        for i in range(10):
+            manager.add_user(f"msg{i}", tokens=100)  # 1000 токенов > 500
+
+        assert manager.has_summary is True
+
+    def test_total_tokens_includes_summary(self):
+        """total_tokens включает токены summary."""
+        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+
+        llm = MockLLMProvider(output_tokens=100)
+        compressor = ContextCompressor(llm)
+        strategy = AdaptiveWithCompression(
+            compressor=compressor,
+            threshold_tokens=500,
+            target_tokens=200,
+        )
+        manager = ChatHistoryManager(strategy)
+
+        # Добавляем сообщения
+        for i in range(5):
+            manager.add_user(f"msg{i}", tokens=150)  # 750 токенов > 500
+
+        # total_tokens = сообщения + summary
+        total = manager.total_tokens()
+
+        # Должен включать токены summary (100)
+        assert total >= 100
+
+    def test_get_messages_for_llm_with_summary(self):
+        """get_messages_for_llm включает summary для AdaptiveWithCompression."""
+        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+
+        llm = MockLLMProvider(response_text="Previous context", output_tokens=50)
+        compressor = ContextCompressor(llm)
+        strategy = AdaptiveWithCompression(
+            compressor=compressor,
+            threshold_tokens=400,
+            target_tokens=100,
+        )
+        manager = ChatHistoryManager(strategy)
+
+        # Триггерим сжатие
+        for i in range(5):
+            manager.add_user(f"msg{i}", tokens=100)
+
+        messages = manager.get_messages_for_llm()
+
+        # Первое сообщение должно быть summary (system)
+        assert messages[0]["role"] == "system"
+        assert "Previous context" in messages[0]["content"]
+
+    def test_get_messages_for_llm_without_summary(self):
+        """get_messages_for_llm работает без summary."""
+        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+
+        llm = MockLLMProvider()
+        compressor = ContextCompressor(llm)
+        strategy = AdaptiveWithCompression(
+            compressor=compressor,
+            threshold_tokens=10000,  # Высокий порог
+            target_tokens=5000,
+        )
+        manager = ChatHistoryManager(strategy)
+
+        # Не триггерим сжатие
+        manager.add_user("hello", tokens=100)
+        manager.add_assistant("hi", tokens=50)
+
+        messages = manager.get_messages_for_llm()
+
+        assert len(messages) == 2
+        assert messages[0]["role"] == "user"
+        assert messages[1]["role"] == "assistant"
