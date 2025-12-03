@@ -143,6 +143,9 @@
 32. [**Media Optimization Strategies**](32_media_optimization_strategies.md)  
     Утилиты audio.py/video.py: сжатие, пресеты качества, FFmpeg dependency
 
+33. [**Markdown-Media Integration**](33_markdown_media_integration.md)  
+    Обогащение IMAGE_REF чанков через Vision API: контекст из документа, резолв путей
+
 ---
 
 ## 🚀 Быстрый старт
