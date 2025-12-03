@@ -33,10 +33,10 @@ class MediaConfig:
         max_video_duration_sec: Макс. длительность видео.
     """
 
-    # Модели Gemini
-    image_model: str = "gemini-2.5-flash"
-    audio_model: str = "gemini-2.5-flash-lite"  # Дешевле flash в 4x
-    video_model: str = "gemini-2.5-pro"  # Для сложного мультимодального контента
+    # Модели Gemini (все на flash-lite — самая экономичная модель)
+    image_model: str = "gemini-2.5-flash-lite"
+    audio_model: str = "gemini-2.5-flash-lite"
+    video_model: str = "gemini-2.5-flash-lite"
 
     # Rate Limiting
     rpm_limit: int = 15  # Консервативно для Free Tier

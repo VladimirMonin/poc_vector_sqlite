@@ -14,6 +14,10 @@ import time
 from functools import wraps
 from typing import Callable, TypeVar
 
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 # Типы для дженерика
 F = TypeVar("F", bound=Callable)
 
@@ -45,7 +49,14 @@ def _is_retryable(error: Exception) -> bool:
         True если ошибка временная и стоит повторить.
     """
     error_str = str(error).lower()
-    return any(pattern in error_str for pattern in RETRYABLE_PATTERNS)
+    is_retryable = any(pattern in error_str for pattern in RETRYABLE_PATTERNS)
+    logger.trace(
+        "Error classification",
+        error_type=type(error).__name__,
+        is_retryable=is_retryable,
+        error_preview=error_str[:100],
+    )
+    return is_retryable
 
 
 def retry_with_backoff(
@@ -71,6 +82,7 @@ def retry_with_backoff(
         @wraps(func)
         def wrapper(*args, **kwargs):
             last_exception = None
+            func_name = getattr(func, "__name__", repr(func))
 
             for attempt in range(max_retries):
                 try:
@@ -80,10 +92,21 @@ def retry_with_backoff(
 
                     # Не ретраим если ошибка не временная
                     if not _is_retryable(e):
+                        logger.warning(
+                            "Non-retryable error, failing immediately",
+                            func=func_name,
+                            error_type=type(e).__name__,
+                        )
                         raise
 
                     # Последняя попытка — бросаем обёрнутое исключение
                     if attempt == max_retries - 1:
+                        logger.error(
+                            "All retry attempts exhausted",
+                            func=func_name,
+                            attempts=max_retries,
+                            error_type=type(e).__name__,
+                        )
                         raise MediaProcessingError(
                             f"Failed after {max_retries} retries: {e}"
                         ) from e
@@ -91,9 +114,24 @@ def retry_with_backoff(
                     # Exponential backoff с jitter
                     delay = min(base_delay * (2**attempt), max_delay)
                     jitter = random.uniform(0, 1)
-                    time.sleep(delay + jitter)
+                    total_delay = delay + jitter
+                    
+                    logger.warning(
+                        "Retry attempt",
+                        func=func_name,
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        delay_ms=round(total_delay * 1000, 1),
+                        error_type=type(e).__name__,
+                    )
+                    time.sleep(total_delay)
 
             # Недостижимо, но для типизации
+            logger.error(
+                "Unexpected retry loop exit",
+                func=func_name,
+                attempts=max_retries,
+            )
             raise MediaProcessingError(
                 f"Failed after {max_retries} retries"
             ) from last_exception

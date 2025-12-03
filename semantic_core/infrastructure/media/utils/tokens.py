@@ -11,6 +11,10 @@
 
 from typing import TYPE_CHECKING
 
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     from PIL import Image
 
@@ -35,6 +39,12 @@ def calculate_image_tokens(image: "Image.Image") -> int:
 
     # Small images (both dimensions ≤ 384px)
     if width <= 384 and height <= 384:
+        logger.trace(
+            "Small image token calculation",
+            width=width,
+            height=height,
+            tokens=TOKENS_PER_TILE,
+        )
         return TOKENS_PER_TILE
 
     # Large images - tiled processing
@@ -44,8 +54,17 @@ def calculate_image_tokens(image: "Image.Image") -> int:
     tiles_w = (width + crop_unit - 1) // crop_unit  # ceiling division
     tiles_h = (height + crop_unit - 1) // crop_unit
     total_tiles = tiles_w * tiles_h
+    tokens = total_tiles * TOKENS_PER_TILE
 
-    return total_tiles * TOKENS_PER_TILE
+    logger.trace(
+        "Large image token calculation",
+        width=width,
+        height=height,
+        tiles=total_tiles,
+        tokens=tokens,
+    )
+
+    return tokens
 
 
 def calculate_images_tokens(images: list["Image.Image"]) -> dict:
@@ -72,6 +91,12 @@ def calculate_images_tokens(images: list["Image.Image"]) -> dict:
 
     breakdown_lines.append(f"Total: {total:,} tokens")
     breakdown = "\n".join(breakdown_lines)
+
+    logger.trace(
+        "Images tokens calculated",
+        image_count=len(images),
+        total_tokens=total,
+    )
 
     return {
         "total_tokens": total,
@@ -102,7 +127,7 @@ GEMINI_PRICING = {
 }
 
 
-def estimate_cost(tokens: int, model: str = "gemini-2.5-flash") -> dict:
+def estimate_cost(tokens: int, model: str = "gemini-2.5-flash-lite") -> dict:
     """Оценивает стоимость API на основе количества токенов.
 
     Args:
@@ -116,8 +141,15 @@ def estimate_cost(tokens: int, model: str = "gemini-2.5-flash") -> dict:
         - estimated_input_cost_usd: Оценка стоимости в USD.
         - note: Примечание.
     """
-    rates = GEMINI_PRICING.get(model, GEMINI_PRICING["gemini-2.5-flash"])
+    rates = GEMINI_PRICING.get(model, GEMINI_PRICING["gemini-2.5-flash-lite"])
     input_cost = (tokens / 1000) * rates["input"]
+
+    logger.trace(
+        "Cost estimated",
+        tokens=tokens,
+        model=model,
+        cost_usd=round(input_cost, 6),
+    )
 
     return {
         "tokens": tokens,

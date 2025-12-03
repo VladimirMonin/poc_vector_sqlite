@@ -6,6 +6,7 @@
 """
 
 import json
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -27,6 +28,9 @@ from semantic_core.infrastructure.media.utils.video import (
     frames_to_bytes,
     get_video_duration,
 )
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from semantic_core.infrastructure.gemini.audio_analyzer import GeminiAudioAnalyzer
@@ -69,7 +73,7 @@ class GeminiVideoAnalyzer:
     """Мультимодальный анализатор видео через Gemini API.
 
     Отправляет кадры + оптимизированное аудио в одном запросе.
-    Использует gemini-2.5-pro для сложного мультимодального контента.
+    Использует gemini-2.5-flash-lite по умолчанию (самая экономичная модель).
 
     Attributes:
         api_key: API ключ Google Gemini.
@@ -83,7 +87,7 @@ class GeminiVideoAnalyzer:
         >>> print(result.description)
     """
 
-    DEFAULT_MODEL = "gemini-2.5-pro"
+    DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
     def __init__(
         self,
@@ -102,6 +106,11 @@ class GeminiVideoAnalyzer:
         self.model = model
         self.audio_analyzer = audio_analyzer
         self._client = None
+        logger.debug(
+            "Video analyzer initialized",
+            model=model,
+            has_audio_analyzer=audio_analyzer is not None,
+        )
 
     @property
     def client(self):
@@ -110,6 +119,7 @@ class GeminiVideoAnalyzer:
             from google import genai
 
             self._client = genai.Client(api_key=self.api_key)
+            logger.debug("Gemini client created")
         return self._client
 
     @retry_with_backoff(max_retries=5, base_delay=1.0, max_delay=60.0)
@@ -136,11 +146,24 @@ class GeminiVideoAnalyzer:
         """
         from google.genai import types
 
+        start_time = time.perf_counter()
         config = config or VideoAnalysisConfig()
         video_path = request.resource.path
+        
+        logger.debug(
+            "Analyzing video",
+            path=str(video_path),
+            frame_mode=config.frame_mode,
+            frame_count=config.frame_count,
+            include_audio=config.include_audio,
+        )
 
         # 1. Получаем длительность
         duration = get_video_duration(video_path)
+        logger.debug(
+            "Video duration",
+            duration_sec=round(duration, 2),
+        )
 
         # 2. Извлекаем кадры
         frames = extract_frames(
@@ -151,6 +174,10 @@ class GeminiVideoAnalyzer:
             interval_seconds=config.interval_seconds,
             quality=config.frame_quality,
             max_frames=config.max_frames,
+        )
+        logger.debug(
+            "Frames extracted",
+            frame_count=len(frames),
         )
 
         # Конвертируем кадры в bytes
@@ -164,9 +191,16 @@ class GeminiVideoAnalyzer:
                 audio_bytes, audio_mime = optimize_audio_to_bytes(
                     extract_audio_from_video(video_path)
                 )
-            except Exception:
+                logger.debug(
+                    "Audio extracted and optimized",
+                    size_kb=round(len(audio_bytes) / 1024, 1),
+                )
+            except Exception as e:
                 # Продолжаем без аудио (некоторые видео без звука)
-                pass
+                logger.debug(
+                    "No audio extracted",
+                    reason=str(e)[:100],
+                )
 
         # 4. Собираем промпт
         prompt_parts = []
@@ -239,14 +273,43 @@ class GeminiVideoAnalyzer:
 
         # 8. Парсим результат
         if not response.text:
+            logger.error("Gemini returned empty response", path=str(video_path))
             raise ValueError("Gemini returned empty response")
 
-        data = json.loads(response.text)
+        # Логируем AI вызов
+        logger.trace_ai(
+            operation="video_analysis",
+            model=self.model,
+            prompt_preview="Video analysis with frames",
+            response_preview=response.text[:200] + "..." if len(response.text) > 200 else response.text,
+        )
+
+        try:
+            data = json.loads(response.text)
+        except json.JSONDecodeError as e:
+            logger.error(
+                "Failed to parse Gemini response as JSON",
+                path=str(video_path),
+                error=str(e),
+                response_preview=response.text[:500],
+            )
+            raise ValueError(f"Invalid JSON in Gemini response: {e}")
 
         # Извлекаем usage_metadata (это Pydantic модель, не словарь)
         tokens_used = None
         if hasattr(response, "usage_metadata") and response.usage_metadata:
             tokens_used = getattr(response.usage_metadata, "total_token_count", None)
+
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Video analyzed",
+            latency_ms=round(latency_ms, 2),
+            duration_sec=round(duration, 2),
+            frames_count=len(frames),
+            has_audio=audio_bytes is not None,
+            tokens_used=tokens_used,
+            keywords_count=len(data.get("keywords", [])),
+        )
 
         return MediaAnalysisResult(
             description=data["description"],
