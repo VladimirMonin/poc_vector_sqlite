@@ -258,10 +258,10 @@ class TestAudioAnalyzerUnit:
 
         analyzer = GeminiAudioAnalyzer(
             api_key="test-key",
-            model="gemini-2.5-pro",
+            model="gemini-2.5-flash-lite",
         )
 
-        assert analyzer.model == "gemini-2.5-pro"
+        assert analyzer.model == "gemini-2.5-flash-lite"
 
     def test_client_lazy_initialization(self):
         """Клиент инициализируется lazy при первом обращении."""
