@@ -17,6 +17,7 @@
 ### 1. Domain Layer (`semantic_core/domain/chunk.py`)
 
 **Добавлено:**
+
 - `ChunkType.AUDIO_REF` = "audio_ref"
 - `ChunkType.VIDEO_REF` = "video_ref"
 - `MEDIA_CHUNK_TYPES` — frozenset для удобной проверки медиа-типов
@@ -36,6 +37,7 @@ MEDIA_CHUNK_TYPES = frozenset({
 ### 2. Markdown Parser (`semantic_core/processing/parsers/markdown_parser.py`)
 
 **Добавлено:**
+
 - Константы расширений:
   - `AUDIO_EXTENSIONS`: `.mp3`, `.wav`, `.ogg`, `.flac`, `.aac`, `.aiff`
   - `VIDEO_EXTENSIONS`: `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`
@@ -48,6 +50,7 @@ MEDIA_CHUNK_TYPES = frozenset({
   - `link_open` → `text` → `link_close`: накопление текста ссылки
 
 **Логика:**
+
 ```
 [Audio](file.mp3)  → AUDIO_REF с alt="Audio"
 [Video](demo.mp4)  → VIDEO_REF с alt="Video"
@@ -59,6 +62,7 @@ MEDIA_CHUNK_TYPES = frozenset({
 ### 3. Smart Splitter (`semantic_core/processing/splitters/smart_splitter.py`)
 
 **Изменения:**
+
 - Импорт `MEDIA_CHUNK_TYPES`
 - Условие изоляции медиа-чанков:
 
@@ -75,11 +79,13 @@ elif segment.segment_type in MEDIA_CHUNK_TYPES:
 ### 4. Markdown Asset Enricher (`semantic_core/processing/enrichers/markdown_assets.py`)
 
 **Изменения в `MediaContext`:**
+
 - Добавлено поле `media_type: str` (image/audio/video)
 - `format_for_api()` — универсальный метод (вместо только vision)
 - `format_for_vision()` — алиас для обратной совместимости
 
 **Изменения в `MarkdownAssetEnricher`:**
+
 - `get_context()` определяет `media_type` и `role` по chunk_type
 - `_get_media_type_name()` — маппинг ChunkType → название
 - `_get_default_role()` — дефолтные роли:
@@ -94,6 +100,7 @@ elif segment.segment_type in MEDIA_CHUNK_TYPES:
 **Добавлены ветки для:**
 
 **AUDIO_REF (обогащённый):**
+
 ```
 Section: Header > Subheader
 Type: Audio
@@ -106,6 +113,7 @@ Source: path/to/file.mp3
 ```
 
 **AUDIO_REF (необогащённый):**
+
 ```
 Section: Header > Subheader
 Type: Audio Reference
@@ -114,6 +122,7 @@ Source: path/to/file.mp3
 ```
 
 **VIDEO_REF (обогащённый):**
+
 ```
 Section: Header > Subheader
 Type: Video
@@ -126,6 +135,7 @@ Source: path/to/file.mp4
 ```
 
 **VIDEO_REF (необогащённый):**
+
 ```
 Section: Header > Subheader
 Type: Video Reference
@@ -138,6 +148,7 @@ Source: path/to/file.mp4
 ### 6. Pipeline (`semantic_core/pipeline.py`)
 
 **Конструктор SemanticCore:**
+
 ```python
 def __init__(
     self,
@@ -150,6 +161,7 @@ def __init__(
 ```
 
 **Новые методы:**
+
 - `_has_analyzer_for_type()` — проверка наличия анализатора
 - `_resolve_media_path()` — универсальный резолв пути (ранее `_resolve_image_path`)
 - `_analyze_media_for_chunk()` — роутинг на нужный анализатор
@@ -165,6 +177,7 @@ def __init__(
 | VIDEO_REF | `_video_transcription`, `_video_keywords`, `_video_ocr`, `_video_duration` |
 
 **Содержимое чанка после обогащения:**
+
 - IMAGE_REF: `content = description`
 - AUDIO_REF: `content = transcription` (или description если нет транскрипции)
 - VIDEO_REF: `content = description` (транскрипция в metadata)

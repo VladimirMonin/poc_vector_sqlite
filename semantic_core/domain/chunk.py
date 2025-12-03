@@ -36,11 +36,13 @@ class ChunkType(str, Enum):
 
 
 # Множество медиа-типов для удобной проверки
-MEDIA_CHUNK_TYPES = frozenset({
-    ChunkType.IMAGE_REF,
-    ChunkType.AUDIO_REF,
-    ChunkType.VIDEO_REF,
-})
+MEDIA_CHUNK_TYPES = frozenset(
+    {
+        ChunkType.IMAGE_REF,
+        ChunkType.AUDIO_REF,
+        ChunkType.VIDEO_REF,
+    }
+)
 
 
 @dataclass

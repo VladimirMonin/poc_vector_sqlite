@@ -21,6 +21,7 @@
 ### Форматы Gemini API
 
 **Audio (официально поддерживаемые):**
+
 - WAV (`audio/wav`)
 - MP3 (`audio/mp3`, `audio/mpeg`)
 - AIFF (`audio/aiff`) ← добавить в расширения!
@@ -35,6 +36,7 @@
 ### Особенности парсинга markdown-it-py
 
 Токены ссылок — это **три отдельных токена**:
+
 ```
 1. link_open  (attrs = [("href", "file.mp3")])
 2. text       (content = "Link Text")
@@ -56,8 +58,8 @@
 
 **Обновление `ChunkType` (Enum):**
 
-* Добавить `AUDIO_REF` ("audio\_ref") — Ссылка на аудиофайл.
-* Добавить `VIDEO_REF` ("video\_ref") — Ссылка на видеофайл.
+- Добавить `AUDIO_REF` ("audio\_ref") — Ссылка на аудиофайл.
+- Добавить `VIDEO_REF` ("video\_ref") — Ссылка на видеофайл.
 
 *(Существующие: TEXT, CODE, TABLE, IMAGE\_REF)*
 
@@ -69,8 +71,8 @@
 
 ### Списки расширений (Case Insensitive)
 
-* **AUDIO\_EXT:** `.mp3`, `.wav`, `.ogg`, `.flac`, `.aac`, `.aiff`
-* **VIDEO\_EXT:** `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`
+- **AUDIO\_EXT:** `.mp3`, `.wav`, `.ogg`, `.flac`, `.aac`, `.aiff`
+- **VIDEO\_EXT:** `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`
 
 > ⚠️ `.m4a` намеренно исключён — Gemini не поддерживает напрямую.
 > Если нужна поддержка, добавить с пометкой "requires conversion".
@@ -81,17 +83,17 @@
 
 1. **Для ссылок (`[Текст](url)`):**
 
-      * Перехватываем `link_open` токен, извлекаем `href` из attrs.
-      * Накапливаем текст из следующих `text` токенов до `link_close`.
-      * Проверяем расширение файла (case-insensitive).
-      * Если совпадает с `AUDIO_EXT` → Создаем `ParsingSegment(AUDIO_REF)`.
-      * Если совпадает с `VIDEO_EXT` → Создаем `ParsingSegment(VIDEO_REF)`.
-      * *Метаданные:* `path` = href, `alt` = накопленный текст.
+      - Перехватываем `link_open` токен, извлекаем `href` из attrs.
+      - Накапливаем текст из следующих `text` токенов до `link_close`.
+      - Проверяем расширение файла (case-insensitive).
+      - Если совпадает с `AUDIO_EXT` → Создаем `ParsingSegment(AUDIO_REF)`.
+      - Если совпадает с `VIDEO_EXT` → Создаем `ParsingSegment(VIDEO_REF)`.
+      - *Метаданные:* `path` = href, `alt` = накопленный текст.
 
 2. **Для изображений (`![Alt](url)`):**
 
-      * *Текущее поведение:* Создает `IMAGE_REF`.
-      * *Новое поведение:* Проверить расширение. Если там видео (например, `![Preview](video.mp4)`), то принудительно менять тип на `VIDEO_REF`.
+      - *Текущее поведение:* Создает `IMAGE_REF`.
+      - *Новое поведение:* Проверить расширение. Если там видео (например, `![Preview](video.mp4)`), то принудительно менять тип на `VIDEO_REF`.
 
 -----
 
@@ -103,6 +105,7 @@
 В цикл обработки сегментов добавить условия для `AUDIO_REF` и `VIDEO_REF` (по аналогии с `IMAGE_REF`).
 
 **Рекомендация:** Использовать множество для проверки:
+
 ```python
 MEDIA_TYPES = {ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF}
 
@@ -112,9 +115,9 @@ if segment.segment_type in MEDIA_TYPES:
 
 1. **Flush Text:** Если пришел медиа-сегмент — немедленно сбросить накопившийся текстовый буфер в чанк.
 2. **Create Chunk:** Создать отдельный чанк для медиа.
-      * `chunk_type`: `AUDIO_REF` или `VIDEO_REF`.
-      * `content`: Путь к файлу (или alt-текст, как placeholder).
-      * `metadata`: Копировать иерархию заголовков (`headers`) и путь к файлу.
+      - `chunk_type`: `AUDIO_REF` или `VIDEO_REF`.
+      - `content`: Путь к файлу (или alt-текст, как placeholder).
+      - `metadata`: Копировать иерархию заголовков (`headers`) и путь к файлу.
 
 -----
 
@@ -123,12 +126,14 @@ if segment.segment_type in MEDIA_TYPES:
 `MarkdownAssetEnricher` уже существует и работает! Нужны минимальные изменения.
 
 **Текущее состояние:**
+
 - `get_context()` — работает для любого чанка (читает headers, находит соседей)
 - `enrich()` — фильтрует только `IMAGE_REF`
 
 **Изменения:**
 
 1. **Расширить фильтр в `enrich()`:**
+
 ```python
 MEDIA_TYPES = {ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF}
 
@@ -179,6 +184,7 @@ elif chunk.chunk_type == ChunkType.VIDEO_REF:
 ### 6.1 Расширение конструктора
 
 Добавить параметры:
+
 ```python
 def __init__(
     self,
@@ -197,6 +203,7 @@ def __init__(
 **Изменения:**
 
 1. Расширить фильтр:
+
 ```python
 MEDIA_TYPES = {ChunkType.IMAGE_REF, ChunkType.AUDIO_REF, ChunkType.VIDEO_REF}
 
@@ -206,6 +213,7 @@ for chunk in chunks:
 ```
 
 2. Добавить роутинг по типу:
+
 ```python
 if chunk.chunk_type == ChunkType.IMAGE_REF:
     result = self.image_analyzer.analyze(request)

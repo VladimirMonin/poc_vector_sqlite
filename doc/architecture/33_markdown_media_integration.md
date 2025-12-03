@@ -97,6 +97,7 @@ graph LR
 ### Пример контекста
 
 **Исходный Markdown:**
+
 ```markdown
 # Nginx Setup
 
@@ -110,6 +111,7 @@ This shows request flow.
 ```
 
 **Контекст для Vision:**
+
 ```
 Document section: Nginx Setup > Configuration
 Image caption: Nginx diagram

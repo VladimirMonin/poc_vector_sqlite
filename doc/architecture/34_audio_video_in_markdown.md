@@ -27,6 +27,7 @@
 ```
 
 **Без Phase 6.5**: парсер видит:
+
 - `[Аудио лекции](...)` → обычный текст с URL
 - `![Скринкаст](...)` → `IMAGE_REF` (но это видео!)
 
@@ -140,6 +141,7 @@ MEDIA_CHUNK_TYPES = frozenset({
 ```
 
 **Где используется:**
+
 - `SmartSplitter`: изоляция медиа-чанков
 - `MarkdownAssetEnricher`: фильтрация чанков
 - `SemanticCore._enrich_media_chunks()`: роутинг
