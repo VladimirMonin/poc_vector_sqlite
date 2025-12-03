@@ -62,6 +62,7 @@ class BaseLLMProvider(ABC):
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
+        history: Optional[list[dict]] = None,
     ) -> GenerationResult:
         """Генерирует ответ на основе промпта.
 
@@ -70,6 +71,8 @@ class BaseLLMProvider(ABC):
             system_prompt: Системный промпт (инструкции для модели).
             temperature: Температура генерации (0.0-2.0).
             max_tokens: Максимальное количество токенов в ответе.
+            history: История чата как список dict с role и content.
+                     Пример: [{"role": "user", "content": "Hi"}]
 
         Returns:
             GenerationResult с текстом и метаданными.

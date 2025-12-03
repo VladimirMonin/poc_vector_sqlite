@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Literal, Union, TYPE_CHECKING
 
 from semantic_core.interfaces.llm import BaseLLMProvider, GenerationResult
+from semantic_core.interfaces.chat_history import ChatMessage
 from semantic_core.domain import SearchResult, ChunkResult
 from semantic_core.utils.logger import get_logger
 
@@ -116,6 +117,7 @@ CONTEXT:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         full_docs: bool = False,
+        history: Optional[list[ChatMessage]] = None,
     ) -> RAGResult:
         """Выполняет RAG-запрос: поиск + генерация.
 
@@ -126,6 +128,8 @@ CONTEXT:
             max_tokens: Ограничение токенов ответа.
             full_docs: Использовать полные документы вместо чанков.
                        По умолчанию False — используются гранулярные чанки.
+            history: История чата для контекста (опционально).
+                     Если передана, будет включена в запрос к LLM.
 
         Returns:
             RAGResult с ответом и источниками.
@@ -143,6 +147,7 @@ CONTEXT:
             search_mode=search_mode,
             context_chunks=self.context_chunks,
             full_docs=full_docs,
+            history_messages=len(history) if history else 0,
         )
 
         # 1. Retrieval — поиск релевантных источников
@@ -172,11 +177,19 @@ CONTEXT:
         # 2. Generation — генерируем ответ
         system_prompt = self._format_system_prompt(context)
 
+        # Формируем историю для LLM (если есть)
+        history_for_llm = None
+        if history:
+            history_for_llm = [
+                {"role": m.role, "content": m.content} for m in history
+            ]
+
         generation = self.llm.generate(
             prompt=query,
             system_prompt=system_prompt,
             temperature=temperature,
             max_tokens=max_tokens,
+            history=history_for_llm,
         )
 
         result = RAGResult(

@@ -62,6 +62,7 @@ class GeminiLLMProvider(BaseLLMProvider):
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
+        history: Optional[list[dict]] = None,
     ) -> GenerationResult:
         """Генерирует ответ на основе промпта.
 
@@ -70,6 +71,7 @@ class GeminiLLMProvider(BaseLLMProvider):
             system_prompt: Системный промпт (инструкции для модели).
             temperature: Температура генерации (0.0-2.0).
             max_tokens: Максимальное количество токенов в ответе.
+            history: История чата как список dict с role и content.
 
         Returns:
             GenerationResult с текстом и метаданными.
@@ -82,6 +84,7 @@ class GeminiLLMProvider(BaseLLMProvider):
             model=self._model,
             prompt_length=len(prompt),
             has_system_prompt=system_prompt is not None,
+            history_messages=len(history) if history else 0,
         )
 
         start_time = time.perf_counter()
@@ -94,10 +97,13 @@ class GeminiLLMProvider(BaseLLMProvider):
                 system_instruction=system_prompt,
             )
 
+            # Формируем контент с историей
+            contents = self._build_contents(prompt, history)
+
             # Вызываем API
             response = self._client.models.generate_content(
                 model=self._model,
-                contents=prompt,
+                contents=contents,
                 config=config,
             )
 
@@ -154,6 +160,51 @@ class GeminiLLMProvider(BaseLLMProvider):
                 model=self._model,
             )
             raise RuntimeError(f"Ошибка генерации LLM: {e}") from e
+
+    def _build_contents(
+        self,
+        prompt: str,
+        history: Optional[list[dict]] = None,
+    ) -> list[types.Content]:
+        """Формирует контент для API с учётом истории.
+
+        Args:
+            prompt: Текущий промпт пользователя.
+            history: История предыдущих сообщений.
+
+        Returns:
+            Список Content объектов для Gemini API.
+        """
+        if not history:
+            # Без истории — просто текст
+            return prompt
+
+        # С историей — формируем список сообщений
+        contents = []
+
+        for msg in history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+
+            # Gemini использует "user" и "model" (не "assistant")
+            gemini_role = "model" if role == "assistant" else "user"
+
+            contents.append(
+                types.Content(
+                    role=gemini_role,
+                    parts=[types.Part.from_text(text=content)],
+                )
+            )
+
+        # Добавляем текущий промпт
+        contents.append(
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)],
+            )
+        )
+
+        return contents
 
 
 __all__ = ["GeminiLLMProvider"]
