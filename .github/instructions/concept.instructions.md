@@ -40,7 +40,7 @@ Production-ready библиотека для локального семанти
 [full_plan.md](doc/ideas/full_plan.md) — общий план. Детали в `doc/ideas/phase_N/`.
 
 - **Phase 1-5:** Core, Storage, Integration, Markdown, Batching — {DONE}
-- **Phase 6:** Multimodality (Images/Audio/Video) — {WE ARE HERE}
+- **Phase 6:** Multimodality (Images/Audio/Video) — {DONE}
 
 ### 📂 Структура Проекта
 
@@ -49,27 +49,58 @@ semantic_core/
 ├── domain/                   # DTO (Document, Chunk, SearchResult, MediaAnalysisResult)
 ├── interfaces/               # Контракты (VectorStore, Embedder, Splitter)
 ├── integrations/             # ORM интеграции (SemanticIndex, PeeweeAdapter)
+│   └── peewee/               # PeeweeAdapter, SearchProxy
+├── core/                     # Высокоуровневая оркестрация
+│   └── media_queue.py        # MediaQueueProcessor
 ├── infrastructure/
-│   ├── gemini/               # GeminiEmbedder, ImageAnalyzer, AudioAnalyzer
-│   ├── media/utils/          # image.py, audio.py, video.py
+│   ├── gemini/               # GeminiEmbedder, ImageAnalyzer, AudioAnalyzer, VideoAnalyzer
+│   │   ├── embedder.py       # Embeddings API
+│   │   ├── image_analyzer.py # Vision API
+│   │   ├── audio_analyzer.py # Audio API
+│   │   ├── video_analyzer.py # Video (frames + audio)
+│   │   ├── rate_limiter.py   # Token Bucket RPM control
+│   │   ├── resilience.py     # Retry, backoff, error classification
+│   │   └── batching.py       # Batch API client
+│   ├── media/utils/          # Утилиты обработки медиа
+│   │   ├── images.py         # Pillow: resize, optimize
+│   │   ├── audio.py          # pydub: extract, compress
+│   │   ├── video.py          # imageio: frame extraction
+│   │   ├── tokens.py         # Token estimation
+│   │   └── files.py          # Path resolution, MIME detection
 │   ├── storage/peewee/       # PeeweeVectorStore, MediaTaskModel
-│   └── text_processing/      # SimpleSplitter, MarkdownNodeParser
-├── processing/               # Parsers, ContextStrategies
-├── batch_manager.py          # Очередь задач, RateLimiter
-└── pipeline.py               # Orchestrator
+│   └── text_processing/      # SimpleSplitter (legacy)
+├── processing/               # Парсинг и обогащение
+│   ├── parsers/              # MarkdownNodeParser (AST)
+│   ├── splitters/            # SmartSplitter
+│   ├── context/              # HierarchicalContextStrategy
+│   └── enrichers/            # MarkdownAssetEnricher
+├── batch_manager.py          # Очередь batch-задач
+└── pipeline.py               # SemanticCore orchestrator
 
-tests/
-├── conftest.py               # Fixtures (in-memory БД, моки)
-├── unit/                     # Юнит-тесты (изолированные компоненты)
-└── integration/              # Интеграционные тесты (end-to-end)
+tests/                        # 470+ тестов
+├── conftest.py               # Все фикстуры проекта
+├── unit/                     # Изолированные unit-тесты
+│   ├── core/                 # BatchManager
+│   ├── infrastructure/       # Gemini, Media utils
+│   └── processing/           # Parsers, Context, Splitters
+├── integration/              # Тесты с реальной БД
+│   ├── media/                # Pipeline + QueueProcessor
+│   └── search/               # Гибридный поиск
+├── e2e/                      # End-to-End с реальными API
+└── fixtures/                 # Тестовые данные
+```
+
+**Подробнее о тестах:** [tests/README.md](tests/README.md)
 
 ### 📚 Документация и Тестирование
 
 **Архитектурные документы:**
-- [Оглавление документации](doc/architecture/00_overview.md) — обзор всех концепций проекта
+
+- [Оглавление документации](doc/architecture/00_overview.md) — обзор всех 34 концепций проекта
 - [Стайл-гайд документации](doc/architecture/00_documentation_style_guide.md) — правила написания доков
 
 **Workflow разработки:**
+
 1. Реализуем функциональность текущей фазы
 2. Коммиты делаем походу разработки по правилам из инструкций. Пуш не делаем!
 3. Пишем тесты в пакете `tests/` (pytest). Тесты у нас запускаются из корня проекта.
@@ -77,4 +108,3 @@ tests/
 5. Пишем один или несколько файлов в `doc/architecture/` по завершённой фазе
 6. Следуем стайл-гайду: минимум кода, максимум объяснений и диаграмм
 7. Обновляем оглавление в `00_overview.md`
-```
