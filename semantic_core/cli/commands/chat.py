@@ -8,6 +8,8 @@ Usage:
     semantic chat --model gemini-1.5-pro  # Другая модель
     semantic chat --search vector     # Только векторный поиск
     semantic chat --context 10        # Больше контекста
+    semantic chat --history-limit 20  # Хранить 20 сообщений
+    semantic chat --token-budget 10000  # Лимит по токенам
 """
 
 from typing import Optional
@@ -75,6 +77,24 @@ def chat(
         "--full-docs",
         help="Использовать полные документы вместо чанков для контекста",
     ),
+    history_limit: int = typer.Option(
+        10,
+        "--history-limit",
+        "-H",
+        help="Максимальное количество сообщений в истории",
+        min=1,
+        max=100,
+    ),
+    token_budget: Optional[int] = typer.Option(
+        None,
+        "--token-budget",
+        help="Лимит токенов для истории (переопределяет --history-limit)",
+    ),
+    no_history: bool = typer.Option(
+        False,
+        "--no-history",
+        help="Отключить историю (без контекста предыдущих сообщений)",
+    ),
 ) -> None:
     """Запустить интерактивный RAG-чат.
 
@@ -83,6 +103,9 @@ def chat(
         semantic chat --model gemini-1.5-pro --context 10
         semantic chat --search vector --no-sources
         semantic chat --full-docs  # Использовать полные документы
+        semantic chat --history-limit 20  # Хранить 20 сообщений
+        semantic chat --token-budget 10000  # Лимит по токенам
+        semantic chat --no-history  # Без истории
     """
     from semantic_core.cli.app import get_cli_context
 
@@ -134,8 +157,31 @@ def chat(
         context_chunks=context_chunks,
     )
 
+    # Инициализируем менеджер истории
+    from semantic_core.core.context import (
+        ChatHistoryManager,
+        LastNMessages,
+        TokenBudget,
+        Unlimited,
+    )
+
+    if no_history:
+        # Без истории — Unlimited, но не будем передавать в RAG
+        history_manager = None
+        history_label = "отключена"
+    elif token_budget:
+        # По токенам
+        history_manager = ChatHistoryManager(TokenBudget(max_tokens=token_budget))
+        history_label = f"до {token_budget} токенов"
+    else:
+        # По количеству сообщений
+        history_manager = ChatHistoryManager(LastNMessages(n=history_limit))
+        history_label = f"до {history_limit} сообщений"
+
     # Приветствие
-    _show_welcome(console, model, search_mode, context_chunks, full_docs)
+    _show_welcome(
+        console, model, search_mode, context_chunks, full_docs, history_label
+    )
 
     # REPL цикл
     while True:
@@ -155,13 +201,30 @@ def chat(
             # Выполняем RAG запрос
             with console.status("[bold green]Думаю...[/bold green]", spinner="dots"):
                 try:
+                    # Получаем историю для RAG (если есть)
+                    history = (
+                        history_manager.get_history() if history_manager else None
+                    )
+
                     result = rag.ask(
                         query=query,
                         search_mode=search_mode,  # type: ignore
                         temperature=temperature,
                         max_tokens=max_tokens,
                         full_docs=full_docs,
+                        history=history,
                     )
+
+                    # Сохраняем в историю
+                    if history_manager:
+                        input_tokens = result.generation.input_tokens or 0
+                        output_tokens = result.generation.output_tokens or 0
+                        # Примерное распределение токенов
+                        history_manager.add_user(query, tokens=input_tokens // 2)
+                        history_manager.add_assistant(
+                            result.answer, tokens=output_tokens
+                        )
+
                 except Exception as e:
                     console.print(
                         Panel(
@@ -182,10 +245,14 @@ def chat(
 
             # Показываем токены
             if result.total_tokens:
+                history_info = ""
+                if history_manager:
+                    history_info = f" | история: {len(history_manager)} сообщ."
+
                 console.print(
                     f"\n[dim]Токены: {result.total_tokens} "
                     f"(input: {result.generation.input_tokens}, "
-                    f"output: {result.generation.output_tokens})[/dim]"
+                    f"output: {result.generation.output_tokens}){history_info}[/dim]"
                 )
 
         except KeyboardInterrupt:
@@ -203,6 +270,7 @@ def _show_welcome(
     search_mode: str,
     context_chunks: int,
     full_docs: bool = False,
+    history_label: str = "до 10 сообщений",
 ) -> None:
     """Показывает приветственное сообщение."""
     mode_icons = {
@@ -218,6 +286,7 @@ def _show_welcome(
         f"Модель: [cyan]{model}[/cyan]\n"
         f"Поиск: [cyan]{mode_label}[/cyan]\n"
         f"Контекст: [cyan]{context_chunks} {context_mode}[/cyan]\n"
+        f"История: [cyan]{history_label}[/cyan]\n"
     )
 
     if full_docs:
