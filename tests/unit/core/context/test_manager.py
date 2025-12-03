@@ -246,7 +246,10 @@ class TestChatHistoryManagerWithCompression:
 
     def test_has_summary_false_before_compression(self):
         """has_summary возвращает False до сжатия."""
-        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+        from semantic_core.core.context import (
+            AdaptiveWithCompression,
+            ContextCompressor,
+        )
 
         llm = MockLLMProvider()
         compressor = ContextCompressor(llm)
@@ -263,7 +266,10 @@ class TestChatHistoryManagerWithCompression:
 
     def test_has_summary_true_after_compression(self):
         """has_summary возвращает True после сжатия."""
-        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+        from semantic_core.core.context import (
+            AdaptiveWithCompression,
+            ContextCompressor,
+        )
 
         llm = MockLLMProvider(output_tokens=50)
         compressor = ContextCompressor(llm)
@@ -282,7 +288,10 @@ class TestChatHistoryManagerWithCompression:
 
     def test_total_tokens_includes_summary(self):
         """total_tokens включает токены summary."""
-        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+        from semantic_core.core.context import (
+            AdaptiveWithCompression,
+            ContextCompressor,
+        )
 
         llm = MockLLMProvider(output_tokens=100)
         compressor = ContextCompressor(llm)
@@ -305,7 +314,10 @@ class TestChatHistoryManagerWithCompression:
 
     def test_get_messages_for_llm_with_summary(self):
         """get_messages_for_llm включает summary для AdaptiveWithCompression."""
-        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+        from semantic_core.core.context import (
+            AdaptiveWithCompression,
+            ContextCompressor,
+        )
 
         llm = MockLLMProvider(response_text="Previous context", output_tokens=50)
         compressor = ContextCompressor(llm)
@@ -328,7 +340,10 @@ class TestChatHistoryManagerWithCompression:
 
     def test_get_messages_for_llm_without_summary(self):
         """get_messages_for_llm работает без summary."""
-        from semantic_core.core.context import AdaptiveWithCompression, ContextCompressor
+        from semantic_core.core.context import (
+            AdaptiveWithCompression,
+            ContextCompressor,
+        )
 
         llm = MockLLMProvider()
         compressor = ContextCompressor(llm)

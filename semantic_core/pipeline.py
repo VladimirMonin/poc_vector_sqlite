@@ -17,7 +17,13 @@ from semantic_core.interfaces import (
     BaseSplitter,
     BaseContextStrategy,
 )
-from semantic_core.domain import Document, SearchResult, ChunkResult, MediaConfig, MediaType
+from semantic_core.domain import (
+    Document,
+    SearchResult,
+    ChunkResult,
+    MediaConfig,
+    MediaType,
+)
 from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
 from semantic_core.utils.logger import get_logger, setup_logging, LoggingConfig

@@ -236,14 +236,18 @@ class TestAdaptiveWithCompression:
         """Ошибка если threshold <= target."""
         compressor, _ = self.make_compressor()
 
-        with pytest.raises(ValueError, match="threshold_tokens должен быть > target_tokens"):
+        with pytest.raises(
+            ValueError, match="threshold_tokens должен быть > target_tokens"
+        ):
             AdaptiveWithCompression(
                 compressor=compressor,
                 threshold_tokens=10000,
                 target_tokens=10000,
             )
 
-        with pytest.raises(ValueError, match="threshold_tokens должен быть > target_tokens"):
+        with pytest.raises(
+            ValueError, match="threshold_tokens должен быть > target_tokens"
+        ):
             AdaptiveWithCompression(
                 compressor=compressor,
                 threshold_tokens=5000,

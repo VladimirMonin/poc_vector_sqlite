@@ -180,9 +180,7 @@ CONTEXT:
         # Формируем историю для LLM (если есть)
         history_for_llm = None
         if history:
-            history_for_llm = [
-                {"role": m.role, "content": m.content} for m in history
-            ]
+            history_for_llm = [{"role": m.role, "content": m.content} for m in history]
 
         generation = self.llm.generate(
             prompt=query,

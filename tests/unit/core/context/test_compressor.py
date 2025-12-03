@@ -11,7 +11,9 @@ from semantic_core.core.context.compressor import ContextCompressor
 class MockLLMProvider:
     """Mock LLM провайдер для тестов."""
 
-    def __init__(self, response_text: str = "Summary of conversation", output_tokens: int = 50):
+    def __init__(
+        self, response_text: str = "Summary of conversation", output_tokens: int = 50
+    ):
         self.response_text = response_text
         self.output_tokens = output_tokens
         self.call_count = 0
@@ -202,4 +204,6 @@ class TestContextCompressorIntegration:
         result2 = compressor.compress(messages2)
 
         assert llm.call_count == 2
-        assert result1.content != result2.content or llm.response_text == llm.response_text
+        assert (
+            result1.content != result2.content or llm.response_text == llm.response_text
+        )

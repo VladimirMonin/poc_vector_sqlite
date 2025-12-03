@@ -184,6 +184,7 @@ semantic chat --no-history
 ```
 
 Приоритет:
+
 1. `--no-history` → отключает историю
 2. `--token-budget` → TokenBudget стратегия
 3. `--history-limit` → LastNMessages (по умолчанию)

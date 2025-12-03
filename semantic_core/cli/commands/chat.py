@@ -202,9 +202,7 @@ def chat(
         history_label = f"до {history_limit} сообщений"
 
     # Приветствие
-    _show_welcome(
-        console, model, search_mode, context_chunks, full_docs, history_label
-    )
+    _show_welcome(console, model, search_mode, context_chunks, full_docs, history_label)
 
     # REPL цикл
     while True:
@@ -225,9 +223,7 @@ def chat(
             with console.status("[bold green]Думаю...[/bold green]", spinner="dots"):
                 try:
                     # Получаем историю для RAG (если есть)
-                    history = (
-                        history_manager.get_history() if history_manager else None
-                    )
+                    history = history_manager.get_history() if history_manager else None
 
                     result = rag.ask(
                         query=query,
