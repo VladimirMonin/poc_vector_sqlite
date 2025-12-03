@@ -41,6 +41,8 @@
     >>> results = core.search("запрос")
 """
 
+__version__ = "0.8.0"
+
 # Domain Layer
 from semantic_core.domain import (
     Document,
@@ -103,6 +105,8 @@ from semantic_core.pipeline import SemanticCore
 from semantic_core.batch_manager import BatchManager
 
 __all__ = [
+    # Version
+    "__version__",
     # Domain
     "Document",
     "Chunk",
