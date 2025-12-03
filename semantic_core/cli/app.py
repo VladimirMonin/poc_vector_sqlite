@@ -124,5 +124,10 @@ from semantic_core.cli.commands import queue_cmd, worker_cmd
 app.add_typer(queue_cmd, name="queue")
 app.add_typer(worker_cmd, name="worker")
 
+# Phase 9.0: RAG Chat
+from semantic_core.cli.commands import chat_cmd
+
+app.add_typer(chat_cmd, name="chat")
+
 
 __all__ = ["app", "get_cli_context"]

@@ -201,13 +201,15 @@ class GeminiAudioAnalyzer:
             raise ValueError("Gemini returned empty response")
 
         # Логируем AI вызов
+        prompt_preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
+        response_preview = (
+            response.text[:200] + "..." if len(response.text) > 200 else response.text
+        )
         logger.trace_ai(
-            operation="audio_analysis",
+            prompt=prompt_preview,
+            response=response_preview,
             model=self.model,
-            prompt_preview=prompt[:100] + "..." if len(prompt) > 100 else prompt,
-            response_preview=response.text[:200] + "..."
-            if len(response.text) > 200
-            else response.text,
+            operation="audio_analysis",
         )
 
         try:

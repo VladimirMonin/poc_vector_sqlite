@@ -277,13 +277,14 @@ class GeminiVideoAnalyzer:
             raise ValueError("Gemini returned empty response")
 
         # Логируем AI вызов
+        response_preview = (
+            response.text[:200] + "..." if len(response.text) > 200 else response.text
+        )
         logger.trace_ai(
-            operation="video_analysis",
+            prompt="Video analysis with frames",
+            response=response_preview,
             model=self.model,
-            prompt_preview="Video analysis with frames",
-            response_preview=response.text[:200] + "..."
-            if len(response.text) > 200
-            else response.text,
+            operation="video_analysis",
         )
 
         try:

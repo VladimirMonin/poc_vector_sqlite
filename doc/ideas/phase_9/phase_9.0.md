@@ -100,14 +100,36 @@ class GeminiLLMProvider(BaseLLMProvider):
 
 ## 📐 RAGEngine
 
+### Архитектура контекста
+
+RAGEngine использует **гранулярный поиск по чанкам** (`search_chunks()`) по умолчанию.
+Это оптимально по токенам и качеству. Опционально можно запросить полный документ.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Режим по умолчанию (full_docs=False)                           │
+│  Поиск → ChunkResult → в контекст только релевантные чанки      │
+│  5 чанков × ~500 символов = ~2.5k токенов                       │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Режим full_docs=True (--full-docs в CLI)                       │
+│  Поиск → ChunkResult → подгружаем parent документы целиком      │
+│  Для суммаризации или когда нужен полный контекст               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Код
+
 ```python
 # semantic_core/core/rag.py
 
 @dataclass
 class RAGResult:
     answer: str
-    sources: list[SearchResult]
+    sources: list[ChunkResult]  # Гранулярные результаты
     generation: GenerationResult
+    query: str = ""
 
 class RAGEngine:
     DEFAULT_SYSTEM_PROMPT = """Answer based ONLY on the provided context.
@@ -118,17 +140,50 @@ If context doesn't have the answer, say so. Format in Markdown."""
         self.llm = llm
         self.context_chunks = context_chunks
     
-    def ask(self, query: str, search_mode: str = "hybrid") -> RAGResult:
-        # 1. Retrieval
-        sources = self.core.search(query, limit=self.context_chunks, mode=search_mode)
+    def ask(
+        self, 
+        query: str, 
+        search_mode: str = "hybrid",
+        full_docs: bool = False,  # Подгружать полные документы?
+    ) -> RAGResult:
+        # 1. Retrieval — всегда гранулярный поиск
+        chunks = self.core.search_chunks(query, limit=self.context_chunks, mode=search_mode)
+        
         # 2. Build context
-        context = self._build_context(sources)
+        if full_docs:
+            context = self._build_full_docs_context(chunks)
+        else:
+            context = self._build_chunks_context(chunks)  # По умолчанию
+        
         # 3. Generate
         generation = self.llm.generate(
-            prompt=f"CONTEXT:\n{context}\n\nQUESTION:\n{query}",
-            system_prompt=self.DEFAULT_SYSTEM_PROMPT,
+            prompt=query,
+            system_prompt=self._format_system_prompt(context),
         )
-        return RAGResult(answer=generation.text, sources=sources, generation=generation)
+        return RAGResult(answer=generation.text, sources=chunks, generation=generation)
+    
+    def _build_chunks_context(self, chunks: list[ChunkResult]) -> str:
+        """Формирует контекст из чанков (экономный режим)."""
+        parts = []
+        for i, chunk in enumerate(chunks, 1):
+            source = chunk.parent_doc_title or f"Source {i}"
+            parts.append(f"[{i}] {source} (score: {chunk.score:.3f})\n{chunk.content}")
+        return "\n\n---\n\n".join(parts)
+    
+    def _build_full_docs_context(self, chunks: list[ChunkResult]) -> str:
+        """Подгружает полные документы по parent_id."""
+        seen_doc_ids = set()
+        parts = []
+        for chunk in chunks:
+            if chunk.parent_doc_id in seen_doc_ids:
+                continue
+            seen_doc_ids.add(chunk.parent_doc_id)
+            # Загружаем полный документ через store
+            doc = self.core.store.get_document(chunk.parent_doc_id)
+            if doc:
+                source = doc.metadata.get("source", f"Document {chunk.parent_doc_id}")
+                parts.append(f"[{source}]\n{doc.content}")
+        return "\n\n---\n\n".join(parts)
 ```
 
 ---
@@ -143,6 +198,7 @@ def chat(
     model: str = Option("gemini-2.0-flash", "--model", "-m"),
     context_chunks: int = Option(5, "--context", "-c"),
     search_mode: str = Option("hybrid", "--search", "-s", help="vector/fts/hybrid"),
+    full_docs: bool = Option(False, "--full-docs", "-f", help="Подгружать полные документы"),
 ):
     """Интерактивный RAG чат."""
     # ... инициализация ...
@@ -151,7 +207,7 @@ def chat(
         query = Prompt.ask("[bold blue]You[/]")
         if query in ("exit", "quit"): break
         
-        result = rag.ask(query, search_mode=search_mode)
+        result = rag.ask(query, search_mode=search_mode, full_docs=full_docs)
         console.print(Markdown(result.answer))
         _show_sources(result.sources)
 ```
@@ -162,10 +218,11 @@ def chat(
 
 - [ ] `BaseLLMProvider` интерфейс
 - [ ] `GeminiLLMProvider` с токенами в ответе
-- [ ] `RAGEngine.ask()` работает
+- [ ] `RAGEngine.ask()` с гранулярным поиском по чанкам
+- [ ] `--full-docs` флаг для подгрузки полных документов
 - [ ] `semantic chat` запускает REPL
 - [ ] Поддержка `--search vector|fts|hybrid`
-- [ ] Тесты: mock LLM, build_context
+- [ ] Тесты: mock LLM, build_chunks_context, build_full_docs_context
 
 ---
 

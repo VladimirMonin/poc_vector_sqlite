@@ -9,6 +9,7 @@
     docs_cmd: semantic docs — встроенная документация.
     queue_cmd: semantic queue — управление очередями.
     worker_cmd: semantic worker — воркеры обработки.
+    chat_cmd: semantic chat — интерактивный RAG-чат.
 """
 
 from semantic_core.cli.commands import init_cmd
@@ -19,6 +20,7 @@ from semantic_core.cli.commands.search import search_cmd
 from semantic_core.cli.commands.docs import docs_cmd
 from semantic_core.cli.commands.queue import queue_cmd
 from semantic_core.cli.commands.worker import worker_cmd
+from semantic_core.cli.commands.chat import chat_cmd
 
 __all__ = [
     "init_cmd",
@@ -29,4 +31,5 @@ __all__ = [
     "docs_cmd",
     "queue_cmd",
     "worker_cmd",
+    "chat_cmd",
 ]

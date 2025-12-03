@@ -55,6 +55,12 @@ EMOJI_MAP: dict[str, str] = {
     "embeddings": "🧠",
     "gemini": "🧠",
     "api": "🌐",
+    # LLM & RAG (Phase 9.0)
+    "llm": "🤖",
+    "rag": "💬",
+    "chat": "💬",
+    "generate": "✨",
+    "generation": "✨",
     # Batching & Queues (Phase 7.2)
     "batch": "📦",
     "batching": "📦",
