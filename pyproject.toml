@@ -1,7 +1,7 @@
 [project]
 name = "poc-vector-sqlite"
-version = "0.1.0"
-description = ""
+version = "0.8.0"
+description = "Local-first semantic search library with SQLite + Gemini AI"
 authors = [
     {name = "VladimirMonin",email = "vladimir.monin2016@yandex.ru"}
 ]
@@ -16,8 +16,12 @@ dependencies = [
     "markdown-it-py (>=3.0.0,<4.0.0)",
     "google-genai (>=1.0.0,<2.0.0)",
     "audioop-lts (>=0.2.2,<0.3.0)",
-    "rich (>=13.0.0,<14.0.0)"
+    "rich (>=13.0.0,<14.0.0)",
+    "typer[all] (>=0.15.0,<1.0.0)"
 ]
+
+[project.scripts]
+semantic = "semantic_core.cli:main"
 
 [project.optional-dependencies]
 media = [
@@ -30,6 +34,9 @@ media = [
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [{include = "semantic_core"}]
 
 [dependency-groups]
 dev = [

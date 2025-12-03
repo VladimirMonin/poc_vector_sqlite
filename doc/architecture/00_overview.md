@@ -170,6 +170,22 @@
 
 ---
 
+### 🖥 CLI & Configuration (Фаза 8)
+
+40. [**Unified Configuration**](40_unified_configuration.md)  
+    SemanticConfig: Pydantic Settings с TOML + env, единый источник правды
+
+41. [**CLI Architecture**](41_cli_architecture.md)  
+    Typer + Rich: быстрый --help, lazy initialization, красивый вывод
+
+42. [**CLI Commands**](42_cli_commands.md)  
+    ingest, search, docs — три основные команды для повседневной работы
+
+43. [**Queue & Worker Commands**](43_queue_worker_commands.md)  
+    queue status/flush/retry, worker run-once/start — операционные команды для async-обработки
+
+---
+
 ## 🚀 Быстрый старт
 
 ```bash
