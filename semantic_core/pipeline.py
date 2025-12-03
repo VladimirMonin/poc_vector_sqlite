@@ -6,7 +6,9 @@
 """
 
 import json
+import logging
 import uuid
+from pathlib import Path
 from typing import Optional, Literal, TYPE_CHECKING
 
 from semantic_core.interfaces import (
@@ -16,6 +18,7 @@ from semantic_core.interfaces import (
     BaseContextStrategy,
 )
 from semantic_core.domain import Document, SearchResult, MediaConfig, MediaType
+from semantic_core.domain.chunk import Chunk, ChunkType
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
 
 if TYPE_CHECKING:
@@ -23,6 +26,8 @@ if TYPE_CHECKING:
     from semantic_core.infrastructure.gemini.rate_limiter import RateLimiter
     from semantic_core.core.media_queue import MediaQueueProcessor
 
+
+logger = logging.getLogger(__name__)
 
 IngestionMode = Literal["sync", "async"]
 
@@ -96,25 +101,29 @@ class SemanticCore:
         self,
         document: Document,
         mode: IngestionMode = "sync",
+        enrich_media: bool = False,
     ) -> Document:
         """Обрабатывает и сохраняет документ.
 
         Алгоритм (sync):
         1. Нарезает документ на чанки (splitter.split).
-        2. Формирует контекст для каждого чанка (context_strategy).
-        3. Генерирует эмбеддинги (embedder.embed_documents).
-        4. Записывает векторы в чанки.
-        5. Сохраняет документ с чанками (store.save).
+        2. [Опционально] Обогащает IMAGE_REF чанки через Vision API.
+        3. Формирует контекст для каждого чанка (context_strategy).
+        4. Генерирует эмбеддинги (embedder.embed_documents).
+        5. Записывает векторы в чанки.
+        6. Сохраняет документ с чанками (store.save).
 
         Алгоритм (async):
         1. Нарезает документ на чанки.
-        2. Формирует контекст и сохраняет в metadata['_vector_source'].
-        3. Сохраняет чанки со статусом PENDING (без векторов).
-        4. Пользователь позже вызывает batch_manager.flush_queue().
+        2. [Опционально] Создаёт задачи на обогащение IMAGE_REF.
+        3. Формирует контекст и сохраняет в metadata['_vector_source'].
+        4. Сохраняет чанки со статусом PENDING (без векторов).
+        5. Пользователь позже вызывает batch_manager.flush_queue().
 
         Args:
             document: Исходный документ.
             mode: Режим обработки ('sync' или 'async').
+            enrich_media: Обогащать ли IMAGE_REF чанки через Vision API.
 
         Returns:
             Document с заполненным id.
@@ -129,7 +138,11 @@ class SemanticCore:
         if not chunks:
             raise ValueError("Сплиттер вернул пустой список чанков")
 
-        # 2. Формируем тексты для векторизации
+        # 2. Обогащаем медиа-чанки (если включено)
+        if enrich_media:
+            chunks = self._enrich_media_chunks(chunks, document, mode)
+
+        # 3. Формируем тексты для векторизации
         vector_texts = []
         for chunk in chunks:
             text = self.context_strategy.form_vector_text(chunk, document)
@@ -373,3 +386,207 @@ class SemanticCore:
         )
 
         return task_id
+
+    # =========================================================================
+    # Markdown Asset Enrichment (Phase 6.4)
+    # =========================================================================
+
+    def _enrich_media_chunks(
+        self,
+        chunks: list[Chunk],
+        document: Document,
+        mode: IngestionMode,
+    ) -> list[Chunk]:
+        """Обогащает IMAGE_REF чанки через Vision API.
+
+        Для каждого IMAGE_REF чанка:
+        1. Резолвит путь к изображению
+        2. Извлекает контекст (текст вокруг, заголовки)
+        3. Вызывает Vision API (sync) или создаёт задачу (async)
+        4. Обновляет chunk.content описанием от Vision
+
+        Args:
+            chunks: Все чанки документа.
+            document: Родительский документ.
+            mode: Режим обработки.
+
+        Returns:
+            Обновлённый список чанков.
+        """
+        from semantic_core.processing.enrichers.markdown_assets import (
+            MarkdownAssetEnricher,
+        )
+
+        # Проверяем, что image_analyzer настроен
+        if self.image_analyzer is None:
+            logger.warning(
+                "enrich_media=True, but image_analyzer not configured. "
+                "Skipping media enrichment."
+            )
+            return chunks
+
+        enricher = MarkdownAssetEnricher()
+        doc_dir = self._get_document_directory(document)
+
+        for chunk in chunks:
+            if chunk.chunk_type != ChunkType.IMAGE_REF:
+                continue
+
+            # Резолвим путь к изображению
+            image_path = self._resolve_image_path(chunk.content, doc_dir)
+
+            if image_path is None:
+                # URL или не найден — пропускаем
+                logger.debug(f"Skipping external/missing image: {chunk.content}")
+                continue
+
+            # Извлекаем контекст
+            context = enricher.get_context(chunk, chunks)
+            context_text = context.format_for_vision()
+
+            # Сохраняем оригинальный путь в metadata
+            chunk.metadata["_original_path"] = chunk.content
+
+            if mode == "sync":
+                # Обрабатываем сразу
+                result = self._analyze_image_for_chunk(image_path, context_text)
+
+                if result is not None:
+                    # Заменяем content на описание
+                    chunk.content = result["description"]
+                    chunk.metadata["_vision_alt"] = result.get("alt_text", "")
+                    chunk.metadata["_vision_keywords"] = result.get("keywords", [])
+                    if result.get("ocr_text"):
+                        chunk.metadata["_vision_ocr"] = result["ocr_text"]
+                    chunk.metadata["_enriched"] = True
+                else:
+                    # Ошибка уже залогирована в _analyze_image_for_chunk
+                    chunk.metadata["_media_error"] = "Vision API failed"
+
+            else:  # async
+                # Создаём задачу в очереди (обработается позже)
+                try:
+                    task_id = self._create_media_task(
+                        path=str(image_path),
+                        context_text=context_text,
+                    )
+                    chunk.metadata["_media_task_id"] = task_id
+                    chunk.metadata["_pending_enrichment"] = True
+                except Exception as e:
+                    logger.error(f"Failed to create media task: {e}")
+                    chunk.metadata["_media_error"] = str(e)
+
+        return chunks
+
+    def _get_document_directory(self, document: Document) -> Optional[Path]:
+        """Получает директорию документа из metadata.
+
+        Args:
+            document: Документ.
+
+        Returns:
+            Path к директории или None.
+        """
+        # Пробуем разные ключи метаданных
+        source = document.metadata.get("source") or document.metadata.get("path")
+
+        if source:
+            path = Path(source)
+            if path.is_file():
+                return path.parent
+            elif path.is_dir():
+                return path
+
+        return None
+
+    def _resolve_image_path(
+        self,
+        image_ref: str,
+        doc_dir: Optional[Path],
+    ) -> Optional[Path]:
+        """Резолвит путь к изображению.
+
+        Порядок проверок:
+        1. Пропускаем URL (http://, https://, data:)
+        2. Абсолютный путь
+        3. Относительно директории документа
+        4. Относительно CWD
+
+        Args:
+            image_ref: Ссылка на изображение из Markdown.
+            doc_dir: Директория документа.
+
+        Returns:
+            Абсолютный Path к файлу или None.
+        """
+        # Пропускаем URL
+        if image_ref.startswith(("http://", "https://", "data:")):
+            return None
+
+        path = Path(image_ref)
+
+        # 1. Абсолютный путь
+        if path.is_absolute():
+            if path.exists():
+                return path
+            logger.warning(f"Image not found (absolute): {path}")
+            return None
+
+        # 2. Относительно директории документа
+        if doc_dir:
+            doc_relative = doc_dir / path
+            if doc_relative.exists():
+                return doc_relative.resolve()
+
+        # 3. Относительно CWD
+        cwd_relative = Path.cwd() / path
+        if cwd_relative.exists():
+            return cwd_relative.resolve()
+
+        logger.warning(f"Image not found: {image_ref}")
+        return None
+
+    def _analyze_image_for_chunk(
+        self,
+        image_path: Path,
+        context_text: str,
+    ) -> Optional[dict]:
+        """Анализирует изображение для обогащения чанка.
+
+        Args:
+            image_path: Путь к изображению.
+            context_text: Контекст для Vision API.
+
+        Returns:
+            Словарь с результатами или None при ошибке.
+        """
+        from semantic_core.domain.media import MediaRequest, MediaResource
+
+        try:
+            # Rate limiting
+            self._ensure_media_queue()
+            self._rate_limiter.wait_if_needed()
+
+            # Создаём запрос
+            resource = MediaResource(
+                path=str(image_path),
+                mime_type=f"image/{image_path.suffix.lstrip('.')}",
+            )
+            request = MediaRequest(
+                resource=resource,
+                context_text=context_text,
+            )
+
+            # Вызываем анализатор
+            result = self.image_analyzer.analyze(request)
+
+            return {
+                "description": result.description,
+                "alt_text": result.alt_text,
+                "keywords": result.keywords,
+                "ocr_text": result.ocr_text,
+            }
+
+        except Exception as e:
+            logger.error(f"Vision API error for {image_path}: {e}")
+            return None

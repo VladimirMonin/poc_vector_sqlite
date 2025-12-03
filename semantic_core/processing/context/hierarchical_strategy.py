@@ -88,18 +88,40 @@ class HierarchicalContextStrategy(BaseContextStrategy):
                 breadcrumbs = " > ".join(headers)
                 parts.append(f"Section: {breadcrumbs}")
 
-            parts.append("Type: Image Reference")
+            # Проверяем, было ли обогащение через Vision API
+            if chunk.metadata.get("_enriched"):
+                # Обогащённый чанк: content = описание от Vision
+                parts.append("Type: Image")
+                parts.append(f"Description: {chunk.content}")
 
-            # Добавляем alt-текст и title если есть
-            alt_text = chunk.metadata.get("alt", "")
-            title_text = chunk.metadata.get("title", "")
+                # Добавляем OCR если есть
+                ocr_text = chunk.metadata.get("_vision_ocr")
+                if ocr_text:
+                    parts.append(f"Visible text: {ocr_text}")
 
-            if alt_text:
-                parts.append(f"Description: {alt_text}")
-            if title_text:
-                parts.append(f"Title: {title_text}")
+                # Добавляем ключевые слова
+                keywords = chunk.metadata.get("_vision_keywords", [])
+                if keywords:
+                    parts.append(f"Keywords: {', '.join(keywords)}")
 
-            parts.append(f"Source: {chunk.content}")
+                # Оригинальный путь
+                original_path = chunk.metadata.get("_original_path", "")
+                if original_path:
+                    parts.append(f"Source: {original_path}")
+            else:
+                # НЕ обогащённый чанк: content = путь к файлу
+                parts.append("Type: Image Reference")
+
+                # Добавляем alt-текст и title если есть
+                alt_text = chunk.metadata.get("alt", "")
+                title_text = chunk.metadata.get("title", "")
+
+                if alt_text:
+                    parts.append(f"Description: {alt_text}")
+                if title_text:
+                    parts.append(f"Title: {title_text}")
+
+                parts.append(f"Source: {chunk.content}")
 
         else:
             # Для обычного текста
