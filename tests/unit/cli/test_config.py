@@ -75,14 +75,14 @@ class TestSemanticConfigFromToml:
 [database]
 path = "custom.db"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     assert config.db_path == Path("custom.db")
             finally:
@@ -95,14 +95,14 @@ path = "custom.db"
 api_key = "test-api-key-123"
 model = "custom-embedding"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     assert config.gemini_api_key == "test-api-key-123"
                     assert config.embedding_model == "custom-embedding"
@@ -116,14 +116,14 @@ model = "custom-embedding"
 splitter = "simple"
 context_strategy = "basic"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     assert config.splitter == "simple"
                     assert config.context_strategy == "basic"
@@ -137,14 +137,14 @@ context_strategy = "basic"
 enabled = false
 rpm_limit = 30
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     assert config.media_enabled is False
                     assert config.media_rpm_limit == 30
@@ -158,14 +158,14 @@ rpm_limit = 30
 limit = 20
 type = "vector"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     assert config.search_limit == 20
                     assert config.search_type == "vector"
@@ -179,14 +179,14 @@ type = "vector"
 level = "DEBUG"
 file = "app.log"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     assert config.log_level == "DEBUG"
                     assert config.log_file == Path("app.log")
@@ -231,14 +231,14 @@ class TestSemanticConfigPriority:
 [database]
 path = "toml.db"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig(db_path="override.db")
                     # kwargs должны победить
                     assert config.db_path == Path("override.db")
@@ -251,17 +251,20 @@ path = "toml.db"
 [database]
 path = "toml.db"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
                 # Чистим env от SEMANTIC_ переменных
-                clean_env = {k: v for k, v in os.environ.items() if not k.startswith("SEMANTIC_")}
+                clean_env = {
+                    k: v for k, v in os.environ.items() if not k.startswith("SEMANTIC_")
+                }
                 with patch.dict(os.environ, clean_env, clear=True):
-                    with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                    with patch(
+                        "semantic_core.config.find_config_file",
+                        return_value=Path(f.name),
+                    ):
                         config = SemanticConfig()
                         assert config.db_path == Path("toml.db")
             finally:
@@ -292,7 +295,7 @@ class TestFindConfigFile:
             parent = Path(tmpdir)
             child = parent / "subdir"
             child.mkdir()
-            
+
             config_path = parent / "semantic.toml"
             config_path.write_text("[database]\npath = 'test.db'\n")
 
@@ -358,7 +361,7 @@ class TestConfigValidators:
         """to_toml_dict() не включает API ключи."""
         config = SemanticConfig(gemini_api_key="secret-key")
         toml_dict = config.to_toml_dict()
-        
+
         # api_key не должен быть в gemini секции
         assert "api_key" not in toml_dict.get("gemini", {})
         # Но модель должна быть
@@ -398,14 +401,14 @@ type = "fts"
 level = "DEBUG"
 file = "semantic.log"
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write(toml_content)
             f.flush()
 
             try:
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
 
                     # Database

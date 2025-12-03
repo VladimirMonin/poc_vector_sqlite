@@ -111,9 +111,7 @@ class TestIngestCommand:
         test_file = tmp_path / "test.md"
         test_file.write_text("# Test")
 
-        result = runner.invoke(
-            app, ["ingest", "--mode", "invalid", str(test_file)]
-        )
+        result = runner.invoke(app, ["ingest", "--mode", "invalid", str(test_file)])
         # Должна быть ошибка валидации
         assert result.exit_code != 0 or "Неверный режим" in result.stdout
 
@@ -236,9 +234,7 @@ class TestSearchCommand:
         # Пытаемся вызвать с невалидным типом
         # get_cli_context импортируется внутри функции, поэтому
         # просто проверяем что ошибка валидации срабатывает
-        result = runner.invoke(
-            app, ["search", "--type", "invalid", "query"]
-        )
+        result = runner.invoke(app, ["search", "--type", "invalid", "query"])
         # Ошибка может быть в stdout или в exit_code != 0
         assert result.exit_code != 0 or "Неверный тип" in result.stdout
 
@@ -328,7 +324,9 @@ class TestDocsCommand:
         for topic_key, topic_data in DOCS_TOPICS.items():
             assert "title" in topic_data, f"Topic {topic_key} missing title"
             assert "content" in topic_data, f"Topic {topic_key} missing content"
-            assert len(topic_data["content"]) > 50, f"Topic {topic_key} content too short"
+            assert len(topic_data["content"]) > 50, (
+                f"Topic {topic_key} content too short"
+            )
 
 
 # ============================================================================
@@ -406,9 +404,7 @@ class TestCommandIntegration:
         test_file = tmp_path / "test.md"
         test_file.write_text("# Test")
 
-        result = runner.invoke(
-            app, ["ingest", "--dry-run", str(test_file)]
-        )
+        result = runner.invoke(app, ["ingest", "--dry-run", str(test_file)])
         assert result.exit_code == 0
         assert "Dry Run" in result.stdout
 

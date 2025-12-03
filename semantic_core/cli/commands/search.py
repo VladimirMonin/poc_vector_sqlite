@@ -78,7 +78,7 @@ def search(
     """
     # Late import to avoid circular dependency
     from semantic_core.cli.app import get_cli_context
-    
+
     cli_ctx = get_cli_context()
 
     # Валидация типа поиска
@@ -100,10 +100,12 @@ def search(
             k=k,
         )
     except Exception as e:
-        console.print(Panel(
-            f"[red]Ошибка поиска: {e}[/red]",
-            title="❌ Ошибка",
-        ))
+        console.print(
+            Panel(
+                f"[red]Ошибка поиска: {e}[/red]",
+                title="❌ Ошибка",
+            )
+        )
         raise typer.Exit(1)
 
     # Фильтрация по порогу
@@ -125,10 +127,12 @@ def _render_rich(
 ) -> None:
     """Отображает результаты в Rich формате."""
     if not results:
-        console.print(Panel(
-            "[yellow]Ничего не найдено[/yellow]",
-            title=f"🔍 Поиск: {query}",
-        ))
+        console.print(
+            Panel(
+                "[yellow]Ничего не найдено[/yellow]",
+                title=f"🔍 Поиск: {query}",
+            )
+        )
         return
 
     # Заголовок
@@ -138,10 +142,12 @@ def _render_rich(
         "hybrid": "🔀 Гибридный",
     }.get(search_type, search_type)
 
-    console.print(Panel(
-        f"[cyan]Найдено результатов: {len(results)}[/cyan]",
-        title=f"🔍 {type_label} поиск: [bold]{query}[/bold]",
-    ))
+    console.print(
+        Panel(
+            f"[cyan]Найдено результатов: {len(results)}[/cyan]",
+            title=f"🔍 {type_label} поиск: [bold]{query}[/bold]",
+        )
+    )
 
     # Таблица результатов
     table = Table(show_header=True, header_style="bold magenta")

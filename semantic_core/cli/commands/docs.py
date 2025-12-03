@@ -316,20 +316,24 @@ def docs(
     elif topic in DOCS_TOPICS:
         _show_topic(topic)
     else:
-        console.print(Panel(
-            f"[red]Неизвестный топик: {topic}[/red]\n\n"
-            f"Доступные топики: {', '.join(DOCS_TOPICS.keys())}",
-            title="❌ Ошибка",
-        ))
+        console.print(
+            Panel(
+                f"[red]Неизвестный топик: {topic}[/red]\n\n"
+                f"Доступные топики: {', '.join(DOCS_TOPICS.keys())}",
+                title="❌ Ошибка",
+            )
+        )
         raise typer.Exit(1)
 
 
 def _show_topics_list() -> None:
     """Показывает список доступных топиков."""
-    console.print(Panel(
-        "[cyan]Semantic Core — встроенная документация[/cyan]",
-        title="📚 Документация",
-    ))
+    console.print(
+        Panel(
+            "[cyan]Semantic Core — встроенная документация[/cyan]",
+            title="📚 Документация",
+        )
+    )
 
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Топик", width=15)
@@ -355,8 +359,10 @@ def _show_topics_list() -> None:
 def _show_topic(topic: str) -> None:
     """Отображает конкретный топик документации."""
     topic_data = DOCS_TOPICS[topic]
-    console.print(Panel(
-        Markdown(topic_data["content"]),
-        title=topic_data["title"],
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            Markdown(topic_data["content"]),
+            title=topic_data["title"],
+            border_style="blue",
+        )
+    )

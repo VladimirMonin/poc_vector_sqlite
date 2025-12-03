@@ -103,9 +103,17 @@ class TestDoctorCommand:
         assert result.exit_code in (0, 1)  # 0 = всё ок, 1 = есть проблемы
         # Должна быть какая-то диагностика
         output_lower = result.stdout.lower()
-        assert any(word in output_lower for word in [
-            "python", "sqlite", "environment", "окружение", "version", "версия"
-        ])
+        assert any(
+            word in output_lower
+            for word in [
+                "python",
+                "sqlite",
+                "environment",
+                "окружение",
+                "version",
+                "версия",
+            ]
+        )
 
     def test_doctor_checks_python_version(self):
         """doctor проверяет версию Python."""
@@ -145,7 +153,7 @@ class TestCliContext:
     def test_context_lazy_initialization(self):
         """Контекст лениво инициализирует компоненты."""
         from semantic_core.cli.context import CLIContext
-        
+
         ctx = CLIContext()
         # При создании core не должен быть инициализирован
         assert ctx._core is None
@@ -154,7 +162,7 @@ class TestCliContext:
     def test_context_get_config(self):
         """Контекст предоставляет конфигурацию."""
         from semantic_core.cli.context import CLIContext
-        
+
         reset_config()
         ctx = CLIContext()
         config = ctx.get_config()
@@ -170,14 +178,14 @@ class TestCliConsole:
         """Console — синглтон."""
         from semantic_core.cli.console import console
         from semantic_core.cli.console import console as console2
-        
+
         assert console is console2
 
     def test_console_is_rich_console(self):
         """Console — экземпляр Rich Console."""
         from semantic_core.cli.console import console
         from rich.console import Console
-        
+
         assert isinstance(console, Console)
 
 
@@ -186,15 +194,16 @@ class TestCliEdgeCases:
 
     def test_empty_config_file(self):
         """Пустой TOML файл не вызывает ошибку."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write("")  # Пустой файл
             f.flush()
 
             try:
                 from semantic_core.config import SemanticConfig
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     # Должны загрузиться дефолты
                     assert config.db_path == Path("semantic.db")
@@ -203,16 +212,17 @@ class TestCliEdgeCases:
 
     def test_invalid_toml_file(self):
         """Невалидный TOML приводит к логированию warning и использованию дефолтов."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write("this is not valid toml [[[")
             f.flush()
 
             try:
                 from semantic_core.config import SemanticConfig
+
                 # _load_toml ловит ошибки и возвращает {}
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     # Должны загрузиться дефолты (т.к. TOML невалидный)
                     assert config.db_path == Path("semantic.db")
@@ -221,15 +231,16 @@ class TestCliEdgeCases:
 
     def test_partial_toml_sections(self):
         """Частичные секции TOML дополняются дефолтами."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".toml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write("[database]\npath = 'partial.db'\n")
             f.flush()
 
             try:
                 from semantic_core.config import SemanticConfig
-                with patch("semantic_core.config.find_config_file", return_value=Path(f.name)):
+
+                with patch(
+                    "semantic_core.config.find_config_file", return_value=Path(f.name)
+                ):
                     config = SemanticConfig()
                     # database изменён
                     assert config.db_path == Path("partial.db")

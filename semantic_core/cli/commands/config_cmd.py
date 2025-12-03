@@ -112,9 +112,7 @@ def show(
 
     # Gemini
     api_key_display = (
-        config.gemini_api_key
-        if reveal_secrets
-        else _mask_secret(config.gemini_api_key)
+        config.gemini_api_key if reveal_secrets else _mask_secret(config.gemini_api_key)
     )
     batch_key_display = (
         config.gemini_batch_key

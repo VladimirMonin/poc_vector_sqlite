@@ -89,7 +89,9 @@ def doctor(
     if deps_ok:
         env_checks.append(("Dependencies", "ok", "all installed"))
     else:
-        env_checks.append(("Dependencies", "error", f"missing: {', '.join(missing_deps)}"))
+        env_checks.append(
+            ("Dependencies", "error", f"missing: {', '.join(missing_deps)}")
+        )
 
     sections.append(("Environment", env_checks))
     all_checks.extend(env_checks)
@@ -188,7 +190,13 @@ def doctor(
 
         total, used, free = shutil.disk_usage(Path.cwd())
         free_gb = free / (1024**3)
-        storage_checks.append(("Disk space", "ok" if free_gb > 1 else "warning", f"{free_gb:.1f} GB available"))
+        storage_checks.append(
+            (
+                "Disk space",
+                "ok" if free_gb > 1 else "warning",
+                f"{free_gb:.1f} GB available",
+            )
+        )
     except Exception:
         storage_checks.append(("Disk space", "info", "unknown"))
 
@@ -265,7 +273,9 @@ def _output_rich(sections: list, all_checks: list) -> None:
         # Проверяем конкретные проблемы
         for name, status, _ in all_checks:
             if name == "GEMINI_API_KEY" and status == "error":
-                console.print("   • Установите GEMINI_API_KEY: export GEMINI_API_KEY=your_key")
+                console.print(
+                    "   • Установите GEMINI_API_KEY: export GEMINI_API_KEY=your_key"
+                )
             if name == "GEMINI_BATCH_KEY" and status == "warning":
                 console.print(
                     "   • Установите GEMINI_BATCH_KEY для асинхронной обработки (дешевле для больших объёмов)"

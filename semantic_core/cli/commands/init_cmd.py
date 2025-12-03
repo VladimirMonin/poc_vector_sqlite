@@ -51,9 +51,7 @@ def init(
 
     # Проверяем существующий файл
     if config_path.exists() and not force:
-        console.print(
-            f"[yellow]⚠️  Файл {config_path} уже существует.[/yellow]"
-        )
+        console.print(f"[yellow]⚠️  Файл {config_path} уже существует.[/yellow]")
         if non_interactive:
             console.print("Используйте --force для перезаписи.")
             raise typer.Exit(1)

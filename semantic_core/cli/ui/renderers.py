@@ -30,10 +30,12 @@ def render_search_results(
         verbose: Показывать детальную информацию.
     """
     if not results:
-        console.print(Panel(
-            "[yellow]Ничего не найдено[/yellow]",
-            title=f"🔍 Поиск: {query}",
-        ))
+        console.print(
+            Panel(
+                "[yellow]Ничего не найдено[/yellow]",
+                title=f"🔍 Поиск: {query}",
+            )
+        )
         return
 
     # Заголовок
@@ -44,10 +46,12 @@ def render_search_results(
     }
     icon = type_icons.get(search_type, "🔍")
 
-    console.print(Panel(
-        f"[cyan]Найдено результатов: {len(results)}[/cyan]",
-        title=f"{icon} Поиск: [bold]{query}[/bold]",
-    ))
+    console.print(
+        Panel(
+            f"[cyan]Найдено результатов: {len(results)}[/cyan]",
+            title=f"{icon} Поиск: [bold]{query}[/bold]",
+        )
+    )
 
     # Таблица
     table = Table(show_header=True, header_style="bold magenta")
@@ -80,16 +84,20 @@ def render_ingest_summary(
     total = success + failed
 
     if failed == 0:
-        console.print(Panel(
-            f"[green]✓ Успешно проиндексировано: {success} из {total}[/green]",
-            title="📚 Индексация завершена",
-        ))
+        console.print(
+            Panel(
+                f"[green]✓ Успешно проиндексировано: {success} из {total}[/green]",
+                title="📚 Индексация завершена",
+            )
+        )
     else:
-        console.print(Panel(
-            f"[yellow]Проиндексировано: {success} из {total}\n"
-            f"[red]Ошибок: {failed}[/red][/yellow]",
-            title="⚠️  Индексация с ошибками",
-        ))
+        console.print(
+            Panel(
+                f"[yellow]Проиндексировано: {success} из {total}\n"
+                f"[red]Ошибок: {failed}[/red][/yellow]",
+                title="⚠️  Индексация с ошибками",
+            )
+        )
 
         if errors:
             console.print("\n[red bold]Ошибки:[/red bold]")
@@ -106,10 +114,12 @@ def render_error(message: str, title: str = "Ошибка") -> None:
         message: Текст ошибки.
         title: Заголовок панели.
     """
-    console.print(Panel(
-        f"[red]{message}[/red]",
-        title=f"❌ {title}",
-    ))
+    console.print(
+        Panel(
+            f"[red]{message}[/red]",
+            title=f"❌ {title}",
+        )
+    )
 
 
 def render_success(message: str, title: str = "Успех") -> None:
@@ -119,10 +129,12 @@ def render_success(message: str, title: str = "Успех") -> None:
         message: Текст сообщения.
         title: Заголовок панели.
     """
-    console.print(Panel(
-        f"[green]{message}[/green]",
-        title=f"✓ {title}",
-    ))
+    console.print(
+        Panel(
+            f"[green]{message}[/green]",
+            title=f"✓ {title}",
+        )
+    )
 
 
 def render_warning(message: str, title: str = "Предупреждение") -> None:
@@ -132,10 +144,12 @@ def render_warning(message: str, title: str = "Предупреждение") ->
         message: Текст предупреждения.
         title: Заголовок панели.
     """
-    console.print(Panel(
-        f"[yellow]{message}[/yellow]",
-        title=f"⚠️  {title}",
-    ))
+    console.print(
+        Panel(
+            f"[yellow]{message}[/yellow]",
+            title=f"⚠️  {title}",
+        )
+    )
 
 
 def _format_score(score: float) -> Text:
@@ -151,7 +165,7 @@ def _format_score(score: float) -> Text:
 def _format_source(source: str, max_length: int = 28) -> str:
     """Форматирует путь к источнику с обрезкой."""
     if len(source) > max_length:
-        return "..." + source[-(max_length - 3):]
+        return "..." + source[-(max_length - 3) :]
     return source
 
 

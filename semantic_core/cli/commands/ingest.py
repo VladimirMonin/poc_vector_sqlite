@@ -164,7 +164,7 @@ def ingest(
     """
     # Late import to avoid circular dependency
     from semantic_core.cli.app import get_cli_context
-    
+
     cli_ctx = get_cli_context()
 
     # Валидация режима
@@ -206,10 +206,12 @@ def ingest(
 
 def _show_dry_run(files: list[Path]) -> None:
     """Показывает файлы без индексации (dry-run)."""
-    console.print(Panel(
-        f"[cyan]Найдено файлов: {len(files)}[/cyan]",
-        title="🔍 Dry Run",
-    ))
+    console.print(
+        Panel(
+            f"[cyan]Найдено файлов: {len(files)}[/cyan]",
+            title="🔍 Dry Run",
+        )
+    )
 
     for f in files:
         media_type = _detect_media_type(f)
@@ -291,18 +293,22 @@ def _ingest_json(
             doc = _create_document(file_path)
             core.ingest(doc, mode=mode, enrich_media=enrich_media)
             results["success"] += 1
-            results["files"].append({
-                "path": str(file_path),
-                "status": "ok",
-                "media_type": _detect_media_type(file_path).value,
-            })
+            results["files"].append(
+                {
+                    "path": str(file_path),
+                    "status": "ok",
+                    "media_type": _detect_media_type(file_path).value,
+                }
+            )
         except Exception as e:
             results["failed"] += 1
-            results["files"].append({
-                "path": str(file_path),
-                "status": "error",
-                "error": str(e),
-            })
+            results["files"].append(
+                {
+                    "path": str(file_path),
+                    "status": "error",
+                    "error": str(e),
+                }
+            )
             results["errors"].append({"file": str(file_path), "error": str(e)})
 
     console.print_json(json.dumps(results, ensure_ascii=False))
@@ -315,16 +321,20 @@ def _show_summary(results: dict) -> None:
     total = success + failed
 
     if failed == 0:
-        console.print(Panel(
-            f"[green]✓ Успешно проиндексировано: {success} из {total}[/green]",
-            title="📚 Индексация завершена",
-        ))
+        console.print(
+            Panel(
+                f"[green]✓ Успешно проиндексировано: {success} из {total}[/green]",
+                title="📚 Индексация завершена",
+            )
+        )
     else:
-        console.print(Panel(
-            f"[yellow]Проиндексировано: {success} из {total}\n"
-            f"[red]Ошибок: {failed}[/red][/yellow]",
-            title="⚠️  Индексация с ошибками",
-        ))
+        console.print(
+            Panel(
+                f"[yellow]Проиндексировано: {success} из {total}\n"
+                f"[red]Ошибок: {failed}[/red][/yellow]",
+                title="⚠️  Индексация с ошибками",
+            )
+        )
 
         if results["errors"]:
             console.print("\n[red bold]Ошибки:[/red bold]")
