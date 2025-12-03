@@ -151,6 +151,25 @@
 
 ---
 
+### 📊 Observability Layer (Фаза 7)
+
+35. [**Semantic Logging Architecture**](35_semantic_logging.md)  
+    Dual-mode logging: Console (INFO+) для разработчика, File (TRACE) для AI-агентов
+
+36. [**Visual Semantics in Logs**](36_visual_semantics_logs.md)  
+    EMOJI_MAP: мгновенная идентификация модуля и уровня через эмодзи
+
+37. [**Context Propagation with bind()**](37_context_propagation.md)  
+    Проброс batch_id, doc_id через весь pipeline без thread-local storage
+
+38. [**Secret Redaction in Logs**](38_secret_redaction.md)  
+    SensitiveDataFilter: автоматическое маскирование API-ключей
+
+39. [**Diagnostics & Debugging**](39_diagnostics_debugging.md)  
+    dump_debug_info(), check_config(), trace_ai() и error_with_context()
+
+---
+
 ## 🚀 Быстрый старт
 
 ```bash

@@ -12,6 +12,9 @@ from markdown_it.token import Token
 
 from semantic_core.domain import ChunkType
 from semantic_core.interfaces.parser import ParsingSegment
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 # Расширения медиа-файлов (case-insensitive)
@@ -202,10 +205,31 @@ class MarkdownNodeParser:
         Yields:
             ParsingSegment: Структурированные сегменты документа.
         """
+        # Создаём логгер с контекстом документа
+        content_hash = hash(content) & 0xFFFFFF  # 6 hex digits
+        log = logger.bind(doc_id=f"doc-{content_hash:06x}")
+
+        content_len = len(content)
+        has_frontmatter = content.strip().startswith("---")
+        log.debug(
+            f"Начало парсинга: {content_len} символов, frontmatter={has_frontmatter}"
+        )
+
         tokens = self.md.parse(content)
+        log.trace(f"markdown-it выдал {len(tokens)} токенов верхнего уровня")
 
         # Стек заголовков для отслеживания иерархии
         headers_stack: list[tuple[int, str]] = []  # [(level, text), ...]
+
+        # Счётчики для статистики
+        stats = {
+            "headers": 0,
+            "paragraphs": 0,
+            "code_blocks": 0,
+            "media": 0,
+            "lists": 0,
+            "quotes": 0,
+        }
 
         i = 0
         while i < len(tokens):
@@ -224,6 +248,11 @@ class MarkdownNodeParser:
                     (lvl, txt) for lvl, txt in headers_stack if lvl < level
                 ]
                 headers_stack.append((level, header_text))
+                stats["headers"] += 1
+
+                log.trace(
+                    f"Заголовок h{level}: '{header_text[:50]}{'...' if len(header_text) > 50 else ''}'"
+                )
 
                 # Пропускаем heading_open, inline, heading_close
                 i += 3
@@ -237,6 +266,12 @@ class MarkdownNodeParser:
                 # Извлекаем номера строк из карты токена
                 start_line = token.map[0] + 1 if token.map else None
                 end_line = token.map[1] if token.map else None
+
+                stats["code_blocks"] += 1
+                log.trace(
+                    f"Блок кода: lang={language or 'none'}, "
+                    f"{len(code_content)} символов, строки {start_line}-{end_line}"
+                )
 
                 yield ParsingSegment(
                     content=code_content,
@@ -271,9 +306,15 @@ class MarkdownNodeParser:
 
                     # Если есть только медиа (без текста), отдаём их как отдельные сегменты
                     if media_segments and not has_text:
+                        stats["media"] += len(media_segments)
+                        for seg in media_segments:
+                            log.trace(
+                                f"Медиа-элемент: type={seg.segment_type.name}, path={seg.content[:60]}"
+                            )
                         yield from media_segments
                     else:
                         # Обычный текстовый параграф
+                        stats["paragraphs"] += 1
                         text_content = inline_token.content
                         yield ParsingSegment(
                             content=text_content,
@@ -309,6 +350,7 @@ class MarkdownNodeParser:
                 )
 
                 if list_text.strip():
+                    stats["lists"] += 1
                     yield ParsingSegment(
                         content=list_text,
                         segment_type=ChunkType.TEXT,
@@ -344,6 +386,7 @@ class MarkdownNodeParser:
                 )
 
                 if quote_text.strip():
+                    stats["quotes"] += 1
                     yield ParsingSegment(
                         content=quote_text,
                         segment_type=ChunkType.TEXT,
@@ -359,3 +402,10 @@ class MarkdownNodeParser:
                 continue
 
             i += 1
+
+        # Итоговая статистика
+        log.info(
+            f"Парсинг завершён: headers={stats['headers']}, paragraphs={stats['paragraphs']}, "
+            f"code_blocks={stats['code_blocks']}, media={stats['media']}, "
+            f"lists={stats['lists']}, quotes={stats['quotes']}"
+        )

@@ -30,6 +30,12 @@ from peewee import (
     CharField,
 )
 
+from semantic_core.utils.logger import get_logger
+
+# Логгер для моделей — используется минимально,
+# т.к. модели статичны (без бизнес-логики)
+logger = get_logger(__name__)
+
 
 class BatchStatus(str, Enum):
     """Статусы батч-задания в жизненном цикле обработки.

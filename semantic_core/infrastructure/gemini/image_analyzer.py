@@ -6,12 +6,16 @@
 """
 
 import json
+import time
 from typing import Optional
 
 from pydantic import BaseModel
 
 from semantic_core.domain.media import MediaRequest, MediaAnalysisResult
 from semantic_core.infrastructure.gemini.resilience import retry_with_backoff
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 # Схема структурированного ответа для Gemini
@@ -62,7 +66,7 @@ class GeminiImageAnalyzer:
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-2.5-flash-lite",
     ):
         """Инициализация анализатора.
 
@@ -73,6 +77,10 @@ class GeminiImageAnalyzer:
         self.api_key = api_key
         self.model = model
         self._client = None
+        logger.debug(
+            "Image analyzer initialized",
+            model=model,
+        )
 
     @property
     def client(self):
@@ -81,6 +89,7 @@ class GeminiImageAnalyzer:
             from google import genai
 
             self._client = genai.Client(api_key=self.api_key)
+            logger.debug("Gemini client created")
         return self._client
 
     @retry_with_backoff(max_retries=5, base_delay=1.0, max_delay=60.0)
@@ -100,8 +109,26 @@ class GeminiImageAnalyzer:
         from google.genai import types
         from PIL import Image
 
+        start_time = time.perf_counter()
+        image_path = str(request.resource.path)
+
+        logger.debug(
+            "Analyzing image",
+            path=image_path,
+            has_context=bool(request.context_text),
+            has_prompt=bool(request.user_prompt),
+        )
+
         # 1. Загружаем изображение
         image = Image.open(request.resource.path)
+        width, height = image.size
+
+        logger.trace(
+            "Image loaded",
+            width=width,
+            height=height,
+            mode=image.mode,
+        )
 
         # 2. Собираем промпт
         prompt_parts = []
@@ -150,14 +177,43 @@ class GeminiImageAnalyzer:
 
         # 5. Парсим результат
         if not response.text:
+            logger.error("Gemini returned empty response", path=image_path)
             raise ValueError("Gemini returned empty response")
 
-        data = json.loads(response.text)
+        # Логируем AI вызов
+        logger.trace_ai(
+            operation="image_analysis",
+            model=self.model,
+            prompt_preview=prompt[:100] + "..." if len(prompt) > 100 else prompt,
+            response_preview=response.text[:200] + "..."
+            if len(response.text) > 200
+            else response.text,
+        )
+
+        try:
+            data = json.loads(response.text)
+        except json.JSONDecodeError as e:
+            logger.error(
+                "Failed to parse Gemini response as JSON",
+                path=image_path,
+                error=str(e),
+                response_preview=response.text[:500],
+            )
+            raise ValueError(f"Invalid JSON in Gemini response: {e}")
 
         # Извлекаем usage_metadata (это Pydantic модель, не словарь)
         tokens_used = None
         if hasattr(response, "usage_metadata") and response.usage_metadata:
             tokens_used = getattr(response.usage_metadata, "total_token_count", None)
+
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "Image analyzed",
+            latency_ms=round(latency_ms, 2),
+            tokens_used=tokens_used,
+            keywords_count=len(data.get("keywords", [])),
+            has_ocr=bool(data.get("ocr_text")),
+        )
 
         return MediaAnalysisResult(
             description=data["description"],

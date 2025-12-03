@@ -8,6 +8,10 @@
 import threading
 import time
 
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class RateLimiter:
     """Token Bucket Rate Limiter.
@@ -36,6 +40,11 @@ class RateLimiter:
         self.rpm_limit = rpm_limit
         self._lock = threading.Lock()
         self._last_request: float = 0.0
+        logger.debug(
+            "Rate limiter initialized",
+            rpm_limit=rpm_limit,
+            min_delay_ms=round(self.min_delay * 1000, 1),
+        )
 
     @property
     def min_delay(self) -> float:
@@ -55,12 +64,22 @@ class RateLimiter:
             wait_time = 0.0
             if elapsed < self.min_delay and self._last_request > 0:
                 wait_time = self.min_delay - elapsed
+                logger.debug(
+                    "Rate limit throttle",
+                    wait_ms=round(wait_time * 1000, 1),
+                    min_delay_ms=round(self.min_delay * 1000, 1),
+                )
                 time.sleep(wait_time)
 
             self._last_request = time.time()
+            logger.trace(
+                "Request allowed",
+                wait_ms=round(wait_time * 1000, 1),
+            )
             return wait_time
 
     def reset(self) -> None:
         """Сбрасывает таймер (для тестов)."""
         with self._lock:
             self._last_request = 0.0
+            logger.debug("Rate limiter reset")

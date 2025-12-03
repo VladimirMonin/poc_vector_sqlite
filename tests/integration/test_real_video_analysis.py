@@ -349,13 +349,13 @@ class TestVideoAnalyzerPerformance:
 class TestVideoAnalyzerUnit:
     """Unit-тесты GeminiVideoAnalyzer без реальных API вызовов."""
 
-    def test_default_model_is_pro(self):
-        """По умолчанию используется pro модель для видео."""
+    def test_default_model_is_flash_lite(self):
+        """По умолчанию используется flash-lite модель для видео."""
         from semantic_core.infrastructure.gemini.video_analyzer import (
             GeminiVideoAnalyzer,
         )
 
-        assert GeminiVideoAnalyzer.DEFAULT_MODEL == "gemini-2.5-pro"
+        assert GeminiVideoAnalyzer.DEFAULT_MODEL == "gemini-2.5-flash-lite"
 
     def test_custom_model_accepted(self):
         """Можно передать кастомную модель."""
@@ -365,10 +365,10 @@ class TestVideoAnalyzerUnit:
 
         analyzer = GeminiVideoAnalyzer(
             api_key="test-key",
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash-lite",
         )
 
-        assert analyzer.model == "gemini-2.5-flash"
+        assert analyzer.model == "gemini-2.5-flash-lite"
 
     def test_client_lazy_initialization(self):
         """Клиент инициализируется lazy при первом обращении."""

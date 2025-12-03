@@ -10,6 +10,10 @@
 from io import BytesIO
 from typing import TYPE_CHECKING
 
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     from PIL import Image
     from semantic_core.domain.config import MediaConfig
@@ -29,6 +33,12 @@ def resize_image(image: "Image.Image", max_dimension: int) -> "Image.Image":
 
     # Не нужен ресайз
     if max(width, height) <= max_dimension:
+        logger.trace(
+            "No resize needed",
+            width=width,
+            height=height,
+            max_dimension=max_dimension,
+        )
         return image
 
     # Вычисляем новые размеры с сохранением пропорций
@@ -42,7 +52,15 @@ def resize_image(image: "Image.Image", max_dimension: int) -> "Image.Image":
     # LANCZOS — лучшее качество для downscaling
     from PIL import Image as PILImage
 
-    return image.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+    resized = image.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+    
+    logger.debug(
+        "Image resized",
+        original=f"{width}x{height}",
+        resized=f"{new_width}x{new_height}",
+    )
+    
+    return resized
 
 
 def optimize_for_api(
@@ -66,7 +84,16 @@ def optimize_for_api(
     """
     from PIL import Image as PILImage
 
+    logger.debug(
+        "Optimizing image for API",
+        path=path,
+        max_dimension=max_dimension,
+        format=image_format,
+        quality=quality,
+    )
+
     image = PILImage.open(path)
+    original_size = image.size
 
     # Конвертируем RGBA в RGB для JPEG
     if image.mode == "RGBA" and image_format.lower() == "jpeg":
@@ -89,4 +116,14 @@ def optimize_for_api(
         image.save(buffer, format="JPEG", quality=quality)
         mime_type = "image/jpeg"
 
-    return buffer.getvalue(), mime_type
+    result_bytes = buffer.getvalue()
+    
+    logger.debug(
+        "Image optimized",
+        original_size=f"{original_size[0]}x{original_size[1]}",
+        result_size=f"{image.size[0]}x{image.size[1]}",
+        result_bytes=len(result_bytes),
+        mime_type=mime_type,
+    )
+
+    return result_bytes, mime_type

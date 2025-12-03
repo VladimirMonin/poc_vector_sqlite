@@ -10,6 +10,9 @@ from typing import Optional
 from semantic_core.domain import Chunk, ChunkType, Document, MEDIA_CHUNK_TYPES
 from semantic_core.interfaces.parser import DocumentParser, ParsingSegment
 from semantic_core.interfaces.splitter import BaseSplitter
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class SmartSplitter(BaseSplitter):
@@ -63,11 +66,24 @@ class SmartSplitter(BaseSplitter):
         Raises:
             ValueError: Если document пустой.
         """
+        # Получаем идентификатор для логов: из metadata или id документа
+        doc_id = document.metadata.get("doc_id") or (
+            str(document.id)[:8] if document.id else "unknown"
+        )
+        log = logger.bind(doc_id=doc_id)
+
         if not document.content or not document.content.strip():
+            log.error("Попытка разбить пустой документ")
             raise ValueError("Document content is empty")
+
+        log.debug(
+            f"Начало разбиения: chunk_size={self.chunk_size}, "
+            f"code_chunk_size={self.code_chunk_size}, preserve_code={self.preserve_code}"
+        )
 
         # Парсим документ на сегменты
         segments = list(self.parser.parse(document.content))
+        log.debug(f"Получено {len(segments)} сегментов от парсера")
 
         # Преобразуем сегменты в чанки
         chunks: list[Chunk] = []
@@ -76,7 +92,10 @@ class SmartSplitter(BaseSplitter):
         # Буфер для накопления текстовых сегментов
         text_buffer: list[ParsingSegment] = []
 
-        for segment in segments:
+        # Счётчики для статистики
+        stats = {"text": 0, "code": 0, "media": 0}
+
+        for seg_idx, segment in enumerate(segments):
             # Обработка блоков кода - всегда изолированно
             if segment.segment_type == ChunkType.CODE and self.preserve_code:
                 # Сначала сбрасываем накопленный текст
@@ -84,12 +103,21 @@ class SmartSplitter(BaseSplitter):
                     text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
                     chunks.extend(text_chunks)
                     chunk_index += len(text_chunks)
+                    stats["text"] += len(text_chunks)
                     text_buffer.clear()
 
                 # Создаем чанк(и) для кода
+                code_size = len(segment.content)
+                will_split = code_size > self.code_chunk_size
+                log.trace(
+                    f"Сегмент[{seg_idx}] CODE: {code_size} символов, "
+                    f"lang={segment.language or 'none'}, split={will_split}"
+                )
+
                 code_chunks = self._create_code_chunks(segment, chunk_index)
                 chunks.extend(code_chunks)
                 chunk_index += len(code_chunks)
+                stats["code"] += len(code_chunks)
 
             # Обработка изображений/медиа - всегда отдельный чанк
             elif segment.segment_type in MEDIA_CHUNK_TYPES:
@@ -98,7 +126,12 @@ class SmartSplitter(BaseSplitter):
                     text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
                     chunks.extend(text_chunks)
                     chunk_index += len(text_chunks)
+                    stats["text"] += len(text_chunks)
                     text_buffer.clear()
+
+                log.trace(
+                    f"Сегмент[{seg_idx}] {segment.segment_type.name}: {segment.content[:60]}"
+                )
 
                 # Создаём отдельный чанк для медиа-ссылки
                 chunks.append(
@@ -120,6 +153,7 @@ class SmartSplitter(BaseSplitter):
                     )
                 )
                 chunk_index += 1
+                stats["media"] += 1
 
             # Обработка текста
             elif segment.segment_type == ChunkType.TEXT:
@@ -128,9 +162,13 @@ class SmartSplitter(BaseSplitter):
                 # Проверяем, не переполнен ли буфер
                 buffer_size = sum(len(s.content) for s in text_buffer)
                 if buffer_size >= self.chunk_size:
+                    log.trace(
+                        f"Буфер текста переполнен: {buffer_size} >= {self.chunk_size}, сброс"
+                    )
                     text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
                     chunks.extend(text_chunks)
                     chunk_index += len(text_chunks)
+                    stats["text"] += len(text_chunks)
                     text_buffer.clear()
 
             else:
@@ -139,8 +177,15 @@ class SmartSplitter(BaseSplitter):
 
         # Сбрасываем оставшийся текст
         if text_buffer:
+            log.trace(f"Сброс оставшегося буфера: {len(text_buffer)} сегментов")
             text_chunks = self._flush_text_buffer(text_buffer, chunk_index)
             chunks.extend(text_chunks)
+            stats["text"] += len(text_chunks)
+
+        log.info(
+            f"Разбиение завершено: {len(segments)} сегментов → {len(chunks)} чанков "
+            f"(text={stats['text']}, code={stats['code']}, media={stats['media']})"
+        )
 
         return chunks
 
@@ -158,6 +203,11 @@ class SmartSplitter(BaseSplitter):
         """
         if not buffer:
             return []
+
+        total_size = sum(len(s.content) for s in buffer)
+        logger.trace(
+            f"Группировка {len(buffer)} текстовых сегментов ({total_size} символов)"
+        )
 
         chunks: list[Chunk] = []
         current_chunk_parts: list[str] = []
@@ -213,6 +263,7 @@ class SmartSplitter(BaseSplitter):
                 )
             )
 
+        logger.trace(f"Сгруппировано в {len(chunks)} текстовых чанков")
         return chunks
 
     def _create_code_chunks(
@@ -231,9 +282,11 @@ class SmartSplitter(BaseSplitter):
             Список чанков кода.
         """
         code_content = segment.content
+        code_size = len(code_content)
 
         # Если код влезает в лимит - создаем один чанк
-        if len(code_content) <= self.code_chunk_size:
+        if code_size <= self.code_chunk_size:
+            logger.trace(f"Код ({code_size} символов) влезает в лимит, создаём 1 чанк")
             return [
                 Chunk(
                     content=code_content,
@@ -249,6 +302,9 @@ class SmartSplitter(BaseSplitter):
             ]
 
         # Иначе режем построчно
+        logger.trace(
+            f"Код ({code_size} символов) > {self.code_chunk_size}, режем построчно"
+        )
         chunks: list[Chunk] = []
         lines = code_content.splitlines(keepends=True)
         current_chunk_lines: list[str] = []
@@ -296,4 +352,5 @@ class SmartSplitter(BaseSplitter):
                 )
             )
 
+        logger.trace(f"Большой блок кода разбит на {len(chunks)} чанков")
         return chunks

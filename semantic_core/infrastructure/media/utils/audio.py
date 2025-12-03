@@ -18,6 +18,10 @@ from typing import Optional
 
 from pydub import AudioSegment
 
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 # Поддерживаемые MIME-типы аудио
 SUPPORTED_AUDIO_TYPES = [
     "audio/mpeg",
@@ -49,6 +53,7 @@ def ensure_ffmpeg() -> None:
         DependencyError: Если ffmpeg не найден в PATH.
     """
     if shutil.which("ffmpeg") is None:
+        logger.error("ffmpeg not found in PATH")
         raise DependencyError(
             "System ffmpeg is required for audio/video processing.\n"
             "Install: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)"
@@ -89,9 +94,20 @@ def extract_audio_from_video(
 
     video_path = Path(video_path)
     if not video_path.exists():
+        logger.error("Video file not found", path=str(video_path))
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
+    logger.debug(
+        "Extracting audio from video",
+        video_path=str(video_path),
+        format=format,
+        bitrate=bitrate,
+        sample_rate=sample_rate,
+        mono=mono,
+    )
+
     audio = AudioSegment.from_file(str(video_path))
+    original_duration_sec = len(audio) / 1000
 
     if mono:
         audio = audio.set_channels(1)
@@ -109,6 +125,15 @@ def extract_audio_from_video(
         format=format,
         codec=codec,
         bitrate=f"{bitrate}k",
+    )
+
+    logger.info(
+        "Audio extracted from video",
+        video_path=str(video_path),
+        output_path=str(output_path),
+        duration_sec=original_duration_sec,
+        format=format,
+        bitrate=bitrate,
     )
 
     return output_path
@@ -144,9 +169,20 @@ def optimize_audio(
 
     audio_path = Path(audio_path)
     if not audio_path.exists():
+        logger.error("Audio file not found", path=str(audio_path))
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
+    logger.debug(
+        "Optimizing audio",
+        audio_path=str(audio_path),
+        format=format,
+        bitrate=bitrate,
+        sample_rate=sample_rate,
+        mono=mono,
+    )
+
     audio = AudioSegment.from_file(str(audio_path))
+    original_duration_sec = len(audio) / 1000
 
     if mono:
         audio = audio.set_channels(1)
@@ -164,6 +200,15 @@ def optimize_audio(
         format=format,
         codec=codec,
         bitrate=f"{bitrate}k",
+    )
+
+    logger.info(
+        "Audio optimized",
+        audio_path=str(audio_path),
+        output_path=str(output_path),
+        duration_sec=original_duration_sec,
+        format=format,
+        bitrate=bitrate,
     )
 
     return output_path
@@ -193,7 +238,15 @@ def optimize_audio_to_bytes(
     ensure_ffmpeg()
 
     audio_path = Path(audio_path)
+    logger.debug(
+        "Optimizing audio to bytes",
+        audio_path=str(audio_path),
+        format=format,
+        bitrate=bitrate,
+    )
+
     audio = AudioSegment.from_file(str(audio_path))
+    duration_sec = len(audio) / 1000
 
     if mono:
         audio = audio.set_channels(1)
@@ -209,7 +262,17 @@ def optimize_audio_to_bytes(
     )
 
     mime_type = f"audio/{format}"
-    return buffer.getvalue(), mime_type
+    audio_bytes = buffer.getvalue()
+
+    logger.info(
+        "Audio optimized to bytes",
+        audio_path=str(audio_path),
+        duration_sec=duration_sec,
+        size_bytes=len(audio_bytes),
+        mime_type=mime_type,
+    )
+
+    return audio_bytes, mime_type
 
 
 def get_audio_duration(path: str | Path) -> float:
@@ -222,7 +285,9 @@ def get_audio_duration(path: str | Path) -> float:
         Длительность в секундах.
     """
     audio = AudioSegment.from_file(str(path))
-    return len(audio) / 1000.0
+    duration = len(audio) / 1000.0
+    logger.trace("Got audio duration", path=str(path), duration_sec=duration)
+    return duration
 
 
 def is_audio_supported(mime_type: str) -> bool:

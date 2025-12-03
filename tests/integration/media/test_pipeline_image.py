@@ -216,7 +216,7 @@ class TestSemanticCoreMediaConfig:
 
         config = MediaConfig(
             rpm_limit=30,
-            image_model="gemini-2.5-pro",
+            image_model="gemini-2.5-flash-lite",
             max_image_dimension=1280,
         )
 
@@ -230,4 +230,4 @@ class TestSemanticCoreMediaConfig:
         )
 
         assert core.media_config.rpm_limit == 30
-        assert core.media_config.image_model == "gemini-2.5-pro"
+        assert core.media_config.image_model == "gemini-2.5-flash-lite"

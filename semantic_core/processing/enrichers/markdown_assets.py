@@ -9,6 +9,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from semantic_core.domain import Chunk, ChunkType, MEDIA_CHUNK_TYPES
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -121,9 +124,18 @@ class MarkdownAssetEnricher:
         Returns:
             MediaContext с извлечённым контекстом.
         """
+        log = logger.bind(chunk_id=f"chunk-{media_chunk.chunk_index}")
+        log.debug(
+            f"Извлечение контекста для {media_chunk.chunk_type.name}: "
+            f"{media_chunk.content[:50]}{'...' if len(media_chunk.content) > 50 else ''}"
+        )
+
         # 1. Формируем breadcrumbs из headers
         headers = media_chunk.metadata.get("headers", [])
         breadcrumbs = " > ".join(headers) if headers else ""
+
+        if breadcrumbs:
+            log.trace(f"Breadcrumbs: {breadcrumbs}")
 
         # 2. Находим позицию чанка
         chunk_index = media_chunk.chunk_index
@@ -151,6 +163,12 @@ class MarkdownAssetEnricher:
 
         surrounding_text = "\n".join(surrounding_parts)
 
+        if before_text or after_text:
+            log.trace(
+                f"Найден окружающий текст: before={len(before_text)} chars, "
+                f"after={len(after_text)} chars"
+            )
+
         # 6. Извлекаем alt и title
         alt_text = media_chunk.metadata.get("alt", "")
         title = media_chunk.metadata.get("title", "")
@@ -159,7 +177,7 @@ class MarkdownAssetEnricher:
         media_type = self._get_media_type_name(media_chunk.chunk_type)
         role = self._get_default_role(media_chunk.chunk_type)
 
-        return MediaContext(
+        context = MediaContext(
             breadcrumbs=breadcrumbs,
             surrounding_text=surrounding_text,
             alt_text=alt_text,
@@ -167,6 +185,15 @@ class MarkdownAssetEnricher:
             media_type=media_type,
             role=role,
         )
+
+        log.info(
+            f"Контекст извлечён: type={media_type}, "
+            f"has_breadcrumbs={bool(breadcrumbs)}, "
+            f"has_surrounding={bool(surrounding_text)}, "
+            f"has_alt={bool(alt_text)}"
+        )
+
+        return context
 
     def _get_media_type_name(self, chunk_type: ChunkType) -> str:
         """Возвращает название типа медиа."""
@@ -223,6 +250,11 @@ class MarkdownAssetEnricher:
             if not text:
                 continue
 
+            logger.trace(
+                f"Найден соседний TEXT чанк [{direction}]: "
+                f"chunk_index={chunk.chunk_index}, {len(text)} chars"
+            )
+
             # Обрезаем до нужного размера
             if direction == "before":
                 # Берём последние N символов
@@ -231,4 +263,5 @@ class MarkdownAssetEnricher:
                 # Берём первые N символов
                 return text[: self.context_window]
 
+        logger.trace(f"Соседний TEXT чанк [{direction}] не найден")
         return ""
