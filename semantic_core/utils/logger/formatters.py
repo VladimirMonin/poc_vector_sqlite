@@ -85,6 +85,10 @@ EMOJI_MAP: dict[str, str] = {
     "diagnostic": "🩺",
     "diagnostics": "🩺",
     "config": "⚙️",
+    # CLI (Phase 8.1)
+    "cli": "🖥️",
+    "worker": "👷",
+    "commands": "🖥️",
 }
 
 # Эмодзи для уровней логирования

@@ -118,5 +118,11 @@ app.add_typer(ingest_cmd, name="ingest")
 app.add_typer(search_cmd, name="search")
 app.add_typer(docs_cmd, name="docs")
 
+# Phase 8.1: Operations commands
+from semantic_core.cli.commands import queue_cmd, worker_cmd
+
+app.add_typer(queue_cmd, name="queue")
+app.add_typer(worker_cmd, name="worker")
+
 
 __all__ = ["app", "get_cli_context"]

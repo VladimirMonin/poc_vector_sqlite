@@ -7,6 +7,8 @@
     ingest_cmd: semantic ingest — индексация документов.
     search_cmd: semantic search — семантический поиск.
     docs_cmd: semantic docs — встроенная документация.
+    queue_cmd: semantic queue — управление очередями.
+    worker_cmd: semantic worker — воркеры обработки.
 """
 
 from semantic_core.cli.commands import init_cmd
@@ -15,6 +17,8 @@ from semantic_core.cli.commands import doctor_cmd
 from semantic_core.cli.commands.ingest import ingest_cmd
 from semantic_core.cli.commands.search import search_cmd
 from semantic_core.cli.commands.docs import docs_cmd
+from semantic_core.cli.commands.queue import queue_cmd
+from semantic_core.cli.commands.worker import worker_cmd
 
 __all__ = [
     "init_cmd",
@@ -23,4 +27,6 @@ __all__ = [
     "ingest_cmd",
     "search_cmd",
     "docs_cmd",
+    "queue_cmd",
+    "worker_cmd",
 ]
