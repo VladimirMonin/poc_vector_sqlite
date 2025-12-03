@@ -13,7 +13,6 @@ import struct
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
-from uuid import uuid4
 
 from semantic_core.utils.logger import get_logger
 
@@ -76,7 +75,7 @@ class GeminiBatchClient:
     def __init__(
         self,
         api_key: str,
-        model_name: str = "models/text-embedding-004",
+        model_name: str = "models/gemini-embedding-001",
         dimension: int = 768,
     ):
         """Инициализация клиента.
@@ -116,6 +115,9 @@ class GeminiBatchClient:
     ) -> str:
         """Создаёт батч-задание для генерации эмбеддингов.
 
+        Использует специализированный метод batches.create_embeddings()
+        который принимает список текстов напрямую (inlined_requests).
+
         Args:
             chunks: Список чанков для векторизации.
             context_texts: Словарь {chunk_id -> текст с контекстом}.
@@ -137,42 +139,42 @@ class GeminiBatchClient:
             raise ValueError("Список чанков не может быть пустым")
 
         logger.info(
-            "Creating batch job",
+            "Creating batch embedding job",
             chunk_count=len(chunks),
             model=self.model_name,
         )
 
-        # 1. Формируем JSONL файл
-        jsonl_path = self._create_jsonl_file(chunks, context_texts)
-        logger.debug("JSONL file created", path=jsonl_path)
-
         try:
-            # 2. Загружаем файл в Google Cloud
-            batch_id = uuid4().hex[:8]
-            uploaded_file = self._client.files.upload(
-                file=jsonl_path,
-                config=genai_types.UploadFileConfig(
-                    display_name=f"batch_embeddings_{batch_id}"
-                ),
-            )
+            # Собираем тексты для эмбеддинга
+            texts = []
+            self._chunk_id_order = []  # Сохраняем порядок для retrieve_results
             
-            logger.debug(
-                "JSONL file uploaded",
-                file_name=uploaded_file.name,
-                display_name=f"batch_embeddings_{batch_id}",
-            )
+            for chunk in chunks:
+                text = (
+                    context_texts.get(chunk.id, chunk.content)
+                    if context_texts
+                    else chunk.content
+                )
+                texts.append(text)
+                self._chunk_id_order.append(str(chunk.id))
 
-            # 3. Создаём батч-задание
-            # Используем display_name загруженного файла для src
-            batch_job = self._client.batches.create(
+            # Создаём батч-задание через специальный метод для embeddings
+            batch_job = self._client.batches.create_embeddings(
                 model=self.model_name,
-                src=f"files/{uploaded_file.name}",
+                src=genai_types.EmbeddingsBatchJobSource(
+                    inlined_requests=genai_types.EmbedContentBatch(
+                        contents=texts,
+                        config=genai_types.EmbedContentConfig(
+                            task_type="RETRIEVAL_DOCUMENT",
+                            output_dimensionality=self.dimension,
+                        ),
+                    ),
+                ),
             )
 
             logger.info(
-                "Batch job created successfully",
+                "Batch embedding job created successfully",
                 job_name=batch_job.name,
-                file_name=uploaded_file.name,
                 chunk_count=len(chunks),
             )
 
@@ -180,16 +182,11 @@ class GeminiBatchClient:
 
         except Exception as e:
             logger.error(
-                "Failed to create batch job",
+                "Failed to create batch embedding job",
                 error_type=type(e).__name__,
                 error_message=str(e)[:200],
             )
             raise RuntimeError(f"Не удалось создать батч-задание: {e}")
-
-        finally:
-            # Удаляем локальный временный JSONL файл
-            Path(jsonl_path).unlink(missing_ok=True)
-            logger.trace("Local JSONL file deleted")
 
     def get_job_status(self, google_job_id: str) -> str:
         """Получить статус батч-задания.
@@ -272,38 +269,45 @@ class GeminiBatchClient:
             results = {}
             failed_count = 0
             
-            # Результаты инлайнятся в job.responses
-            # Каждый response содержит key (наш chunk_id) и результат
-            if hasattr(batch_job, "responses") and batch_job.responses:
-                for response in batch_job.responses:
-                    chunk_id = response.key
+            # Для inlined_requests результаты приходят в dest.inlined_embed_content_responses
+            # Порядок соответствует порядку отправки (self._chunk_id_order)
+            dest = getattr(batch_job, "dest", None)
+            inlined_responses = (
+                getattr(dest, "inlined_embed_content_responses", None)
+                if dest else None
+            )
+            
+            if inlined_responses:
+                chunk_ids = getattr(self, "_chunk_id_order", [])
+                
+                for idx, item in enumerate(inlined_responses):
+                    # Получаем chunk_id по индексу или используем индекс
+                    chunk_id = chunk_ids[idx] if idx < len(chunk_ids) else str(idx)
                     
-                    # Проверяем на ошибку
-                    if hasattr(response, "error") and response.error:
-                        logger.warning(
-                            "Chunk embedding failed in batch",
-                            chunk_id=chunk_id,
-                            error=str(response.error)[:100],
-                        )
-                        failed_count += 1
-                        continue
-                    
-                    # Извлекаем embedding из response
-                    # Структура: response.response.embeddings[0].values
                     try:
-                        embedding_values = self._extract_embedding_values(response)
-                        if embedding_values:
-                            # Конвертируем в bytes через struct.pack
+                        # Структура: InlinedEmbedContentResponse -> response -> embedding -> values
+                        response = getattr(item, "response", None)
+                        if not response:
+                            logger.warning("No response in item", chunk_id=chunk_id)
+                            failed_count += 1
+                            continue
+                            
+                        embedding = getattr(response, "embedding", None)
+                        if not embedding:
+                            logger.warning("No embedding in response", chunk_id=chunk_id)
+                            failed_count += 1
+                            continue
+                            
+                        values = getattr(embedding, "values", None)
+                        if values is not None:
+                            values_list = list(values)
                             vector_blob = struct.pack(
-                                f"{len(embedding_values)}f",
-                                *embedding_values
+                                f"{len(values_list)}f",
+                                *values_list
                             )
                             results[chunk_id] = vector_blob
                         else:
-                            logger.warning(
-                                "Empty embedding values",
-                                chunk_id=chunk_id,
-                            )
+                            logger.warning("Empty embedding values", chunk_id=chunk_id)
                             failed_count += 1
                     except Exception as e:
                         logger.warning(
@@ -312,6 +316,11 @@ class GeminiBatchClient:
                             error=str(e)[:100],
                         )
                         failed_count += 1
+            else:
+                logger.warning(
+                    "No inlined_embed_content_responses found in batch job",
+                    job_id=google_job_id,
+                )
             
             logger.info(
                 "Batch results retrieved",
@@ -319,9 +328,6 @@ class GeminiBatchClient:
                 success_count=len(results),
                 failed_count=failed_count,
             )
-            
-            # Cleanup: удаляем входной файл из Google Cloud
-            self._cleanup_source_file(batch_job)
             
             return results
 
@@ -335,40 +341,6 @@ class GeminiBatchClient:
                 error_message=str(e)[:200],
             )
             raise RuntimeError(f"Ошибка при скачивании результатов: {e}")
-    
-    def _extract_embedding_values(self, response) -> Optional[List[float]]:
-        """Извлекает значения embedding из ответа batch job.
-        
-        Args:
-            response: Объект ответа из batch_job.responses.
-            
-        Returns:
-            Список float значений вектора или None если не удалось извлечь.
-        """
-        # Пробуем разные структуры ответа
-        # Структура может отличаться в зависимости от версии API
-        
-        # Вариант 1: response.response.embeddings[0].values
-        if hasattr(response, "response"):
-            resp = response.response
-            if hasattr(resp, "embeddings") and resp.embeddings:
-                if hasattr(resp.embeddings[0], "values"):
-                    return list(resp.embeddings[0].values)
-            
-            # Вариант 2: response.response.embedding.values
-            if hasattr(resp, "embedding"):
-                if hasattr(resp.embedding, "values"):
-                    return list(resp.embedding.values)
-        
-        # Вариант 3: Прямой доступ через dict-like интерфейс
-        if hasattr(response, "get"):
-            resp_data = response.get("response", {})
-            if "embeddings" in resp_data and resp_data["embeddings"]:
-                return resp_data["embeddings"][0].get("values")
-            if "embedding" in resp_data:
-                return resp_data["embedding"].get("values")
-        
-        return None
     
     def _cleanup_source_file(self, batch_job) -> None:
         """Удаляет входной файл из Google Cloud.
