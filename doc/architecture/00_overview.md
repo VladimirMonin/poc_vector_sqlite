@@ -200,6 +200,9 @@
 47. [**Chat History Management**](47_chat_history_management.md)  
     Управление историей чата: стратегии LastNMessages, TokenBudget и автотримминг
 
+48. [**Context Compression**](48_context_compression.md)  
+    Сжатие истории через LLM summarization: ContextCompressor и AdaptiveWithCompression
+
 ---
 
 ## 🚀 Быстрый старт
