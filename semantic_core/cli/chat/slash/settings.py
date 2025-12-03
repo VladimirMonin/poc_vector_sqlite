@@ -23,9 +23,7 @@ class ModelCommand(BaseSlashCommand):
         """Показать или сменить модель."""
         if not args.strip():
             # Показываем текущую модель
-            ctx.console.print(
-                f"Текущая модель: [cyan]{ctx.llm.model_name}[/cyan]"
-            )
+            ctx.console.print(f"Текущая модель: [cyan]{ctx.llm.model_name}[/cyan]")
             ctx.console.print(
                 "[dim]Для смены: /model <название>[/dim]\n"
                 "[dim]Примеры: gemini-2.0-flash, gemini-1.5-pro[/dim]"
@@ -78,12 +76,8 @@ class ContextCommand(BaseSlashCommand):
         """Показать или изменить количество чанков."""
         if not args.strip():
             # Показываем текущее значение
-            ctx.console.print(
-                f"Чанков контекста: [cyan]{ctx.context_chunks}[/cyan]"
-            )
-            ctx.console.print(
-                "[dim]Для изменения: /context <число> (1-20)[/dim]"
-            )
+            ctx.console.print(f"Чанков контекста: [cyan]{ctx.context_chunks}[/cyan]")
+            ctx.console.print("[dim]Для изменения: /context <число> (1-20)[/dim]")
             return SlashResult()
 
         # Парсим число
@@ -118,12 +112,8 @@ class TemperatureCommand(BaseSlashCommand):
     def execute(self, ctx: ChatContext, args: str) -> SlashResult:
         """Показать или изменить температуру."""
         if not args.strip():
-            ctx.console.print(
-                f"Температура: [cyan]{ctx.temperature}[/cyan]"
-            )
-            ctx.console.print(
-                "[dim]Для изменения: /temperature <0.0-2.0>[/dim]"
-            )
+            ctx.console.print(f"Температура: [cyan]{ctx.temperature}[/cyan]")
+            ctx.console.print("[dim]Для изменения: /temperature <0.0-2.0>[/dim]")
             return SlashResult()
 
         try:
@@ -139,9 +129,7 @@ class TemperatureCommand(BaseSlashCommand):
         old_value = ctx.temperature
         ctx.temperature = new_value
 
-        ctx.console.print(
-            f"[green]✓ Температура: {old_value} → {new_value}[/green]"
-        )
+        ctx.console.print(f"[green]✓ Температура: {old_value} → {new_value}[/green]")
         return SlashResult()
 
 

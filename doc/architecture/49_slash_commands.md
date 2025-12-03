@@ -22,11 +22,13 @@
 Почему именно `/command`, а не `!command` или `:command`?
 
 **Slash стал стандартом де-факто:**
+
 - Discord, Slack, Telegram боты — везде `/`
 - Git GUI клиенты — `/search`, `/commit`
 - IDE — VS Code Command Palette начинается с `/`
 
 **Плюсы slash-подхода:**
+
 - Чёткое разделение: `/help` — команда, `help me` — вопрос
 - Пользователь уже знает этот паттерн
 - Легко парсить: проверил первый символ — готово
@@ -74,6 +76,7 @@ SlashResult
 ```
 
 **SlashAction** определяет, что делает REPL после команды:
+
 - `CONTINUE` — продолжаем цикл (по умолчанию)
 - `EXIT` — выходим из чата
 - `CLEAR` — очищаем экран и продолжаем
@@ -197,11 +200,13 @@ query = input()
 Особенность `/model` и `/context` — они меняют настройки на лету.
 
 **ModelCommand** — создаёт новый LLM провайдер:
+
 1. Проверяет, что ctx.llm — это GeminiLLMProvider
 2. Создаёт новый провайдер с другой моделью
 3. Обновляет ctx.llm и ctx.rag._llm
 
 **ContextCommand** — проще:
+
 1. Парсит и валидирует число (1-20)
 2. Обновляет ctx.context_chunks
 3. Обновляет ctx.rag._context_chunks
@@ -231,6 +236,7 @@ ChatContext с моками:
 ```
 
 **Особенности тестирования:**
+
 - Команды выводят через `ctx.console.print()`, не возвращают message
 - Проверяем `mock_context.console.print.assert_called()`
 - Моки источников должны иметь реальные строки для Rich Markdown

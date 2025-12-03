@@ -294,7 +294,9 @@ def chat(
                 elif result.action == SlashAction.CLEAR:
                     console.clear()
                     current_model = chat_context.extra_context.get("_model", model)
-                    current_full_docs = chat_context.extra_context.get("_full_docs", "False") == "True"
+                    current_full_docs = (
+                        chat_context.extra_context.get("_full_docs", "False") == "True"
+                    )
                     _show_welcome(
                         console,
                         current_model,
@@ -318,9 +320,17 @@ def chat(
                     history = history_manager.get_history() if history_manager else None
 
                     # Читаем настройки из контекста
-                    current_max_tokens_str = chat_context.extra_context.get("_max_tokens", "")
-                    current_max_tokens = int(current_max_tokens_str) if current_max_tokens_str else max_tokens
-                    current_full_docs = chat_context.extra_context.get("_full_docs", "False") == "True"
+                    current_max_tokens_str = chat_context.extra_context.get(
+                        "_max_tokens", ""
+                    )
+                    current_max_tokens = (
+                        int(current_max_tokens_str)
+                        if current_max_tokens_str
+                        else max_tokens
+                    )
+                    current_full_docs = (
+                        chat_context.extra_context.get("_full_docs", "False") == "True"
+                    )
 
                     result = rag.ask(
                         query=query,
@@ -359,8 +369,12 @@ def chat(
             console.print(Markdown(result.answer))
 
             # Показываем источники
-            current_show_sources = chat_context.extra_context.get("_show_sources", "True") == "True"
-            current_full_docs = chat_context.extra_context.get("_full_docs", "False") == "True"
+            current_show_sources = (
+                chat_context.extra_context.get("_show_sources", "True") == "True"
+            )
+            current_full_docs = (
+                chat_context.extra_context.get("_full_docs", "False") == "True"
+            )
             if current_show_sources and result.has_sources:
                 _show_sources(console, result.sources, current_full_docs)
 
@@ -419,9 +433,7 @@ def _show_welcome(
     if full_docs:
         welcome_text += f"Режим: [yellow]полные документы[/yellow]\n"
 
-    welcome_text += (
-        f"\n[dim]Введите вопрос или /help для списка команд.[/dim]"
-    )
+    welcome_text += f"\n[dim]Введите вопрос или /help для списка команд.[/dim]"
 
     console.print(
         Panel(

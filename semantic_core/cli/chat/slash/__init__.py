@@ -9,7 +9,7 @@
         Контекст чата для передачи в команды.
 
 Команды:
-    Basic: HelpCommand, ClearCommand, QuitCommand, TokensCommand, 
+    Basic: HelpCommand, ClearCommand, QuitCommand, TokensCommand,
            HistoryCommand, CompressCommand
     Search: SearchCommand, SearchModeCommand, SourcesCommand, SourceCommand
     Settings: ModelCommand, ContextCommand

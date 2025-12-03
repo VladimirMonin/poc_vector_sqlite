@@ -90,9 +90,7 @@ class SearchModeCommand(BaseSlashCommand):
             }
             current = mode_icons.get(ctx.search_mode, ctx.search_mode)
             ctx.console.print(f"Текущий режим поиска: [cyan]{current}[/cyan]")
-            ctx.console.print(
-                f"[dim]Доступные: {', '.join(self.VALID_MODES)}[/dim]"
-            )
+            ctx.console.print(f"[dim]Доступные: {', '.join(self.VALID_MODES)}[/dim]")
             return SlashResult()
 
         mode = args.strip().lower()
@@ -182,9 +180,7 @@ class SourceCommand(BaseSlashCommand):
 
         sources = ctx.last_result.sources
         if num < 1 or num > len(sources):
-            ctx.console.print(
-                f"[red]Номер должен быть от 1 до {len(sources)}[/red]"
-            )
+            ctx.console.print(f"[red]Номер должен быть от 1 до {len(sources)}[/red]")
             return SlashResult()
 
         source = sources[num - 1]
@@ -199,12 +195,14 @@ class SourceCommand(BaseSlashCommand):
             title = source.parent_doc_title or f"Chunk #{source.chunk_id}"
 
         # Показываем
-        ctx.console.print(Panel(
-            Markdown(content) if content.startswith("#") else content,
-            title=f"📄 {title}",
-            subtitle=f"Score: {source.score:.3f}",
-            border_style="blue",
-        ))
+        ctx.console.print(
+            Panel(
+                Markdown(content) if content.startswith("#") else content,
+                title=f"📄 {title}",
+                subtitle=f"Score: {source.score:.3f}",
+                border_style="blue",
+            )
+        )
         return SlashResult()
 
 
