@@ -32,7 +32,7 @@
 """
 
 from semantic_core.domain.document import Document, MediaType
-from semantic_core.domain.chunk import Chunk, ChunkType
+from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.domain.search_result import SearchResult, ChunkResult, MatchType
 from semantic_core.domain.auth import GoogleKeyring
 from semantic_core.domain.config import MediaConfig
@@ -49,6 +49,7 @@ __all__ = [
     "MediaType",
     "Chunk",
     "ChunkType",
+    "MEDIA_CHUNK_TYPES",
     "SearchResult",
     "ChunkResult",
     "MatchType",
