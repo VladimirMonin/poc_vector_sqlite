@@ -50,6 +50,7 @@ stop
 **Источники**: README.md, doc/architecture/00_overview.md
 
 **Содержание:**
+
 - Установка (poetry install)
 - Настройка .env (GEMINI_API_KEY)
 - Первый ingest (3 команды)
@@ -67,6 +68,7 @@ stop
 **Источники**: doc/architecture/40_unified_configuration.md
 
 **Содержание:**
+
 - Иерархия: CLI args > env > semantic.toml > defaults
 - Создание semantic.toml (пример)
 - Все секции конфига (таблица с ссылками на reference)
@@ -82,6 +84,7 @@ stop
 **Источники**: doc/architecture/41-43 (CLI)
 
 **Содержание:**
+
 - Философия CLI (Rich output, lazy init)
 - Основные команды: ingest, search, docs
 - Примеры с флагами (таблица)
@@ -97,6 +100,7 @@ stop
 **Источники**: doc/architecture/46_rag_chat_cli.md, 49_slash_commands.md
 
 **Содержание:**
+
 - Запуск чата: `semantic chat`
 - Как формулировать вопросы
 - Slash commands: /search, /sources, /model, /clear
@@ -112,6 +116,7 @@ stop
 **Источники**: doc/architecture/25-34 (Multimodal)
 
 **Содержание:**
+
 - Включение media: poetry install --extras media
 - Анализ изображений в Markdown
 - Обработка аудио файлов
@@ -137,6 +142,7 @@ stop
 | `text-embedding-004` | 768 | ❌ | Legacy |
 
 **MRL (Matryoshka Representation Learning)**:
+
 - 3072 — максимальное качество (default)
 - 1536 — баланс качество/размер
 - 768 — экономия места, ~98% качества
@@ -219,6 +225,7 @@ prerequisites: [другой_гайд]
 
 - [Гайд 1](file.md)
 - [Гайд 2](file.md)
+
 ```
 
 ---

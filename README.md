@@ -69,7 +69,8 @@ doc/architecture/        # 38 архитектурных документов
 
 | Раздел | Описание |
 |--------|----------|
-| **[Архитектура](doc/architecture/00_overview.md)** | 38 документов: от эмбеддингов до мультимодальности |
+| **[User Guide](docs/README.md)** | Гайды, концепции, справочники — как использовать |
+| **[Architecture Deep Dive](doc/architecture/00_overview.md)** | 51 документ: от эмбеддингов до Batch API |
 | **[Тесты](tests/README.md)** | Структура, фикстуры, маркеры |
 | **[Логирование](semantic_core/utils/logger/README.md)** | TRACE уровень, bind(), маскирование секретов |
 
@@ -93,6 +94,10 @@ doc/architecture/        # 38 архитектурных документов
 | 5 | ✅ | Batch API + Async Processing |
 | 6 | ✅ | Multimodality (Image/Audio/Video) |
 | 7 | ✅ | Observability (Semantic Logging) |
+| 8 | ✅ | CLI & Configuration |
+| 9 | ✅ | RAG Integration |
+| 10 | ✅ | Batch API Real Implementation |
+| 11 | 🔄 | Documentation & Diagrams |
 
 ---
 

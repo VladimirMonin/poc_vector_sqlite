@@ -1,0 +1,80 @@
+@startuml
+title Semantic Core Architecture
+
+package "Domain Layer" {
+    [Document] as doc
+    [Chunk] as chunk
+    [SearchResult] as sr
+    [MediaAnalysisResult] as mar
+}
+
+package "Interfaces Layer" {
+    interface "BaseEmbedder" as emb
+    interface "BaseVectorStore" as vs
+    interface "BaseSplitter" as sp
+    interface "BaseLLMProvider" as llm
+    interface "DocumentParser" as dp
+}
+
+package "Infrastructure Layer" {
+    package "Gemini" {
+        [GeminiEmbedder] as ge
+        [GeminiLLMProvider] as glp
+        [ImageAnalyzer] as ia
+        [AudioAnalyzer] as aa
+        [VideoAnalyzer] as va
+    }
+    package "Storage" {
+        [PeeweeVectorStore] as pvs
+    }
+    package "Processing" {
+        [SmartSplitter] as ss
+        [MarkdownNodeParser] as mnp
+    }
+}
+
+package "Core Layer" {
+    [SemanticCore] as sc
+    [RAGEngine] as rag
+    [MediaQueueProcessor] as mqp
+    [BatchManager] as bm
+}
+
+package "CLI Layer" {
+    [ingest] as cli_i
+    [search] as cli_s
+    [chat] as cli_c
+}
+
+cli_i --> sc
+cli_s --> sc
+cli_c --> rag
+
+sc --> emb
+sc --> vs
+sc --> sp
+rag --> llm
+rag --> sc
+
+ge ..|> emb
+glp ..|> llm
+pvs ..|> vs
+ss ..|> sp
+mnp ..|> dp
+
+sc --> mqp
+mqp --> ia
+mqp --> aa
+mqp --> va
+
+note right of sc
+    Центральный оркестратор
+    всех операций
+end note
+
+legend right
+    |= Символ |= Значение |
+    | --> | Использует |
+    | ..|> | Реализует |
+endlegend
+@enduml
