@@ -26,11 +26,13 @@
 ## Обнаруженные issues (не баги, а особенности)
 
 ### Issue #1: CLI argument order
+
 **Описание:** Typer/Click требует опции ПЕРЕД путём при использовании `callback(invoke_without_command=True)`  
 **Пример:** `semantic ingest --recursive docs` ✅ vs `semantic ingest docs --recursive` ❌  
 **Статус:** Документировать, не фиксить (ограничение Typer)
 
 ### Issue #2: Environment variable prefix  
+
 **Описание:** API ключ требует префикс `SEMANTIC_` → `SEMANTIC_GEMINI_API_KEY`  
 **Статус:** Документировать (by design)
 
@@ -58,12 +60,14 @@
 **Причина:** `SearchResult` содержит `.document` (объект Document), а не прямые атрибуты  
 
 **Было:**
+
 ```python
 source = result.metadata.get("source", "—")
 content = result.content
 ```
 
 **Стало:**
+
 ```python
 source = result.document.metadata.get("source", "—")
 content = result.document.content

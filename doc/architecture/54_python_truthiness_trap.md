@@ -127,11 +127,12 @@ bool(x) вызывает:
 
 ---
 
-## 🔧 Где был баг: 6 мест!
+## 🔧 Где был баг: 6 мест
 
 ### 1. Slash-команды (basic.py)
 
 **TokensCommand:**
+
 ```python
 # ❌ БЫЛО
 if not ctx.history_manager:
@@ -143,6 +144,7 @@ if ctx.history_manager is None:
 ```
 
 **HistoryCommand:**
+
 ```python
 # ❌ БЫЛО
 if not ctx.history_manager:
@@ -154,6 +156,7 @@ if ctx.history_manager is None:
 ```
 
 **CompressCommand:**
+
 ```python
 # ❌ БЫЛО
 if not ctx.history_manager:
@@ -167,6 +170,7 @@ if ctx.history_manager is None:
 ### 2. REPL loop (chat.py)
 
 **Получение истории для RAG (строка 322):**
+
 ```python
 # ❌ БЫЛО
 history = history_manager.get_history() if history_manager else None
@@ -176,6 +180,7 @@ history = history_manager.get_history() if history_manager is not None else None
 ```
 
 **Сохранение в историю (строка 350):**
+
 ```python
 # ❌ БЫЛО
 if history_manager:
@@ -189,6 +194,7 @@ if history_manager is not None:
 ```
 
 **Отображение статистики (строка 386):**
+
 ```python
 # ❌ БЫЛО
 if history_manager:
@@ -266,6 +272,7 @@ class TestChatE2E:
 ```
 
 **14 E2E тестов** теперь гарантируют, что:
+
 - `/tokens` работает
 - `/history` работает
 - `/compress` работает
@@ -276,6 +283,7 @@ class TestChatE2E:
 ## 🎓 Урок: контейнеры и `__len__()`
 
 Если ваш класс:
+
 - Хранит коллекцию элементов
 - Имеет метод `__len__()`
 - Может быть "пустым"
@@ -339,4 +347,4 @@ bool(queue)  # True, даже если пуста
 
 ---
 
-**← [53. Windows Compatibility](53_windows_compatibility.md)** | **[К оглавлению](00_overview.md)** 
+**← [53. Windows Compatibility](53_windows_compatibility.md)** | **[К оглавлению](00_overview.md)**

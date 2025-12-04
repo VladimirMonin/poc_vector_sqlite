@@ -66,7 +66,9 @@ class QuitCommand(BaseSlashCommand):
 
     def execute(self, ctx: ChatContext, args: str) -> SlashResult:
         """Завершить сессию чата."""
-        return SlashResult(action=SlashAction.EXIT, message="[dim]До свидания! 👋[/dim]")
+        return SlashResult(
+            action=SlashAction.EXIT, message="[dim]До свидания! 👋[/dim]"
+        )
 
 
 class TokensCommand(BaseSlashCommand):
@@ -166,13 +168,17 @@ class CompressCommand(BaseSlashCommand):
     def execute(self, ctx: ChatContext, args: str) -> SlashResult:
         """Запустить сжатие истории."""
         if ctx.history_manager is None:
-            ctx.console.print("[yellow]История отключена (используйте чат без --no-history)[/yellow]")
+            ctx.console.print(
+                "[yellow]История отключена (используйте чат без --no-history)[/yellow]"
+            )
             return SlashResult()
 
         # Получаем историю
         messages = ctx.history_manager.get_history()
         if len(messages) < 2:
-            ctx.console.print("[yellow]Недостаточно сообщений для сжатия (минимум 2)[/yellow]")
+            ctx.console.print(
+                "[yellow]Недостаточно сообщений для сжатия (минимум 2)[/yellow]"
+            )
             return SlashResult()
 
         before_tokens = ctx.history_manager.total_tokens()

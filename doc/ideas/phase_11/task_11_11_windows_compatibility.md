@@ -14,6 +14,7 @@
 **Проблема:** Pillow, imageio и другие пакеты с C-расширениями не имеют pre-built wheels для Python 3.14 на Windows.
 
 **Ошибка:**
+
 ```
 Pillow 10.4.0 does not support Python 3.14 and does not provide prebuilt Windows binaries.
 RequiredDependencyException: zlib
@@ -22,6 +23,7 @@ RequiredDependencyException: zlib
 **Решение:** Использовать Python 3.13.x на Windows.
 
 **Что исправить:**
+
 - `pyproject.toml` — изменено `requires-python = ">=3.14"` → `">=3.13,<3.15"`
 - Добавить в документацию предупреждение о версии Python
 
@@ -32,12 +34,14 @@ RequiredDependencyException: zlib
 **Проблема:** Typer + Click баг при использовании `callback(invoke_without_command=True)` с `Path` аргументом в sub-Typer.
 
 **НЕ работает (опции после аргумента):**
+
 ```bash
 semantic ingest docs --recursive      # ❌ Missing argument 'PATH'
 semantic ingest ./docs -r -m sync     # ❌ Missing argument 'PATH'
 ```
 
 **Работает (опции ПЕРЕД аргументом):**
+
 ```bash
 semantic ingest --recursive docs      # ✅
 semantic ingest -r -m sync ./docs     # ✅
@@ -47,6 +51,7 @@ semantic ingest --dry-run docs        # ✅
 **Причина:** Click/Typer парсит аргументы позиционно, и при `invoke_without_command=True` в sub-Typer опции после `Path` аргумента интерпретируются как подкоманды.
 
 **Что исправить:**
+
 - Все примеры в документации CLI
 - README.md в секции Quick Start
 - Docstrings в `ingest.py`, `search.py`
@@ -58,6 +63,7 @@ semantic ingest --dry-run docs        # ✅
 **Проблема:** Примеры с `export` не работают в PowerShell.
 
 **Bash (macOS/Linux):**
+
 ```bash
 export SEMANTIC_DB_PATH="project_docs.db"
 export GEMINI_API_KEY="your-key"
@@ -65,6 +71,7 @@ semantic ingest --recursive docs
 ```
 
 **PowerShell (Windows):**
+
 ```powershell
 $env:SEMANTIC_DB_PATH = "project_docs.db"
 $env:GEMINI_API_KEY = "your-key"
@@ -72,6 +79,7 @@ semantic ingest --recursive docs
 ```
 
 **Что исправить:**
+
 - Добавить PowerShell эквиваленты во все гайды
 - Секция "Platform-Specific Commands" в Quick Start
 
@@ -82,6 +90,7 @@ semantic ingest --recursive docs
 **Проблема:** Windows использует `\`, Unix — `/`.
 
 **Рекомендация:** В документации использовать универсальный формат:
+
 ```bash
 semantic ingest docs                  # Относительный путь (работает везде)
 semantic ingest ./docs                # Unix-style (работает в PowerShell)
@@ -150,8 +159,9 @@ semantic ingest docs --recursive
 semantic search "query"
 ```
 
-> ⚠️ **Windows Users:** Place CLI options (`--recursive`, `--dry-run`) 
+> ⚠️ **Windows Users:** Place CLI options (`--recursive`, `--dry-run`)
 > BEFORE the path argument due to a Click/Typer parsing limitation.
+
 ```
 
 ---

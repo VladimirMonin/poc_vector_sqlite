@@ -193,7 +193,9 @@ def chat(
     elif compress_at:
         # Адаптивное сжатие через LLM
         # Вычисляем target: явно заданный или 1/3 от порога (минимум 1000)
-        actual_target = compress_target if compress_target else max(compress_at // 3, 1000)
+        actual_target = (
+            compress_target if compress_target else max(compress_at // 3, 1000)
+        )
         compressor = ContextCompressor(llm)
         strategy = AdaptiveWithCompression(
             compressor=compressor,
@@ -245,7 +247,7 @@ def chat(
         context_chunks=context_chunks,
         temperature=temperature,
     )
-    
+
     # Сохраняем дополнительные настройки в extra_context
     chat_context.extra_context["_show_sources"] = str(show_sources)
     chat_context.extra_context["_full_docs"] = str(full_docs)
@@ -319,7 +321,11 @@ def chat(
             with console.status("[bold green]Думаю...[/bold green]", spinner="dots"):
                 try:
                     # Получаем историю для RAG (если есть)
-                    history = history_manager.get_history() if history_manager is not None else None
+                    history = (
+                        history_manager.get_history()
+                        if history_manager is not None
+                        else None
+                    )
 
                     # Читаем настройки из контекста
                     current_max_tokens_str = chat_context.extra_context.get(
