@@ -235,6 +235,9 @@
 55. [**Flask Integration**](55_flask_integration.md)  
     Интеграция SemanticCore в веб-приложение: Application Factory, DI через extensions, HTTP logging
 
+56. [**Query Cache Architecture**](56_query_cache.md)  
+    Кэширование эмбеддингов запросов: экономия API-вызовов, автокомплит, статистика
+
 ---
 
 ## 🚀 Быстрый старт
