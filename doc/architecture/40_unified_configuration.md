@@ -81,8 +81,8 @@ core = SemanticCore(config=config)
 path = "semantic.db"
 
 [gemini]
-# api_key в .env — не храним секреты в коде!
-model = "text-embedding-004"
+# api_key и batch_key в .env — не храним секреты в коде!
+model = "gemini-embedding-001"
 embedding_dimension = 768
 
 [processing]
@@ -247,6 +247,8 @@ config = get_config()
 embedder = GeminiEmbedder.from_config(config)
 storage = PeeweeVectorStore.from_config(config)
 splitter = SmartSplitter.from_config(config)
+batch_client = GeminiBatchClient.from_config(config)  # Phase 10.1
+batch_manager = BatchManager.from_config(db, config)  # Phase 10.1
 ```
 
 ---
