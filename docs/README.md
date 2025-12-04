@@ -84,7 +84,8 @@ semantic search "как работает гибридный поиск"
 
 | Документ | Описание |
 |----------|----------|
-| *(coming soon)* | Phase 11.10 |
+| [Checklist](guides/deployment/checklist.md) | Pre-deploy проверки |
+| [Production](guides/deployment/production.md) | WAL mode, настройки, мониторинг |
 
 ---
 
