@@ -230,6 +230,13 @@
 
 ---
 
+### 🌐 Flask Web Application (Фаза 12)
+
+55. [**Flask Integration**](55_flask_integration.md)  
+    Интеграция SemanticCore в веб-приложение: Application Factory, DI через extensions, HTTP logging
+
+---
+
 ## 🚀 Быстрый старт
 
 ```bash
