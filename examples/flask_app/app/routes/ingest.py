@@ -96,7 +96,13 @@ def upload_files():
     """Загрузка файлов и индексация.
 
     Принимает multiple files, сохраняет в uploads/,
-    запускает ingest() (sync или async).
+    запускает ingest() для документов и ingest_image() для медиа.
+
+    Поддерживаемые типы:
+        - Документы: .md, .markdown, .txt
+        - Изображения: .png, .jpg, .jpeg, .gif, .webp
+        - Аудио: .mp3, .wav, .ogg (будущее)
+        - Видео: .mp4, .webm (будущее)
 
     Returns:
         Redirect на страницу документов с flash-сообщением.
@@ -113,8 +119,13 @@ def upload_files():
 
     upload_service = _get_upload_service()
     uploaded_files: dict[str, Path] = {}
-    markdown_files: list[Path] = []
+    text_files: list[Path] = []  # .md, .markdown, .txt
+    image_files: list[Path] = []  # .png, .jpg, .jpeg, .gif, .webp
     errors: list[str] = []
+
+    # Расширения по категориям
+    TEXT_EXTENSIONS = {".md", ".markdown", ".txt"}
+    IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
     # Сохраняем все файлы
     for file in files:
@@ -122,8 +133,11 @@ def upload_files():
             result = upload_service.save_file(file.stream, file.filename)
             if result.success:
                 uploaded_files[result.original_name] = result.path
-                if result.path.suffix.lower() in (".md", ".markdown"):
-                    markdown_files.append(result.path)
+                ext = result.path.suffix.lower()
+                if ext in TEXT_EXTENSIONS:
+                    text_files.append(result.path)
+                elif ext in IMAGE_EXTENSIONS:
+                    image_files.append(result.path)
             else:
                 errors.append(f"{result.original_name}: {result.error}")
 
@@ -132,49 +146,86 @@ def upload_files():
             flash(error, "danger")
 
     # Определяем режим (sync/async)
-    mode = "async" if len(markdown_files) >= ASYNC_THRESHOLD else "sync"
-    logger.info(f"📤 Загружено {len(files)} файлов, mode={mode}")
+    total_files = len(text_files) + len(image_files)
+    mode = "async" if total_files >= ASYNC_THRESHOLD else "sync"
+    logger.info(f"📤 Загружено {len(files)} файлов (text={len(text_files)}, images={len(image_files)}), mode={mode}")
 
-    # Индексируем Markdown-файлы
-    ingested_count = 0
-    for md_path in markdown_files:
+    ingested_docs = 0
+    ingested_images = 0
+
+    # === Индексируем текстовые файлы (.md, .markdown, .txt) ===
+    for text_path in text_files:
         try:
-            # Обновляем пути к медиа
-            content = upload_service.process_markdown_paths(
-                md_path,
-                {Path(name).name: path for name, path in uploaded_files.items()},
-            )
+            # Для Markdown — обновляем пути к медиа
+            if text_path.suffix.lower() in (".md", ".markdown"):
+                content = upload_service.process_markdown_paths(
+                    text_path,
+                    {Path(name).name: path for name, path in uploaded_files.items()},
+                )
+            else:
+                # Для .txt — просто читаем содержимое
+                content = text_path.read_text(encoding="utf-8")
 
             # Создаём документ
             doc = Document(
                 content=content,
                 metadata={
-                    "title": md_path.stem.replace("_", " ").title(),
-                    "source": str(md_path),
+                    "title": text_path.stem.replace("_", " ").title(),
+                    "source": str(text_path),
                     "source_type": "upload",
                 },
             )
 
             # Индексируем
             core.ingest(doc, mode=mode)
-            ingested_count += 1
+            ingested_docs += 1
 
         except Exception as e:
-            logger.error(f"🔥 Ошибка индексации {md_path}: {e}")
-            flash(f"Ошибка индексации {md_path.name}: {e}", "danger")
+            logger.error(f"🔥 Ошибка индексации {text_path}: {e}")
+            flash(f"Ошибка индексации {text_path.name}: {e}", "danger")
 
-    if ingested_count > 0:
+    # === Индексируем изображения ===
+    for image_path in image_files:
+        try:
+            # Проверяем, есть ли image_analyzer
+            if not hasattr(core, "image_analyzer") or core.image_analyzer is None:
+                # Fallback: создаём документ с описанием изображения
+                doc = Document(
+                    content=f"![{image_path.stem}]({image_path})",
+                    metadata={
+                        "title": image_path.stem.replace("_", " ").title(),
+                        "source": str(image_path),
+                        "source_type": "upload",
+                        "media_type": "image",
+                    },
+                )
+                core.ingest(doc, mode=mode)
+            else:
+                # Используем Vision API для анализа
+                core.ingest_image(str(image_path), mode=mode)
+
+            ingested_images += 1
+
+        except Exception as e:
+            logger.error(f"🔥 Ошибка индексации изображения {image_path}: {e}")
+            flash(f"Ошибка индексации {image_path.name}: {e}", "danger")
+
+    # === Формируем сообщение ===
+    total_ingested = ingested_docs + ingested_images
+    if total_ingested > 0:
+        parts = []
+        if ingested_docs > 0:
+            parts.append(f"{ingested_docs} документ(ов)")
+        if ingested_images > 0:
+            parts.append(f"{ingested_images} изображений")
+
+        message = f"✅ Загружено и проиндексировано: {', '.join(parts)}"
         if mode == "async":
-            flash(
-                f"✅ Загружено {ingested_count} документов. "
-                f"Обработка в фоновом режиме...",
-                "info",
-            )
-        else:
-            flash(
-                f"✅ Загружено и проиндексировано {ingested_count} документов",
-                "success",
-            )
+            message += " (обработка в фоне)"
+
+        flash(message, "success")
+    elif not errors:
+        flash("Нет файлов для индексации", "warning")
 
     return redirect(url_for("ingest.documents_page"))
 
