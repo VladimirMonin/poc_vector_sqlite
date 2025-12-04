@@ -103,10 +103,10 @@ def chat(
         "--compress-at",
         help="Порог токенов для автоматического сжатия истории через LLM",
     ),
-    compress_target: int = typer.Option(
-        10000,
+    compress_target: Optional[int] = typer.Option(
+        None,
         "--compress-target",
-        help="Целевое количество токенов после сжатия (используется с --compress-at)",
+        help="Целевое количество токенов после сжатия (по умолчанию: compress_at // 3)",
     ),
     no_history: bool = typer.Option(
         False,
@@ -192,14 +192,16 @@ def chat(
         history_label = "отключена"
     elif compress_at:
         # Адаптивное сжатие через LLM
+        # Вычисляем target: явно заданный или 1/3 от порога (минимум 1000)
+        actual_target = compress_target if compress_target else max(compress_at // 3, 1000)
         compressor = ContextCompressor(llm)
         strategy = AdaptiveWithCompression(
             compressor=compressor,
             threshold_tokens=compress_at,
-            target_tokens=compress_target,
+            target_tokens=actual_target,
         )
         history_manager = ChatHistoryManager(strategy)
-        history_label = f"сжатие при {compress_at} токенов"
+        history_label = f"сжатие при {compress_at} → {actual_target} токенов"
     elif token_budget:
         # По токенам
         history_manager = ChatHistoryManager(TokenBudget(max_tokens=token_budget))
@@ -243,6 +245,7 @@ def chat(
         context_chunks=context_chunks,
         temperature=temperature,
     )
+    
     # Сохраняем дополнительные настройки в extra_context
     chat_context.extra_context["_show_sources"] = str(show_sources)
     chat_context.extra_context["_full_docs"] = str(full_docs)
@@ -289,7 +292,6 @@ def chat(
 
                 # Обрабатываем действие
                 if result.action == SlashAction.EXIT:
-                    console.print("[dim]До свидания! 👋[/dim]")
                     break
                 elif result.action == SlashAction.CLEAR:
                     console.clear()
@@ -317,7 +319,7 @@ def chat(
             with console.status("[bold green]Думаю...[/bold green]", spinner="dots"):
                 try:
                     # Получаем историю для RAG (если есть)
-                    history = history_manager.get_history() if history_manager else None
+                    history = history_manager.get_history() if history_manager is not None else None
 
                     # Читаем настройки из контекста
                     current_max_tokens_str = chat_context.extra_context.get(
@@ -345,7 +347,7 @@ def chat(
                     chat_context.last_result = result
 
                     # Сохраняем в историю
-                    if history_manager:
+                    if history_manager is not None:
                         input_tokens = result.generation.input_tokens or 0
                         output_tokens = result.generation.output_tokens or 0
                         # Примерное распределение токенов
@@ -381,7 +383,7 @@ def chat(
             # Показываем токены
             if result.total_tokens:
                 history_info = ""
-                if history_manager:
+                if history_manager is not None:
                     msg_count = len(history_manager)
                     total_history_tokens = history_manager.total_tokens()
                     history_info = f" | история: {msg_count} сообщ., {total_history_tokens} токенов"
