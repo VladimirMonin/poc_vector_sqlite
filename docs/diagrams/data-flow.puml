@@ -1,0 +1,57 @@
+@startuml
+title Data Flow: Ingest to Search
+
+actor User
+participant CLI
+participant SemanticCore as SC
+participant Splitter
+participant Embedder
+participant VectorStore as VS
+
+== Ingest Phase ==
+
+User -> CLI: semantic ingest doc.md
+CLI -> SC: ingest(path)
+SC -> SC: read file content
+
+SC -> Splitter: split(content)
+Splitter --> SC: List[Chunk]
+
+note right of Splitter
+    SmartSplitter:
+    AST parsing
+    preserves structure
+end note
+
+SC -> Embedder: embed_batch(chunks)
+Embedder -> Embedder: Gemini API call
+Embedder --> SC: embeddings[]
+
+SC -> VS: add(document, chunks)
+VS -> VS: SQLite INSERT
+VS --> SC: doc_id
+
+SC --> CLI: success
+CLI --> User: ✓ Indexed
+
+== Search Phase ==
+
+User -> CLI: semantic search "query"
+CLI -> SC: search(query)
+
+SC -> Embedder: embed_text(query)
+Embedder --> SC: query_vector
+
+SC -> VS: search(query_vector)
+VS -> VS: vec0 similarity
+VS --> SC: List[ChunkResult]
+
+SC --> CLI: results
+CLI --> User: Display matches
+
+legend right
+    |= Символ |= Значение |
+    | -> | Синхронный вызов |
+    | --> | Возврат |
+endlegend
+@enduml

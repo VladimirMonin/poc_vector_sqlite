@@ -1,0 +1,74 @@
+@startuml
+title Plugin System: Interfaces & Implementations
+
+package "Interfaces" {
+    interface BaseEmbedder {
+        +embed_text(text): ndarray
+        +embed_batch(texts): list[ndarray]
+        +dimension: int
+    }
+    
+    interface BaseVectorStore {
+        +add(doc, chunks)
+        +search(query, limit): list
+        +get_by_id(id): Document
+        +delete(id)
+    }
+    
+    interface BaseSplitter {
+        +split(content): list[Chunk]
+    }
+    
+    interface BaseContextStrategy {
+        +enrich(chunk): str
+    }
+    
+    interface DocumentParser {
+        +parse(content): list[Segment]
+    }
+    
+    interface BaseLLMProvider {
+        +generate(prompt): GenerationResult
+        +model_name: str
+    }
+    
+    interface BaseChatHistoryStrategy {
+        +should_trim(messages): bool
+        +trim(messages): list
+    }
+}
+
+package "Implementations" {
+    class GeminiEmbedder
+    class PeeweeVectorStore
+    class SmartSplitter
+    class HierarchicalContextStrategy
+    class MarkdownNodeParser
+    class GeminiLLMProvider
+    class TokenLimitStrategy
+}
+
+GeminiEmbedder ..|> BaseEmbedder
+PeeweeVectorStore ..|> BaseVectorStore
+SmartSplitter ..|> BaseSplitter
+HierarchicalContextStrategy ..|> BaseContextStrategy
+MarkdownNodeParser ..|> DocumentParser
+GeminiLLMProvider ..|> BaseLLMProvider
+TokenLimitStrategy ..|> BaseChatHistoryStrategy
+
+note bottom of BaseEmbedder
+    MRL support:
+    768 / 1536 / 3072
+end note
+
+note bottom of BaseLLMProvider
+    Extensible:
+    OpenAI, Anthropic,
+    Ollama...
+end note
+
+legend right
+    |= Символ |= Значение |
+    | ..|> | implements |
+endlegend
+@enduml

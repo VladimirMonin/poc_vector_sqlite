@@ -1,0 +1,55 @@
+@startuml
+title RAG: Question to Answer
+
+actor User
+participant ChatCLI as CLI
+participant RAGEngine as RAG
+participant SemanticCore as SC
+participant LLMProvider as LLM
+database "Chat History" as CH
+
+User -> CLI: Ask question
+CLI -> RAG: ask(question)
+
+== Context Retrieval ==
+
+RAG -> SC: search_chunks(question)
+SC --> RAG: List[ChunkResult]
+
+note right of RAG
+    Default: top 5 chunks
+    Mode: hybrid search
+end note
+
+RAG -> RAG: Build context from chunks
+
+== Generation ==
+
+RAG -> CH: Get history
+CH --> RAG: List[ChatMessage]
+
+RAG -> LLM: generate(prompt, history)
+
+note right of LLM
+    System prompt includes:
+    - Rules
+    - Context chunks
+end note
+
+LLM -> LLM: Gemini API call
+LLM --> RAG: GenerationResult
+
+== Response ==
+
+RAG -> CH: Add user + assistant messages
+RAG --> CLI: RAGResult
+
+CLI --> User: Display answer + sources
+
+legend right
+    |= Component |= Role |
+    | RAGEngine | Orchestrator |
+    | SemanticCore | Search |
+    | LLMProvider | Generation |
+endlegend
+@enduml

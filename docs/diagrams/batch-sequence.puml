@@ -1,0 +1,63 @@
+@startuml
+title Batch API Processing
+
+actor User
+participant CLI
+participant SemanticCore as SC
+participant BatchManager as BM
+database "SQLite Queue" as Q
+participant "Gemini Batch API" as API
+
+== Async Ingest ==
+
+User -> CLI: semantic ingest doc.md --async
+CLI -> SC: ingest(path, mode="async")
+
+SC -> SC: Split document
+SC -> BM: queue_embeddings(chunks)
+BM -> Q: INSERT tasks (pending)
+
+BM --> SC: queued count
+SC --> CLI: ✓ Queued for batch
+
+== Flush to API ==
+
+User -> CLI: semantic queue flush
+CLI -> BM: flush()
+
+BM -> Q: SELECT pending tasks
+Q --> BM: tasks[]
+
+BM -> BM: Create JSONL file
+BM -> API: files.upload(jsonl)
+API --> BM: file_uri
+
+BM -> API: batches.create(file_uri)
+API --> BM: batch_id
+
+BM -> Q: UPDATE status = processing
+BM --> CLI: ✓ Batch submitted
+
+== Sync Results ==
+
+User -> CLI: semantic queue sync
+CLI -> BM: sync_status()
+
+BM -> API: batches.get(batch_id)
+API --> BM: status, results
+
+alt status == COMPLETED
+    BM -> BM: Parse embeddings
+    BM -> Q: UPDATE with vectors
+    BM --> CLI: ✓ Synced N embeddings
+else status == PROCESSING
+    BM --> CLI: ⏳ Still processing
+end
+
+legend right
+    |= Status |= Meaning |
+    | pending | In local queue |
+    | processing | Sent to API |
+    | completed | Vectors ready |
+endlegend
+@enduml
