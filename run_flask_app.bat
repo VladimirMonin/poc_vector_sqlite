@@ -13,8 +13,8 @@ echo.
 REM Добавляем путь к poetry в PATH
 set "PATH=%USERPROFILE%\AppData\Roaming\Python\Scripts;%PATH%"
 
-REM Переходим в папку Flask приложения
-cd /d "%~dp0examples\flask_app"
+REM Переходим в корень проекта
+cd /d "%~dp0"
 
 REM Проверяем наличие poetry
 where poetry >nul 2>&1
@@ -27,6 +27,12 @@ if %ERRORLEVEL% neq 0 (
 REM Устанавливаем зависимости (если нужно)
 echo [*] Проверка зависимостей...
 call poetry install --quiet
+
+REM Добавляем корень проекта и папку flask_app в PYTHONPATH
+set "PYTHONPATH=%cd%;%cd%\examples\flask_app;%PYTHONPATH%"
+
+REM Переходим в папку Flask приложения
+cd /d "%~dp0examples\flask_app"
 
 REM Запускаем приложение
 echo.
