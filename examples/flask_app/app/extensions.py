@@ -54,7 +54,7 @@ def init_semantic_core(app: Flask) -> None:
     """Инициализировать SemanticCore и сохранить в app.extensions.
 
     Загружает конфигурацию через SemanticConfig (env + semantic.toml).
-    Создаёт все компоненты ядра (embedder, store, splitter).
+    Создаёт все компоненты ядра (embedder, store, splitter, media analyzers).
 
     Args:
         app: Flask приложение.
@@ -62,6 +62,9 @@ def init_semantic_core(app: Flask) -> None:
     from semantic_core.config import get_config
     from semantic_core.pipeline import SemanticCore
     from semantic_core.infrastructure.gemini import GeminiEmbedder
+    from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
+    from semantic_core.infrastructure.gemini.audio_analyzer import GeminiAudioAnalyzer
+    from semantic_core.infrastructure.gemini.video_analyzer import GeminiVideoAnalyzer
     from semantic_core.infrastructure.storage.peewee import (
         PeeweeVectorStore,
         init_peewee_database,
@@ -81,7 +84,13 @@ def init_semantic_core(app: Flask) -> None:
     db = init_peewee_database(config.db_path, config.embedding_dimension)
     logger.info(f"🗄️ База данных инициализирована: {config.db_path}")
 
-    # Embedder
+    # Embedder + Media Analyzers
+    api_key = None
+    embedder = None
+    image_analyzer = None
+    audio_analyzer = None
+    video_analyzer = None
+
     try:
         api_key = config.require_api_key()
         embedder = GeminiEmbedder(
@@ -90,9 +99,23 @@ def init_semantic_core(app: Flask) -> None:
             dimension=config.embedding_dimension,
         )
         logger.info(f"🤖 Embedder: {config.embedding_model}")
+
+        # === Media Analyzers ===
+        image_analyzer = GeminiImageAnalyzer(api_key=api_key)
+        logger.info("🖼️ ImageAnalyzer инициализирован")
+
+        audio_analyzer = GeminiAudioAnalyzer(api_key=api_key)
+        logger.info("🎵 AudioAnalyzer инициализирован")
+
+        video_analyzer = GeminiVideoAnalyzer(
+            api_key=api_key,
+            image_analyzer=image_analyzer,
+            audio_analyzer=audio_analyzer,
+        )
+        logger.info("🎬 VideoAnalyzer инициализирован")
+
     except ValueError as e:
         logger.warning(f"⚠️ API ключ не настроен: {e}. Поиск будет ограничен.")
-        embedder = None  # type: ignore
 
     # Store
     store = PeeweeVectorStore(database=db)
@@ -111,8 +134,11 @@ def init_semantic_core(app: Flask) -> None:
             store=store,
             splitter=splitter,
             context_strategy=context_strategy,
+            image_analyzer=image_analyzer,
+            audio_analyzer=audio_analyzer,
+            video_analyzer=video_analyzer,
         )
-        logger.info("✅ SemanticCore инициализирован")
+        logger.info("✅ SemanticCore инициализирован (с медиа-анализаторами)")
     else:
         core = None  # type: ignore
         logger.warning("⚠️ SemanticCore не создан (нет API ключа)")

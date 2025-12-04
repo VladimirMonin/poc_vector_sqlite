@@ -184,26 +184,18 @@ def upload_files():
             logger.error(f"🔥 Ошибка индексации {text_path}: {e}")
             flash(f"Ошибка индексации {text_path.name}: {e}", "danger")
 
-    # === Индексируем изображения ===
+    # === Индексируем изображения через Vision API ===
     for image_path in image_files:
         try:
             # Проверяем, есть ли image_analyzer
-            if not hasattr(core, "image_analyzer") or core.image_analyzer is None:
-                # Fallback: создаём документ с описанием изображения
-                doc = Document(
-                    content=f"![{image_path.stem}]({image_path})",
-                    metadata={
-                        "title": image_path.stem.replace("_", " ").title(),
-                        "source": str(image_path),
-                        "source_type": "upload",
-                        "media_type": "image",
-                    },
-                )
-                core.ingest(doc, mode=mode)
-            else:
-                # Используем Vision API для анализа
-                core.ingest_image(str(image_path), mode=mode)
+            if core.image_analyzer is None:
+                logger.warning(f"⚠️ ImageAnalyzer не настроен, пропускаем {image_path.name}")
+                flash(f"⚠️ {image_path.name}: Vision API не настроен", "warning")
+                continue
 
+            # Используем Vision API для анализа изображения
+            logger.info(f"🖼️ Анализируем изображение: {image_path.name}")
+            core.ingest_image(str(image_path), mode=mode)
             ingested_images += 1
 
         except Exception as e:
