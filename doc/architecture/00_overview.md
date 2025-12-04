@@ -222,6 +222,9 @@
 52. [**Documentation Architecture**](52_documentation_architecture.md)  
     Две папки doc/ и docs/: разделение аудиторий, стилевые правила, структура публичной документации
 
+53. [**Cross-Platform Compatibility: Windows Support**](53_windows_compatibility.md)  
+    Python версии, CLI-парсинг, PowerShell vs Bash, пути и кодировки
+
 ---
 
 ## 🚀 Быстрый старт
