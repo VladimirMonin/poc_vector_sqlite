@@ -28,6 +28,9 @@ REM Устанавливаем зависимости (если нужно)
 echo [*] Проверка зависимостей...
 call poetry install --quiet
 
+REM Добавляем flask_app в PYTHONPATH
+set "PYTHONPATH=%cd%\examples\flask_app;%PYTHONPATH%"
+
 REM Запускаем приложение из корня проекта
 echo.
 echo [OK] Запуск Flask приложения...
@@ -35,6 +38,7 @@ echo     URL: http://127.0.0.1:5000
 echo     Нажмите Ctrl+C для остановки
 echo.
 
+REM Запускаем через poetry из КОРНЯ (где основной pyproject.toml)
 call poetry run python examples/flask_app/run.py
 
 pause
