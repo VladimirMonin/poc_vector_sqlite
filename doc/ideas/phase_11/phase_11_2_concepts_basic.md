@@ -49,6 +49,7 @@ end note
 **Источники**: doc/architecture/01_embeddings_basics.md, 02_gemini_api.md
 
 **Содержание:**
+
 - Что такое эмбеддинги (аналогия с координатами)
 - MRL (Matryoshka Representation Learning) — выбор размерности
 - task_type: RETRIEVAL_DOCUMENT vs RETRIEVAL_QUERY
@@ -56,6 +57,7 @@ end note
 - **Диаграмма**: Sequence — текст → API → вектор
 
 **Актуальные модели**:
+
 | Модель | Размерности (MRL) | Рекомендация |
 |--------|-------------------|--------------|
 | `gemini-embedding-001` | 768 / 1536 / 3072 | Production |
@@ -70,6 +72,7 @@ end note
 **Источники**: doc/architecture/03_sqlite_vec.md, 04_search_types.md
 
 **Содержание:**
+
 - Косинусное расстояние (простое объяснение)
 - sqlite-vec: как хранятся векторы (BLOB)
 - Индексация и производительность
@@ -85,6 +88,7 @@ end note
 **Источники**: doc/architecture/04_search_types.md, 05_hybrid_search_rrf.md
 
 **Содержание:**
+
 - Проблема: vector не находит точные термины
 - Проблема: FTS5 не понимает синонимы
 - RRF формула (одна строка)
@@ -101,6 +105,7 @@ end note
 **Источники**: doc/architecture/08_chunking_strategy.md, 16_smart_splitting.md
 
 **Содержание:**
+
 - Зачем нужен chunking (лимит 2000 токенов)
 - Overlap: зачем перекрытие
 - Simple vs Smart splitting
@@ -117,6 +122,7 @@ end note
 **Источники**: doc/architecture/15_smart_parsing.md, 17_hierarchical_context.md
 
 **Содержание:**
+
 - AST-парсинг через markdown-it-py
 - Иерархия заголовков (header stack)
 - Breadcrumbs: "Title > H1 > H2 > Content"

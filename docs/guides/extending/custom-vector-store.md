@@ -143,6 +143,7 @@ class QdrantStore(BaseVectorStore):
 ChromaDB/Qdrant не имеют полноценного FTS.
 
 Варианты:
+
 1. **Игнорировать FTS** — только vector search
 2. **Внешний FTS** — Elasticsearch, Meilisearch
 3. **Hybrid на стороне DB** — если поддерживает

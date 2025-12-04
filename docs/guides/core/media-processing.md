@@ -90,6 +90,7 @@ semantic worker start
 ```
 
 Преимущества Queue:
+
 - Rate limiting автоматический
 - Продолжение после ошибок
 - Batch API экономия

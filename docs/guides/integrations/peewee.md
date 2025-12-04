@@ -114,6 +114,7 @@ SemanticIndex патчит `save()` и `delete_instance()`:
 ```
 
 **Автоматически**:
+
 - ✅ При `save()` — индексирует (create) или обновляет (update)
 - ✅ При `delete_instance()` — удаляет из индекса
 

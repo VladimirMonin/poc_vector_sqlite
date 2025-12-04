@@ -148,6 +148,7 @@ redact_secrets = true
 #### SQLite в продакшне
 
 **WAL mode** — обязателен для concurrent reads:
+
 ```sql
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
@@ -163,6 +164,7 @@ PRAGMA cache_size = -64000;  -- 64MB
 ### 3. guides/deployment/scaling.md (опционально)
 
 **Содержание:**
+
 - Горизонтальное масштабирование (read replicas)
 - Шардинг по collections
 - Queue workers: сколько инстансов

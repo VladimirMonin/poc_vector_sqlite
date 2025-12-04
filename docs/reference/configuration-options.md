@@ -28,6 +28,7 @@ tags: [reference, config, toml, env]
 **Environment:** `SEMANTIC_DB_PATH`
 
 **TOML:**
+
 ```toml
 [database]
 path = "data/semantic.db"
@@ -43,6 +44,7 @@ path = "data/semantic.db"
 | `embedding_dimension` | `int`          | `768`                            | Размерность (256–3072)    |
 
 **Environment:**
+
 ```bash
 # Без префикса (совместимость)
 export GEMINI_API_KEY=AIza...
@@ -55,6 +57,7 @@ export SEMANTIC_EMBEDDING_DIMENSION=1536
 ```
 
 **TOML:**
+
 ```toml
 [gemini]
 api_key = "AIza..."
@@ -85,12 +88,14 @@ embedding_dimension = 768
 | `hierarchical`  | Иерархия заголовков + родитель        |
 
 **Environment:**
+
 ```bash
 export SEMANTIC_SPLITTER=smart
 export SEMANTIC_CONTEXT_STRATEGY=hierarchical
 ```
 
 **TOML:**
+
 ```toml
 [processing]
 splitter = "smart"
@@ -105,12 +110,14 @@ context_strategy = "hierarchical"
 | `media_rpm_limit` | `int`  | `15`    | Rate limit Vision/Audio (1–100)   |
 
 **Environment:**
+
 ```bash
 export SEMANTIC_MEDIA_ENABLED=true
 export SEMANTIC_MEDIA_RPM_LIMIT=15
 ```
 
 **TOML:**
+
 ```toml
 [media]
 enabled = true
@@ -133,12 +140,14 @@ rpm_limit = 15
 | `hybrid` | Комбинация vector + fts через RRF         |
 
 **Environment:**
+
 ```bash
 export SEMANTIC_SEARCH_LIMIT=20
 export SEMANTIC_SEARCH_TYPE=hybrid
 ```
 
 **TOML:**
+
 ```toml
 [search]
 limit = 10
@@ -164,12 +173,14 @@ type = "hybrid"
 | `CRITICAL` | Критические ошибки                    |
 
 **Environment:**
+
 ```bash
 export SEMANTIC_LOG_LEVEL=DEBUG
 export SEMANTIC_LOG_FILE=logs/semantic.log
 ```
 
 **TOML:**
+
 ```toml
 [logging]
 level = "INFO"

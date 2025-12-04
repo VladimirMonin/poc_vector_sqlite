@@ -16,6 +16,7 @@ prerequisites: ["peewee"]
 
 Semantic Core не знает о вашей ORM.
 Вы пишете **тонкий адаптер**, который:
+
 1. Перехватывает save/delete
 2. Конвертирует ORM → Document
 3. Вызывает core.ingest() / core.delete_by_metadata()

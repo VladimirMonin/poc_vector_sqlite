@@ -36,6 +36,7 @@ except MediaProcessingError as e:
 ```
 
 **Причины:**
+
 | Код     | Описание                          | Решение                          |
 | :------ | :-------------------------------- | :------------------------------- |
 | `429`   | Rate limit exceeded               | Уменьшить `media_rpm_limit`      |
@@ -43,6 +44,7 @@ except MediaProcessingError as e:
 | `500`   | Internal server error             | Проверить формат файла           |
 
 **Retryable паттерны:**
+
 ```python
 RETRYABLE_PATTERNS = (
     "429",       # Rate limit
@@ -70,6 +72,7 @@ except DependencyError as e:
 ```
 
 **Решение:**
+
 ```bash
 # macOS
 brew install ffmpeg

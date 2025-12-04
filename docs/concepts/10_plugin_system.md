@@ -27,6 +27,7 @@ related: ["01_embeddings", "02_vector_search", "08_rag_architecture"]
 ```
 
 **Последствия**:
+
 - Хочешь OpenAI вместо Gemini → переписывать половину кода
 - Перейти с SQLite на PostgreSQL → переделывать интеграцию
 - Тестировать без API → невозможно
@@ -154,6 +155,7 @@ related: ["01_embeddings", "02_vector_search", "08_rag_architecture"]
 ```
 
 **Преимущества DI**:
+
 - Тестирование с моками без API
 - Замена компонентов без изменения кода
 - Конфигурация на уровне приложения
@@ -212,6 +214,7 @@ related: ["01_embeddings", "02_vector_search", "08_rag_architecture"]
 | **Protocol** | Duck typing, структурная совместимость |
 
 В проекте:
+
 - `BaseEmbedder`, `BaseVectorStore`, `BaseLLMProvider` — **ABC**
 - `DocumentParser` — **Protocol** (duck typing для парсеров)
 

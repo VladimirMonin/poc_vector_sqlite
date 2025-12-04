@@ -79,6 +79,7 @@ class ParsingSegment:
 ```
 
 **Разделение ответственности** (SOLID):
+
 - Parser → **структура** (что это: код, текст, изображение)
 - Splitter → **размер** (когда резать на чанки)
 
@@ -166,6 +167,7 @@ class BaseContextStrategy(ABC):
 ```
 
 **Реализации**:
+
 - `NoContextStrategy` — только content
 - `BasicContextStrategy` — title + content
 - `HierarchicalContextStrategy` — breadcrumbs + content
@@ -209,6 +211,7 @@ class DocumentParser(Protocol):
 ```python
 pip install semantic-core
 ```
+
 ```
 
 ### Output (ParsingSegments)
