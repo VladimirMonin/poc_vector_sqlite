@@ -46,7 +46,23 @@ Production-ready библиотека для локального семанти
 - **Phase 8:** CLI & Configuration — {DONE}
 - **Phase 9:** RAG Integration — {DONE}
 - **Phase 10:** Batch API Real Implementation — {DONE}
-- **Phase 11:** Documentation & Diagrams — {IN PROGRESS}
+- **Phase 11:** Documentation & Diagrams — {DONE}
+- **Phase 12:** Flask Web Application — {IN PROGRESS}
+  - **12.0:** App Skeleton, DI, Logging, Dashboard — {DONE}
+  - **12.1:** Search Query Cache — {CURRENT}
+  - **12.2-12.5:** Search UI, Ingest, Chat, Polish — {TODO}
+
+### 🌐 Flask App (`examples/flask_app/`)
+
+Веб-интерфейс для SemanticCore. Стек: Flask 3 + Bootstrap 5.3 + HTMX + Pydantic Settings.
+
+| Компонент | Файл | Назначение |
+|-----------|------|------------|
+| Factory | `app/__init__.py` | `create_app()` с Pydantic config |
+| DI | `app/extensions.py` | `app.extensions['semantic_core']` |
+| Config | `app/config.py` | `FlaskAppConfig` (FLASK_ prefix) |
+| HTTP Logs | `app/logging.py` | Middleware с эмодзи (🌐⚡⚠️🔥) |
+| Dashboard | `app/routes/main.py` | `/`, `/health` |
 
 ### 📂 Структура Проекта
 
@@ -126,7 +142,7 @@ docs/                         # Документация проекта
 | Ресурс                     | Путь                                                               | Описание                      |
 | -------------------------- | ------------------------------------------------------------------ | ----------------------------- |
 | **Публичная документация** | [docs/README.md](docs/README.md)                                   | Гайды, концепции, справочники |
-| **Архитектурный сериал**   | [doc/architecture/00_overview.md](doc/architecture/00_overview.md) | 51 концепция в лёгком стиле   |
+| **Архитектурный сериал**   | [doc/architecture/00_overview.md](doc/architecture/00_overview.md) | 55 концепций в лёгком стиле   |
 | **Планы и отчёты**         | [doc/ideas/](doc/ideas/)                                           | Технические отчёты по фазам   |
 
 > ⚠️ `doc/architecture/06-09` помечены как LEGACY — это старая архитектура до SOLID.

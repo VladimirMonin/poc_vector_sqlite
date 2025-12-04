@@ -17,6 +17,7 @@ from flask import Flask, current_app
 if TYPE_CHECKING:
     from semantic_core.pipeline import SemanticCore
     from semantic_core.config import SemanticConfig
+    from app.services.cache_service import QueryCacheService
 
 
 def get_semantic_core() -> "SemanticCore":
@@ -38,6 +39,15 @@ def get_semantic_config() -> "SemanticConfig":
         Загруженный SemanticConfig.
     """
     return current_app.extensions["semantic_config"]
+
+
+def get_query_cache() -> "QueryCacheService":
+    """Получить QueryCacheService из контекста приложения.
+
+    Returns:
+        Инициализированный QueryCacheService (или None без API key).
+    """
+    return current_app.extensions["query_cache"]
 
 
 def init_semantic_core(app: Flask) -> None:
@@ -107,7 +117,16 @@ def init_semantic_core(app: Flask) -> None:
         core = None  # type: ignore
         logger.warning("⚠️ SemanticCore не создан (нет API ключа)")
 
+    # Query Cache Service (если есть embedder)
+    query_cache = None
+    if embedder:
+        from app.services.cache_service import QueryCacheService
+
+        query_cache = QueryCacheService(embedder=embedder, database=db)
+        logger.info("💾 QueryCacheService инициализирован")
+
     # Сохраняем в extensions
     app.extensions["semantic_core"] = core
     app.extensions["semantic_config"] = config
     app.extensions["semantic_store"] = store
+    app.extensions["query_cache"] = query_cache
