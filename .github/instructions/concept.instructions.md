@@ -42,29 +42,44 @@ Production-ready библиотека для локального семанти
 
 - **Phase 1-5:** Core, Storage, Integration, Markdown, Batching — {DONE}
 - **Phase 6:** Multimodality (Images/Audio/Video) — {DONE}
-- **Phase 7.0:** Logging Core Infrastructure — {DONE}
+- **Phase 7:** Logging Core Infrastructure — {DONE}
+- **Phase 8:** CLI & Configuration — {DONE}
+- **Phase 9:** RAG Integration — {DONE}
+- **Phase 10:** Batch API Real Implementation — {DONE}
+- **Phase 11:** Documentation & Diagrams — {IN PROGRESS}
 
 ### 📂 Структура Проекта
 
 ```text
 semantic_core/
 ├── domain/                   # DTO (Document, Chunk, SearchResult, MediaAnalysisResult)
-├── interfaces/               # Контракты (VectorStore, Embedder, Splitter)
+├── interfaces/               # Контракты (VectorStore, Embedder, Splitter, LLMProvider)
 ├── integrations/             # ORM интеграции (SemanticIndex, PeeweeAdapter)
 │   └── peewee/               # PeeweeAdapter, SearchProxy
 ├── core/                     # Высокоуровневая оркестрация
-│   └── media_queue.py        # MediaQueueProcessor
+│   ├── rag.py                # RAGEngine — вопрос-ответ с источниками
+│   ├── media_queue.py        # MediaQueueProcessor
+│   └── context/              # Стратегии сжатия контекста чата
+├── cli/                      # CLI приложение (Typer + Rich)
+│   ├── app.py                # Точка входа CLI
+│   ├── commands/             # Команды: ingest, search, queue, worker, chat, docs
+│   ├── chat/                 # Интерактивный RAG-чат
+│   │   └── slash/            # Slash-команды (/search, /sources, /model)
+│   ├── console.py            # Rich console
+│   └── ui/                   # UI компоненты
 ├── utils/                    # Утилиты
 │   └── logger/               # Semantic logging (TRACE, эмодзи, bind, secrets)
 ├── infrastructure/
-│   ├── gemini/               # GeminiEmbedder, ImageAnalyzer, AudioAnalyzer, VideoAnalyzer
-│   │   ├── embedder.py       # Embeddings API
+│   ├── gemini/               # Gemini интеграции
+│   │   ├── embedder.py       # Embeddings API (gemini-embedding-001)
 │   │   ├── image_analyzer.py # Vision API
 │   │   ├── audio_analyzer.py # Audio API
 │   │   ├── video_analyzer.py # Video (frames + audio)
 │   │   ├── rate_limiter.py   # Token Bucket RPM control
 │   │   ├── resilience.py     # Retry, backoff, error classification
-│   │   └── batching.py       # Batch API client
+│   │   └── batching.py       # Batch API client (50% экономия)
+│   ├── llm/                  # LLM провайдеры
+│   │   └── gemini_llm.py     # GeminiLLMProvider для RAG
 │   ├── media/utils/          # Утилиты обработки медиа
 │   │   ├── images.py         # Pillow: resize, optimize
 │   │   ├── audio.py          # pydub: extract, compress
@@ -78,20 +93,27 @@ semantic_core/
 │   ├── splitters/            # SmartSplitter
 │   ├── context/              # HierarchicalContextStrategy
 │   └── enrichers/            # MarkdownAssetEnricher
+├── config.py                 # SemanticConfig (Pydantic Settings, TOML)
 ├── batch_manager.py          # Очередь batch-задач
 └── pipeline.py               # SemanticCore orchestrator
 
-tests/                        # 470+ тестов
+tests/                        # 645+ unit-тестов
 ├── conftest.py               # Все фикстуры проекта
 ├── unit/                     # Изолированные unit-тесты
-│   ├── core/                 # BatchManager
-│   ├── infrastructure/       # Gemini, Media utils
+│   ├── core/                 # RAGEngine, BatchManager
+│   ├── infrastructure/       # Gemini, LLM, Media utils
+│   ├── cli/                  # CLI команды, конфигурация
 │   └── processing/           # Parsers, Context, Splitters
 ├── integration/              # Тесты с реальной БД
 │   ├── media/                # Pipeline + QueueProcessor
 │   └── search/               # Гибридный поиск
 ├── e2e/                      # End-to-End с реальными API
 └── fixtures/                 # Тестовые данные
+
+docs/                         # Документация проекта
+└── diagrams/                 # PlantUML диаграммы
+    ├── *.puml                # Исходники диаграмм
+    └── images/               # Отрендеренные .webp
 ```
 
 **Подробнее о тестах:** [tests/README.md](tests/README.md)  
@@ -99,16 +121,30 @@ tests/                        # 470+ тестов
 
 ### 📚 Документация и Тестирование
 
-**Архитектурные документы:**
+**📖 Точки входа в документацию:**
 
-Это наш архитектурный сериал. Мы пишем его в лайт-стиле, чтобы было просто читать и понимать.
+| Ресурс                     | Путь                                                                                                 | Описание                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| **Архитектурный сериал**   | [doc/architecture/00_overview.md](doc/architecture/00_overview.md)                                   | 51 концепция проекта в лёгком стиле   |
+| **Стайл-гайд**             | [doc/architecture/00_documentation_style_guide.md](doc/architecture/00_documentation_style_guide.md) | Правила написания документации        |
+| **PlantUML диаграммы**     | [docs/diagrams/](docs/diagrams/)                                                                     | 8 диаграмм архитектуры                |
+| **Отрендеренные картинки** | [docs/diagrams/images/](docs/diagrams/images/)                                                       | WebP версии диаграмм                  |
+| **Планы и отчёты**         | [doc/ideas/](doc/ideas/)                                                                             | Детальные технические отчёты по фазам |
 
-- [Оглавление документации](doc/architecture/00_overview.md) — обзор всех 38 концепций проекта
-- [Стайл-гайд документации](doc/architecture/00_documentation_style_guide.md) — правила написания доков
+**🖥️ CLI и интерактивный чат:**
 
-Это наш хард-вариант, детальные отчеты по каждой из фаз. Там нет кода, но отличается это тем, что это длинные и сложные для понимания технические документы с кучей деталей. (без кода!)
+```bash
+# Основные команды
+semantic ingest <path>          # Загрузить документы
+semantic search "query"         # Поиск по базе
+semantic chat                   # Интерактивный RAG-чат
 
-- [Полный план разработки](doc/ideas/...) — Там лежат планы с "фазами" и отчеты по ним.
+# Slash-команды в чате
+/search query    # Поиск без LLM
+/sources         # Показать источники
+/model           # Сменить модель
+/clear           # Очистить историю
+```
 
 **Workflow разработки:**
 
