@@ -6,3 +6,6 @@
 
 # User-generated config (created by `semantic init`)
 semantic.toml
+project_docs.db-shm
+project_docs.db-wal
+semantic.db-journal
