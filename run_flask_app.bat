@@ -10,6 +10,9 @@ echo  Semantic Knowledge Base
 echo  ==========================
 echo.
 
+REM Добавляем путь к poetry в PATH
+set "PATH=%USERPROFILE%\AppData\Roaming\Python\Scripts;%PATH%"
+
 REM Переходим в папку Flask приложения
 cd /d "%~dp0examples\flask_app"
 
