@@ -50,8 +50,10 @@ def create_app(config: dict | FlaskAppConfig | None = None) -> Flask:
     # Регистрация blueprints
     from app.routes import main_bp
     from app.routes.search import search_bp
+    from app.routes.ingest import ingest_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(search_bp)
+    app.register_blueprint(ingest_bp)
 
     return app
