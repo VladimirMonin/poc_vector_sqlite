@@ -9,6 +9,7 @@ Usage:
     flask run --debug
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,13 @@ sys.path.insert(0, str(repo_root))
 # Добавляем папку flask_app в PYTHONPATH для импорта app
 flask_app_root = Path(__file__).parent
 sys.path.insert(0, str(flask_app_root))
+
+# Загружаем .env из корня репозитория (там GEMINI_API_KEY)
+from dotenv import load_dotenv
+env_file = repo_root / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
+    print(f"[OK] Загружен .env из {env_file}")
 
 from app import create_app
 from app.config import get_flask_config
