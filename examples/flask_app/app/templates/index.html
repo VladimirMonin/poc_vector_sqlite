@@ -94,15 +94,15 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <a href="#" class="btn btn-outline-primary">
+                    <a href="{{ url_for('search.index') }}" class="btn btn-outline-primary">
                         <i class="bi bi-search me-2"></i>
                         Поиск по базе знаний
                     </a>
-                    <a href="#" class="btn btn-outline-success">
+                    <a href="{{ url_for('ingest.upload_page') }}" class="btn btn-outline-success">
                         <i class="bi bi-upload me-2"></i>
                         Загрузить документы
                     </a>
-                    <a href="#" class="btn btn-outline-info">
+                    <a href="{{ url_for('chat.index') }}" class="btn btn-outline-info">
                         <i class="bi bi-chat-dots me-2"></i>
                         Начать RAG-чат
                     </a>
