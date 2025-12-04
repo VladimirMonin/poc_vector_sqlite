@@ -131,6 +131,11 @@ class SemanticConfig(BaseSettings):
         description="Размерность векторов",
     )
 
+    llm_model: str = Field(
+        default="models/gemini-2.0-flash",
+        description="Модель LLM для RAG и чата",
+    )
+
     # === Processing ===
     splitter: SplitterType = Field(
         default="smart",
