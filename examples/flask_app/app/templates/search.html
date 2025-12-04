@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Поиск — Semantic Knowledge Base{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar с фильтрами -->
+    <div class="col-md-3 col-lg-2">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header">
+                <i class="bi bi-funnel me-1"></i> Фильтры
+            </div>
+            <div class="card-body">
+                <h6 class="text-muted small text-uppercase mb-2">Тип контента</h6>
+                <div id="type-filters">
+                    {% for type in available_types %}
+                    <div class="form-check">
+                        <input 
+                            class="form-check-input type-filter" 
+                            type="checkbox" 
+                            value="{{ type.id }}"
+                            id="type-{{ type.id }}"
+                            checked
+                        >
+                        <label class="form-check-label" for="type-{{ type.id }}">
+                            <i class="bi {{ type.icon }} me-1"></i>
+                            {{ type.label }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <hr>
+                
+                <h6 class="text-muted small text-uppercase mb-2">Режим поиска</h6>
+                <select id="search-mode" class="form-select form-select-sm">
+                    <option value="hybrid" selected>Гибридный (RRF)</option>
+                    <option value="vector">Семантический</option>
+                    <option value="fts">Полнотекстовый</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Основной контент -->
+    <div class="col-md-9 col-lg-10">
+        <!-- Поле поиска -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="position-relative">
+                    <div class="input-group input-group-lg">
+                        <span class="input-group-text bg-transparent border-end-0">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input 
+                            type="text" 
+                            id="search-input"
+                            class="form-control border-start-0"
+                            placeholder="Поиск по базе знаний..."
+                            autocomplete="off"
+                            hx-get="{{ url_for('search.results') }}"
+                            hx-trigger="keyup changed delay:500ms, search"
+                            hx-target="#search-results"
+                            hx-indicator="#search-indicator"
+                            hx-include="#type-filters, #search-mode"
+                            name="q"
+                        >
+                        <span class="input-group-text bg-transparent">
+                            <span id="search-indicator" class="htmx-indicator">
+                                <span class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Поиск...</span>
+                                </span>
+                            </span>
+                        </span>
+                    </div>
+                    
+                    <!-- Автокомплит (datalist) -->
+                    <datalist id="search-suggestions"></datalist>
+                </div>
+                
+                {% if not core_available %}
+                <div class="alert alert-warning mt-3 mb-0" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>SemanticCore недоступен.</strong> 
+                    Проверьте настройку API ключа в semantic.toml или переменных окружения.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Результаты поиска -->
+        <div id="search-results">
+            <!-- Начальное состояние -->
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-search display-1 mb-3"></i>
+                <p class="lead">Введите запрос для поиска</p>
+                <p class="small">
+                    Поиск работает по всем документам: текстам, коду, описаниям изображений и аудио.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Обновление фильтров в запросе
+    function getSelectedTypes() {
+        const checkboxes = document.querySelectorAll('.type-filter:checked');
+        return Array.from(checkboxes).map(cb => cb.value).join(',');
+    }
+    
+    // Добавляем типы к HTMX запросу
+    document.body.addEventListener('htmx:configRequest', function(event) {
+        if (event.detail.path.includes('/search/results')) {
+            event.detail.parameters['types'] = getSelectedTypes();
+            event.detail.parameters['mode'] = document.getElementById('search-mode').value;
+        }
+    });
+    
+    // При изменении фильтров — перезапускаем поиск
+    document.querySelectorAll('.type-filter, #search-mode').forEach(el => {
+        el.addEventListener('change', function() {
+            const input = document.getElementById('search-input');
+            if (input.value.trim()) {
+                htmx.trigger(input, 'search');
+            }
+        });
+    });
+    
+    // Автокомплит
+    let suggestTimeout;
+    document.getElementById('search-input').addEventListener('input', function(e) {
+        clearTimeout(suggestTimeout);
+        const query = e.target.value.trim();
+        
+        if (query.length >= 2) {
+            suggestTimeout = setTimeout(() => {
+                fetch(`{{ url_for('search.suggest') }}?q=${encodeURIComponent(query)}`)
+                    .then(r => r.json())
+                    .then(suggestions => {
+                        const datalist = document.getElementById('search-suggestions');
+                        datalist.innerHTML = suggestions.map(s => `<option value="${s}">`).join('');
+                    });
+            }, 300);
+        }
+    });
+</script>
+{% endblock %}
