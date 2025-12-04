@@ -1,0 +1,10 @@
+# Flask App specific ignores
+*.pyc
+__pycache__/
+.pytest_cache/
+*.db
+*.db-shm
+*.db-wal
+uploads/*
+!uploads/.gitkeep
+.env
