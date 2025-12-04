@@ -225,6 +225,9 @@
 53. [**Cross-Platform Compatibility: Windows Support**](53_windows_compatibility.md)  
     Python версии, CLI-парсинг, PowerShell vs Bash, пути и кодировки
 
+54. [**Python Truthiness Trap: Когда пустой объект — не None**](54_python_truthiness_trap.md)  
+    Коварный баг с `__len__()` и `if not obj:`, E2E тесты для слэш-команд
+
 ---
 
 ## 🚀 Быстрый старт
