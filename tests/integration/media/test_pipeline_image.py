@@ -55,14 +55,15 @@ class TestSemanticCoreImageIngestion:
         assert document_id is not None
         assert isinstance(document_id, str)
 
-        # Документ создан в БД
+        # Документ создан в БД с media_type=image
         doc = DocumentModel.get_by_id(int(document_id))
         assert doc is not None
         assert doc.media_type == "image"
 
-        # Чанк создан с вектором
+        # Чанк создан с типом image_ref и вектором
         chunks = list(ChunkModel.select().where(ChunkModel.document_id == int(document_id)))
-        assert len(chunks) >= 1
+        assert len(chunks) == 1
+        assert chunks[0].chunk_type == "image_ref"
         assert chunks[0].embedding_status == "READY"
 
     def test_ingest_image_async_returns_task_id(

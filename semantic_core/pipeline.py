@@ -415,27 +415,53 @@ class SemanticCore:
                 "mime_type": task.mime_type,
                 "task_id": task_id,
             }
+            keywords = []
             if task.result_keywords:
                 try:
-                    metadata["keywords"] = json.loads(task.result_keywords)
+                    keywords = json.loads(task.result_keywords)
+                    metadata["keywords"] = keywords
                 except (json.JSONDecodeError, TypeError):
                     pass
 
-            # Создаём Document и индексируем
+            # Создаём Document
             doc = Document(
                 content=content,
                 metadata=metadata,
                 media_type=MediaType.IMAGE,
             )
-            saved_doc = self.ingest(doc, mode="sync")
 
-            # Получаем chunk_id из базы
+            # Создаём единственный чанк типа IMAGE_REF
+            from semantic_core.domain import Chunk, ChunkType
+
+            chunk = Chunk(
+                content=content,
+                chunk_index=0,
+                chunk_type=ChunkType.IMAGE_REF,
+                metadata={
+                    "source": path,
+                    "filename": Path(path).name,
+                    "alt_text": task.result_alt_text or "",
+                    "keywords": keywords,
+                },
+            )
+
+            # Формируем текст для векторизации с контекстом
+            vector_text = self.context_strategy.form_vector_text(chunk, doc)
+
+            # Генерируем эмбеддинг
+            embeddings = self.embedder.embed_documents([vector_text])
+            chunk.embedding = embeddings[0]
+
+            # Сохраняем напрямую (минуя splitter)
+            saved_doc = self.store.save(doc, [chunk])
+
+            # Обновляем chunk_id в задаче
             from semantic_core.infrastructure.storage.peewee.models import ChunkModel
-            chunk = ChunkModel.select().where(
+            db_chunk = ChunkModel.select().where(
                 ChunkModel.document_id == saved_doc.id
             ).first()
-            if chunk:
-                task.result_chunk_id = chunk.id
+            if db_chunk:
+                task.result_chunk_id = db_chunk.id
                 task.save()
 
             logger.info(
