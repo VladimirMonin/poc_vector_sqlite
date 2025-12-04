@@ -188,10 +188,20 @@ def documents_page():
     documents = []
     for doc in DocumentModel.select().order_by(DocumentModel.created_at.desc()):
         stats = _get_document_stats(doc.id)
+        
+        # metadata может быть dict или строкой (JSON) в зависимости от версии
+        meta = doc.metadata
+        if isinstance(meta, str):
+            import json
+            try:
+                meta = json.loads(meta)
+            except (json.JSONDecodeError, TypeError):
+                meta = {}
+        
         documents.append({
             "id": doc.id,
-            "title": doc.metadata.get("title", "Без названия") if doc.metadata else "Без названия",
-            "source": doc.metadata.get("source", "—") if doc.metadata else "—",
+            "title": meta.get("title", "Без названия") if isinstance(meta, dict) else "Без названия",
+            "source": meta.get("source", "—") if isinstance(meta, dict) else "—",
             "created_at": doc.created_at,
             "stats": stats,
             "has_pending": stats["pending"] > 0,

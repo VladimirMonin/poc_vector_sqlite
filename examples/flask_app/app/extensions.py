@@ -130,3 +130,27 @@ def init_semantic_core(app: Flask) -> None:
     app.extensions["semantic_config"] = config
     app.extensions["semantic_store"] = store
     app.extensions["query_cache"] = query_cache
+
+    # Chat Service (если есть core)
+    chat_service = None
+    if core:
+        from semantic_core.infrastructure.llm import GeminiLLMProvider
+        from app.services.chat_service import ChatService
+
+        try:
+            llm = GeminiLLMProvider(
+                api_key=api_key,
+                model=config.llm_model,
+            )
+            chat_service = ChatService(
+                core=core,
+                llm=llm,
+                database=db,
+                cache=query_cache,
+                context_chunks=5,
+            )
+            logger.info(f"💬 ChatService инициализирован, model={config.llm_model}")
+        except Exception as e:
+            logger.warning(f"⚠️ ChatService не создан: {e}")
+
+    app.extensions["chat_service"] = chat_service

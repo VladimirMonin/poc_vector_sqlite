@@ -4,5 +4,6 @@
 """
 
 from app.models.cache import SearchQueryModel
+from app.models.chat import ChatSessionModel, ChatMessageModel
 
-__all__ = ["SearchQueryModel"]
+__all__ = ["SearchQueryModel", "ChatSessionModel", "ChatMessageModel"]

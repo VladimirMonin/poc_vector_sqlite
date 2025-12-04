@@ -51,9 +51,11 @@ def create_app(config: dict | FlaskAppConfig | None = None) -> Flask:
     from app.routes import main_bp
     from app.routes.search import search_bp
     from app.routes.ingest import ingest_bp
+    from app.routes.chat import chat_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(ingest_bp)
+    app.register_blueprint(chat_bp)
 
     return app

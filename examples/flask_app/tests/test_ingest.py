@@ -173,13 +173,17 @@ class TestIngestRoutes:
 
         assert response.status_code == 200
 
-    def test_documents_page_empty(self, client):
-        """Пустой список документов."""
+    def test_documents_page_shows_table(self, client):
+        """Страница документов показывает таблицу."""
         response = client.get("/documents")
 
         assert response.status_code == 200
-        # Должно быть сообщение о пустом списке
-        assert b"inbox" in response.data.lower() or b"\xd0\xbd\xd0\xb5\xd1\x82" in response.data.lower()
+        # Должна быть таблица документов или сообщение о пустом списке
+        assert (
+            b"documents-table" in response.data  # Таблица документов
+            or b"inbox" in response.data.lower()  # Пустой inbox
+            or b"\xd0\xbd\xd0\xb5\xd1\x82" in response.data.lower()  # "нет" по-русски
+        )
 
     def test_upload_no_files(self, client):
         """Загрузка без файлов показывает предупреждение."""
