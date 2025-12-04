@@ -82,6 +82,7 @@ def _create_document(path: Path) -> Document:
             "title": path.stem,
             "source": str(path),
             "filename": path.name,
+            "doc_id": path.stem,  # Для логов SmartSplitter
         },
     )
 
