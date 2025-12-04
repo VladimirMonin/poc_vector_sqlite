@@ -56,13 +56,13 @@ Production-ready библиотека для локального семанти
 
 Веб-интерфейс для SemanticCore. Стек: Flask 3 + Bootstrap 5.3 + HTMX + Pydantic Settings.
 
-| Компонент | Файл | Назначение |
-|-----------|------|------------|
-| Factory | `app/__init__.py` | `create_app()` с Pydantic config |
-| DI | `app/extensions.py` | `app.extensions['semantic_core']` |
-| Config | `app/config.py` | `FlaskAppConfig` (FLASK_ prefix) |
-| HTTP Logs | `app/logging.py` | Middleware с эмодзи (🌐⚡⚠️🔥) |
-| Dashboard | `app/routes/main.py` | `/`, `/health` |
+| Компонент | Файл                 | Назначение                        |
+| --------- | -------------------- | --------------------------------- |
+| Factory   | `app/__init__.py`    | `create_app()` с Pydantic config  |
+| DI        | `app/extensions.py`  | `app.extensions['semantic_core']` |
+| Config    | `app/config.py`      | `FlaskAppConfig` (FLASK\_ prefix) |
+| HTTP Logs | `app/logging.py`     | Middleware с эмодзи (🌐⚡⚠️🔥)    |
+| Dashboard | `app/routes/main.py` | `/`, `/health`                    |
 
 ### 📂 Структура Проекта
 

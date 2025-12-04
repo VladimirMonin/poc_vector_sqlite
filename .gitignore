@@ -9,3 +9,4 @@ semantic.toml
 project_docs.db-shm
 project_docs.db-wal
 semantic.db-journal
+examples/flask_app/instance/uploads/

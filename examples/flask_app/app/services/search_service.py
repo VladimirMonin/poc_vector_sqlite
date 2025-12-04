@@ -169,6 +169,8 @@ class SearchService:
             return []
 
         query = query.strip()
+        # Гарантируем int для limit (защита от некорректных вызовов)
+        limit = int(limit) if limit else 20
         logger.info(f"🔍 Поиск: '{query[:50]}...' mode={mode}, types={chunk_types}")
 
         # Если есть кэш — используем кэшированный вектор

@@ -80,7 +80,7 @@ def results():
     query = request.args.get("q", "").strip()
     types_param = request.args.get("types", "")
     mode = request.args.get("mode", "hybrid")
-    limit = request.args.get("limit", "20", type=int)
+    limit = request.args.get("limit", 20, type=int)
 
     # Пустой запрос — пустые результаты
     if not query:
@@ -111,7 +111,10 @@ def results():
         )
 
     except Exception as e:
+        import traceback
+
         logger.error(f"🔥 Search error: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
         return render_template(
             "partials/search_error.html",
             error=f"Ошибка поиска: {str(e)}",

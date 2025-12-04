@@ -155,7 +155,11 @@ class TestIngestRoutes:
         response = client.get("/ingest")
 
         assert response.status_code == 200
-        assert b"upload" in response.data.lower() or b"\xd0\xb7\xd0\xb0\xd0\xb3\xd1\x80\xd1\x83\xd0\xb7" in response.data.lower()
+        assert (
+            b"upload" in response.data.lower()
+            or b"\xd0\xb7\xd0\xb0\xd0\xb3\xd1\x80\xd1\x83\xd0\xb7"
+            in response.data.lower()
+        )
 
     def test_upload_page_without_core(self, app, client):
         """Страница показывает предупреждение без core."""

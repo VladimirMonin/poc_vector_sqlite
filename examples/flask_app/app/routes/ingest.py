@@ -49,7 +49,7 @@ def _get_upload_service() -> UploadService:
 def _get_document_stats(doc_id: int) -> dict:
     """Получить статистику чанков документа."""
     chunks = ChunkModel.select().where(ChunkModel.document_id == doc_id)
-    
+
     stats = {
         "total": 0,
         "text": 0,
@@ -58,7 +58,7 @@ def _get_document_stats(doc_id: int) -> dict:
         "audio": 0,
         "pending": 0,
     }
-    
+
     for chunk in chunks:
         stats["total"] += 1
         chunk_type = chunk.chunk_type
@@ -70,10 +70,10 @@ def _get_document_stats(doc_id: int) -> dict:
             stats["image"] += 1
         elif chunk_type == "audio_ref":
             stats["audio"] += 1
-        
+
         if chunk.embedding_status == "pending":
             stats["pending"] += 1
-    
+
     return stats
 
 
@@ -171,7 +171,10 @@ def upload_files():
                 "info",
             )
         else:
-            flash(f"✅ Загружено и проиндексировано {ingested_count} документов", "success")
+            flash(
+                f"✅ Загружено и проиндексировано {ingested_count} документов",
+                "success",
+            )
 
     return redirect(url_for("ingest.documents_page"))
 
@@ -188,24 +191,29 @@ def documents_page():
     documents = []
     for doc in DocumentModel.select().order_by(DocumentModel.created_at.desc()):
         stats = _get_document_stats(doc.id)
-        
+
         # metadata может быть dict или строкой (JSON) в зависимости от версии
         meta = doc.metadata
         if isinstance(meta, str):
             import json
+
             try:
                 meta = json.loads(meta)
             except (json.JSONDecodeError, TypeError):
                 meta = {}
-        
-        documents.append({
-            "id": doc.id,
-            "title": meta.get("title", "Без названия") if isinstance(meta, dict) else "Без названия",
-            "source": meta.get("source", "—") if isinstance(meta, dict) else "—",
-            "created_at": doc.created_at,
-            "stats": stats,
-            "has_pending": stats["pending"] > 0,
-        })
+
+        documents.append(
+            {
+                "id": doc.id,
+                "title": meta.get("title", "Без названия")
+                if isinstance(meta, dict)
+                else "Без названия",
+                "source": meta.get("source", "—") if isinstance(meta, dict) else "—",
+                "created_at": doc.created_at,
+                "stats": stats,
+                "has_pending": stats["pending"] > 0,
+            }
+        )
 
     return render_template(
         "documents.html",
@@ -227,11 +235,11 @@ def delete_document(doc_id: int):
     try:
         deleted = core.delete(doc_id)
         logger.info(f"🗑️ Удалён документ {doc_id}, {deleted} записей")
-        
+
         # Для HTMX — пустой ответ удаляет элемент
         if request.headers.get("HX-Request"):
             return "", 200
-        
+
         flash(f"Документ удалён ({deleted} записей)", "success")
         return redirect(url_for("ingest.documents_page"))
 

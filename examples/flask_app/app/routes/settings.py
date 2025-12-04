@@ -23,6 +23,7 @@ def index():
     semantic_settings = {}
     try:
         from semantic_core.config import get_config
+
         cfg = get_config()
         semantic_settings = {
             "db_path": str(cfg.db_path),

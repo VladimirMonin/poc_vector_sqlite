@@ -26,13 +26,27 @@ logger = get_logger("flask_app.upload")
 # Поддерживаемые расширения
 ALLOWED_EXTENSIONS = {
     # Документы
-    ".md", ".markdown", ".txt",
+    ".md",
+    ".markdown",
+    ".txt",
     # Изображения
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
     # Аудио
-    ".mp3", ".wav", ".ogg", ".m4a", ".flac",
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".m4a",
+    ".flac",
     # Видео
-    ".mp4", ".webm", ".mov", ".avi",
+    ".mp4",
+    ".webm",
+    ".mov",
+    ".avi",
 }
 
 
@@ -231,9 +245,11 @@ class UploadService:
         files = []
         for file_path in self.upload_dir.iterdir():
             if file_path.is_file():
-                files.append({
-                    "name": file_path.name,
-                    "size": file_path.stat().st_size,
-                    "modified": file_path.stat().st_mtime,
-                })
+                files.append(
+                    {
+                        "name": file_path.name,
+                        "size": file_path.stat().st_size,
+                        "modified": file_path.stat().st_mtime,
+                    }
+                )
         return sorted(files, key=lambda f: f["modified"], reverse=True)

@@ -331,9 +331,7 @@ class ChatService:
         logger.info(f"🗑️ Session deleted: {session_id}")
         return True
 
-    def _get_or_create_session(
-        self, session_id: Optional[str]
-    ) -> ChatSessionModel:
+    def _get_or_create_session(self, session_id: Optional[str]) -> ChatSessionModel:
         """Получить существующую или создать новую сессию.
 
         Args:

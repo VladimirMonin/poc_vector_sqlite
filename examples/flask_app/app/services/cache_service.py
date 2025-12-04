@@ -99,9 +99,7 @@ class QueryCacheService:
         query_hash = SearchQueryModel.compute_hash(query)
 
         # Попытка найти в кэше
-        cached = SearchQueryModel.get_or_none(
-            SearchQueryModel.query_hash == query_hash
-        )
+        cached = SearchQueryModel.get_or_none(SearchQueryModel.query_hash == query_hash)
 
         if cached:
             # Cache hit
@@ -172,17 +170,23 @@ class QueryCacheService:
         """
         from peewee import fn
 
-        stats = SearchQueryModel.select(
-            fn.COUNT(SearchQueryModel.id).alias("unique"),
-            fn.SUM(SearchQueryModel.frequency).alias("total_hits"),
-            fn.AVG(SearchQueryModel.frequency).alias("avg_freq"),
-        ).dicts().get()
+        stats = (
+            SearchQueryModel.select(
+                fn.COUNT(SearchQueryModel.id).alias("unique"),
+                fn.SUM(SearchQueryModel.frequency).alias("total_hits"),
+                fn.AVG(SearchQueryModel.frequency).alias("avg_freq"),
+            )
+            .dicts()
+            .get()
+        )
 
         return {
             "unique_queries": stats["unique"] or 0,
             "total_hits": stats["total_hits"] or 0,
             "avg_frequency": round(stats["avg_freq"] or 0, 2),
-            "cache_savings": max(0, (stats["total_hits"] or 0) - (stats["unique"] or 0)),
+            "cache_savings": max(
+                0, (stats["total_hits"] or 0) - (stats["unique"] or 0)
+            ),
         }
 
     def clear(self) -> int:

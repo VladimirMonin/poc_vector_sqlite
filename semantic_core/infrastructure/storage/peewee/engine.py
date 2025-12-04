@@ -81,7 +81,7 @@ def init_peewee_database(
         path=str(db_path),
         dimension=dimension,
     )
-    
+
     database = VectorDatabase(
         str(db_path),
         pragmas={
@@ -95,7 +95,7 @@ def init_peewee_database(
 
     # Подключаемся для загрузки расширения
     database.connect()
-    
+
     logger.info(
         "Database initialized",
         path=str(db_path),

@@ -204,8 +204,8 @@ class TestChatService:
             sources = []
             for i in range(sources_count):
                 source = MagicMock()
-                source.content = f"Source content {i+1}"
-                source.parent_doc_title = f"Document {i+1}"
+                source.content = f"Source content {i + 1}"
+                source.parent_doc_title = f"Document {i + 1}"
                 source.parent_doc_id = i + 1
                 source.chunk_type = MagicMock(value="text")
                 source.score = 0.05 - i * 0.01

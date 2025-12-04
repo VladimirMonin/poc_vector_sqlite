@@ -379,6 +379,7 @@ def test_health_endpoint(client):
 5. **HTMX + Bootstrap 5.3** — современный UI минимумом JS
 
 **Следующие шаги:**
+
 - Phase 12.1: Search Query Cache
 - Phase 12.2: Search Interface
 - Phase 12.3: Document Upload

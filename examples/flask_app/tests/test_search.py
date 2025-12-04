@@ -292,7 +292,10 @@ class TestSearchRoutes:
         response = client.get("/search/")
 
         assert response.status_code == 200
-        assert b"search" in response.data.lower() or b"\xd0\xbf\xd0\xbe\xd0\xb8\xd1\x81\xd0\xba" in response.data
+        assert (
+            b"search" in response.data.lower()
+            or b"\xd0\xbf\xd0\xbe\xd0\xb8\xd1\x81\xd0\xba" in response.data
+        )
 
     def test_search_page_without_core(self, app, client):
         """Страница показывает предупреждение без core."""

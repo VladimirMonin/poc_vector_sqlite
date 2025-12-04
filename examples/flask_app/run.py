@@ -25,6 +25,7 @@ sys.path.insert(0, str(flask_app_root))
 
 # Загружаем .env ДО импорта app (который импортирует semantic_core)
 from dotenv import load_dotenv
+
 env_file = repo_root / ".env"
 if env_file.exists():
     load_dotenv(env_file, override=True)  # override=True для перезаписи
