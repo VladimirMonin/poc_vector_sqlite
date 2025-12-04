@@ -241,6 +241,9 @@
 57. [**Search Interface Architecture**](57_search_interface.md)  
     HTMX + Flask: интеллектуальный поиск с фильтрами, Markdown рендеринг, Score визуализация
 
+58. [**Content Management Architecture**](58_content_management.md)  
+    Drag-n-Drop загрузка, UUID-именование, sync/async индексация, управление документами
+
 ---
 
 ## 🚀 Быстрый старт
