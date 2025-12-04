@@ -7,10 +7,12 @@
         Координатор батч-обработки эмбеддингов.
 """
 
+from __future__ import annotations
+
 import json
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import TYPE_CHECKING, Optional, Dict, List
 
 from semantic_core.domain import GoogleKeyring
 from semantic_core.infrastructure.gemini import GeminiBatchClient
@@ -21,6 +23,9 @@ from semantic_core.infrastructure.storage.peewee.models import (
     EmbeddingStatus,
 )
 from semantic_core.interfaces import BaseVectorStore
+
+if TYPE_CHECKING:
+    from semantic_core.config import SemanticConfig
 
 
 class BatchManager:
@@ -52,7 +57,7 @@ class BatchManager:
         self,
         keyring: GoogleKeyring,
         vector_store: BaseVectorStore,
-        model_name: str = "models/text-embedding-004",
+        model_name: str = "models/gemini-embedding-001",
         dimension: int = 768,
     ):
         """Инициализация менеджера.
@@ -74,6 +79,42 @@ class BatchManager:
             api_key=keyring.get_batch_key(),
             model_name=model_name,
             dimension=dimension,
+        )
+
+    @classmethod
+    def from_config(
+        cls,
+        config: SemanticConfig,
+        vector_store: BaseVectorStore,
+    ) -> "BatchManager":
+        """Создаёт BatchManager из конфигурации.
+
+        Factory-метод для создания экземпляра с параметрами из SemanticConfig.
+
+        Args:
+            config: Конфигурация Semantic Core.
+            vector_store: Хранилище для массового обновления векторов.
+
+        Returns:
+            Инициализированный BatchManager.
+
+        Raises:
+            ValueError: Если batch_key не настроен.
+
+        Example:
+            >>> from semantic_core.config import get_config
+            >>> config = get_config()
+            >>> manager = BatchManager.from_config(config, vector_store)
+        """
+        keyring = GoogleKeyring(
+            default=config.require_api_key(),
+            batch=config.gemini_batch_key,
+        )
+        return cls(
+            keyring=keyring,
+            vector_store=vector_store,
+            model_name=config.embedding_model,
+            dimension=config.embedding_dimension,
         )
 
     def flush_queue(

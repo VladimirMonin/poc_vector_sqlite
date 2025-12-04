@@ -1,0 +1,246 @@
+# 🔌 Phase 11.6: Guides (extending)
+
+> Гайды по расширению библиотеки новыми провайдерами (LLM, Embedder, VectorStore, MCP)
+
+---
+
+## 🎯 Цель
+
+Написать 4 гайда для разработчиков, добавляющих новые компоненты.
+
+---
+
+## 📊 Диаграмма: Plugin Architecture
+
+```plantuml
+@startuml
+!theme plain
+
+interface BaseEmbedder {
+    +embed_documents(texts): list[vector]
+    +embed_query(query): vector
+}
+
+interface BaseLLMProvider {
+    +generate(prompt, context): GenerationResult
+}
+
+interface BaseVectorStore {
+    +add_chunks(chunks)
+    +search_vector(query, limit)
+    +search_fts(query, limit)
+    +search_hybrid(query, limit)
+}
+
+class GeminiEmbedder implements BaseEmbedder
+class OpenAIEmbedder implements BaseEmbedder
+class OllamaEmbedder implements BaseEmbedder
+
+class GeminiLLM implements BaseLLMProvider
+class OpenAILLM implements BaseLLMProvider
+class AnthropicLLM implements BaseLLMProvider
+
+class PeeweeVectorStore implements BaseVectorStore
+class ChromaDBStore implements BaseVectorStore
+class QdrantStore implements BaseVectorStore
+
+class SemanticCore {
+    -embedder: BaseEmbedder
+    -llm: BaseLLMProvider
+    -store: BaseVectorStore
+}
+
+SemanticCore o-- BaseEmbedder
+SemanticCore o-- BaseLLMProvider
+SemanticCore o-- BaseVectorStore
+@enduml
+```
+
+---
+
+## 📋 Файлы для создания
+
+### 1. guides/extending/custom-llm-provider.md
+
+**Источники**: semantic_core/interfaces/llm.py, infrastructure/llm/
+
+**Содержание:**
+- Интерфейс BaseLLMProvider (диаграмма)
+- Метод generate(): параметры и возврат
+- GenerationResult DTO
+- Mapping параметров для разных API (таблица)
+- Пример: OpenAI GPT-4o (псевдокод)
+- Пример: Anthropic Claude 3.5/4 (псевдокод)
+- Пример: Ollama локальный (псевдокод)
+- Регистрация в SemanticCore
+
+**Актуальные модели для примеров**:
+| Провайдер | Модели |
+|-----------|--------|
+| Google | gemini-2.5-flash, gemini-2.5-pro, gemini-3.0-pro |
+| OpenAI | gpt-4o, gpt-4o-mini, o1, o3 |
+| Anthropic | claude-3.5-sonnet, claude-4-opus |
+| Ollama | llama3.3, mistral, qwen2.5 |
+
+**Диаграмма**: Class — BaseLLMProvider + 3 реализации
+
+**Frontmatter tags**: `[extending, llm, openai, anthropic, ollama]`
+
+---
+
+### 2. guides/extending/custom-vector-store.md
+
+**Источники**: semantic_core/interfaces/vector_store.py, infrastructure/storage/
+
+**Содержание:**
+- Интерфейс BaseVectorStore (диаграмма)
+- 8 методов для реализации (таблица)
+- Особенности: FTS fallback, RRF on client
+- Metadata filtering: разные API
+- Пример: ChromaDB (псевдокод)
+- Пример: Qdrant (псевдокод)
+- Миграция данных между stores
+
+**Диаграмма**: Class — BaseVectorStore + методы
+
+**Frontmatter tags**: `[extending, vector-store, chromadb, qdrant, pinecone]`
+
+---
+
+### 3. guides/extending/custom-embedder.md
+
+**Источники**: semantic_core/interfaces/embedder.py, infrastructure/gemini/embedder.py
+
+**Содержание:**
+- Интерфейс BaseEmbedder (диаграмма)
+- embed_documents() vs embed_query()
+- Размерность и MRL
+
+**Актуальные embedding модели**:
+| Провайдер | Модель | Размерности |
+|-----------|--------|-------------|
+| Google | gemini-embedding-001 | 768 / 1536 / 3072 (MRL) |
+| OpenAI | text-embedding-3-large | 256-3072 (MRL) |
+| OpenAI | text-embedding-3-small | 512-1536 |
+| Cohere | embed-v4 | 1024 |
+| Local | sentence-transformers | 384-1024 |
+
+- Нормализация векторов
+- Пример: OpenAI Embeddings (псевдокод)
+- Пример: Cohere Embed (псевдокод)
+- Пример: Локальный sentence-transformers (псевдокод)
+- **Важно**: все embeddings должны быть одной размерности в БД
+
+**Диаграмма**: Class — BaseEmbedder + реализации
+
+**Frontmatter tags**: `[extending, embedder, openai, cohere, sentence-transformers, mrl]`
+
+---
+
+### 4. guides/extending/mcp-server.md
+
+**Источники**: Концепция MCP, текущие интерфейсы
+
+**Содержание:**
+- Что такое MCP (Model Context Protocol)
+- Архитектура: SemanticCore как backend для MCP
+- Tool definitions (JSON schema)
+- Три основных инструмента:
+  - semantic_search(query, limit)
+  - semantic_ingest(path, metadata)
+  - semantic_chat(message, history)
+- Пример сервера на FastMCP (псевдокод)
+- Клиенты: Claude Desktop, Cursor, custom
+- Security considerations
+
+**Диаграмма**: Sequence — MCP Client → Server → SemanticCore
+
+**Frontmatter tags**: `[extending, mcp, tools, integration, ai-agents]`
+
+---
+
+## 📐 Шаблон extending гайда
+
+```markdown
+---
+title: "Добавление своего X"
+description: "Как реализовать интерфейс BaseX"
+tags: [extending, x, ...]
+difficulty: intermediate | advanced
+interfaces: [BaseX]
+---
+
+## Что получим 🎯
+
+Возможность использовать Y вместо Z.
+
+## Интерфейс 📋
+
+[PlantUML Class диаграмма]
+
+| Метод | Параметры | Возврат | Описание |
+|-------|-----------|---------|----------|
+| ... | ... | ... | ... |
+
+## Пошаговая реализация 🛠️
+
+### Шаг 1: Создать класс
+
+```python
+# Псевдокод (5-10 строк)
+```
+
+### Шаг 2: Реализовать методы
+
+...
+
+### Шаг 3: Зарегистрировать
+
+...
+
+## Mapping параметров 📊
+
+| Semantic Core | Provider A | Provider B |
+|---------------|------------|------------|
+| ... | ... | ... |
+
+## Примеры реализаций 💡
+
+### Provider A
+[Краткий псевдокод]
+
+### Provider B
+[Краткий псевдокод]
+
+## Тестирование ✅
+
+Как протестировать свою реализацию.
+
+## Частые ошибки ⚠️
+
+| Ошибка | Причина | Решение |
+|--------|---------|---------|
+| ... | ... | ... |
+
+## Связанные темы 🔗
+
+- [Concepts: Plugin System](../../concepts/10_plugin_system.md)
+```
+
+---
+
+## ✅ Критерии готовности
+
+- [ ] 4 файла созданы
+- [ ] Class диаграмма для каждого интерфейса
+- [ ] Таблица методов с описанием
+- [ ] Минимум 2 примера провайдеров
+- [ ] Псевдокод, не полный код
+- [ ] Секция "Частые ошибки"
+
+---
+
+## 🔗 Зависимости
+
+**Требует**: 11.1 (структура), 11.3 (concepts/10_plugin_system.md)
+**Блокирует**: Нет

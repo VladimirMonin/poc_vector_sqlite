@@ -192,7 +192,7 @@ db_path = "semantic.db"
 log_level = "INFO"
 
 # Модель для эмбеддингов
-embedding_model = "text-embedding-004"
+embedding_model = "models/gemini-embedding-001"
 
 # Размерность векторов
 embedding_dimensions = 768

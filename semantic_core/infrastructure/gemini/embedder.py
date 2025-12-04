@@ -5,14 +5,19 @@
         Адаптер для генерации эмбеддингов через Gemini.
 """
 
+from __future__ import annotations
+
 import time
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import google.generativeai as genai
 import numpy as np
 
 from semantic_core.interfaces import BaseEmbedder
 from semantic_core.utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from semantic_core.config import SemanticConfig
 
 logger = get_logger(__name__)
 
@@ -29,14 +34,14 @@ class GeminiEmbedder(BaseEmbedder):
     - Автоматической нормализации векторов.
 
     Attributes:
-        model_name: Название модели (по умолчанию 'models/text-embedding-004').
+        model_name: Название модели (по умолчанию 'models/gemini-embedding-001').
         dimension: Размерность векторов (768 для MRL).
     """
 
     def __init__(
         self,
         api_key: str,
-        model_name: str = "models/text-embedding-004",
+        model_name: str = "models/gemini-embedding-001",
         dimension: int = 768,
     ):
         """Инициализация адаптера Gemini.
@@ -56,6 +61,32 @@ class GeminiEmbedder(BaseEmbedder):
             "Embedder initialized",
             model=model_name,
             dimension=dimension,
+        )
+
+    @classmethod
+    def from_config(cls, config: SemanticConfig) -> GeminiEmbedder:
+        """Создаёт embedder из конфигурации.
+
+        Factory-метод для создания экземпляра с параметрами из SemanticConfig.
+
+        Args:
+            config: Конфигурация Semantic Core.
+
+        Returns:
+            Инициализированный GeminiEmbedder.
+
+        Raises:
+            ValueError: Если API ключ не настроен.
+
+        Example:
+            >>> from semantic_core.config import get_config
+            >>> config = get_config()
+            >>> embedder = GeminiEmbedder.from_config(config)
+        """
+        return cls(
+            api_key=config.require_api_key(),
+            model_name=config.embedding_model,
+            dimension=config.embedding_dimension,
         )
 
     def embed_documents(self, texts: list[str]) -> list[np.ndarray]:

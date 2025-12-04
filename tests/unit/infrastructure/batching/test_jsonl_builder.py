@@ -3,7 +3,7 @@
 Проверяет:
 - Валидность JSON в каждой строке
 - Правильность структуры запроса Google Batch API
-- Соответствие custom_id и chunk.id
+- Соответствие key и chunk.id
 - Корректность обработки context_texts
 """
 
@@ -70,10 +70,14 @@ class TestJSONLBuilder:
             Path(jsonl_path).unlink(missing_ok=True)
 
     def test_google_request_structure(self):
-        """Проверка структуры запроса согласно Google Batch API спецификации."""
+        """Проверка структуры запроса согласно Google Batch API спецификации.
+        
+        Формат JSONL по документации google-genai SDK:
+        {"key": "id", "request": {"model": "...", "contents": [...], "config": {...}}}
+        """
         client = GeminiBatchClient(
             api_key="MOCK_KEY",
-            model_name="models/text-embedding-004",
+            model_name="models/gemini-embedding-001",
             dimension=768,
         )
 
@@ -95,23 +99,26 @@ class TestJSONLBuilder:
                 request = json.loads(line)
 
             # Проверяем верхний уровень
-            assert "custom_id" in request, "Должен быть custom_id"
+            assert "key" in request, "Должен быть key (не custom_id!)"
             assert "request" in request, "Должен быть request"
 
-            # Проверяем custom_id
-            assert request["custom_id"] == "chunk_123", (
-                "custom_id должен совпадать с chunk.id"
+            # Проверяем key
+            assert request["key"] == "chunk_123", (
+                "key должен совпадать с chunk.id"
             )
 
             # Проверяем структуру request
             req = request["request"]
             assert "model" in req, "Должна быть model"
-            assert req["model"] == "models/text-embedding-004", "Неверная модель"
+            assert req["model"] == "models/gemini-embedding-001", "Неверная модель"
 
-            assert "content" in req, "Должен быть content"
-            assert "parts" in req["content"], "content должен иметь parts"
-            assert len(req["content"]["parts"]) > 0, "parts не должен быть пустым"
-            assert "text" in req["content"]["parts"][0], "parts[0] должен иметь text"
+            # ВАЖНО: contents - массив, не content объект!
+            assert "contents" in req, "Должен быть contents (массив)"
+            assert "content" not in req, "Не должно быть content (объект)"
+            assert isinstance(req["contents"], list), "contents должен быть списком"
+            assert len(req["contents"]) > 0, "contents не должен быть пустым"
+            assert "parts" in req["contents"][0], "contents[0] должен иметь parts"
+            assert "text" in req["contents"][0]["parts"][0], "parts[0] должен иметь text"
 
             assert "config" in req, "Должен быть config"
             assert req["config"]["task_type"] == "RETRIEVAL_DOCUMENT", (
@@ -147,7 +154,8 @@ class TestJSONLBuilder:
                 line = f.readline()
                 request = json.loads(line)
 
-            text_content = request["request"]["content"]["parts"][0]["text"]
+            # Новый формат: contents[0].parts[0].text
+            text_content = request["request"]["contents"][0]["parts"][0]["text"]
 
             # Проверяем, что использовался context_text, а не просто content
             assert "Title: Document Title" in text_content, (
@@ -160,8 +168,8 @@ class TestJSONLBuilder:
         finally:
             Path(jsonl_path).unlink(missing_ok=True)
 
-    def test_multiple_chunks_custom_ids(self):
-        """Проверка соответствия custom_id для нескольких чанков."""
+    def test_multiple_chunks_keys(self):
+        """Проверка соответствия key для нескольких чанков."""
         client = GeminiBatchClient(api_key="MOCK_KEY", dimension=768)
 
         expected_ids = ["chunk_a", "chunk_b", "chunk_c", "chunk_d"]
@@ -182,15 +190,15 @@ class TestJSONLBuilder:
             with open(jsonl_path, "r") as f:
                 lines = f.readlines()
 
-            # Извлекаем custom_id из каждой строки
-            custom_ids = []
+            # Извлекаем key из каждой строки
+            keys = []
             for line in lines:
                 request = json.loads(line)
-                custom_ids.append(request["custom_id"])
+                keys.append(request["key"])
 
             # Проверяем соответствие
-            assert custom_ids == expected_ids, (
-                "custom_id должны совпадать с chunk.id в том же порядке"
+            assert keys == expected_ids, (
+                "key должны совпадать с chunk.id в том же порядке"
             )
 
         finally:
