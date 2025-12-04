@@ -18,7 +18,9 @@ logger = get_logger(__name__)
 class VectorDatabase(SqliteExtDatabase):
     """Расширенная БД SQLite с поддержкой sqlite-vec.
 
-    Автоматически загружает расширение при подключении.
+    Автоматически загружает расширение при каждом подключении.
+    SQLite extensions привязаны к connection, поэтому загружаем
+    для каждого нового соединения через _add_conn_hooks.
     """
 
     def __init__(self, database: str | Path, *args, **kwargs):
@@ -28,7 +30,6 @@ class VectorDatabase(SqliteExtDatabase):
             database: Путь к файлу БД.
         """
         super().__init__(database, *args, **kwargs)
-        self._vector_extension_loaded = False
         logger.debug(
             "VectorDatabase created",
             path=str(database),
@@ -37,27 +38,29 @@ class VectorDatabase(SqliteExtDatabase):
     def _add_conn_hooks(self, conn: sqlite3.Connection) -> None:
         """Хук загрузки расширения sqlite-vec.
 
+        ВАЖНО: Расширение загружается для КАЖДОГО соединения,
+        т.к. SQLite extensions привязаны к connection, не к database.
+
         Args:
             conn: Объект соединения SQLite.
         """
         super()._add_conn_hooks(conn)
 
-        if not self._vector_extension_loaded:
-            conn.enable_load_extension(True)
-            try:
-                import sqlite_vec
+        # Загружаем расширение для КАЖДОГО нового соединения
+        conn.enable_load_extension(True)
+        try:
+            import sqlite_vec
 
-                sqlite_vec.load(conn)
-                self._vector_extension_loaded = True
-                logger.debug("sqlite-vec extension loaded")
-            except Exception as e:
-                logger.error(
-                    "Failed to load sqlite-vec extension",
-                    error_type=type(e).__name__,
-                )
-                raise RuntimeError(f"Не удалось загрузить sqlite-vec: {e}")
-            finally:
-                conn.enable_load_extension(False)
+            sqlite_vec.load(conn)
+            logger.debug("sqlite-vec extension loaded for connection")
+        except Exception as e:
+            logger.error(
+                "Failed to load sqlite-vec extension",
+                error_type=type(e).__name__,
+            )
+            raise RuntimeError(f"Не удалось загрузить sqlite-vec: {e}")
+        finally:
+            conn.enable_load_extension(False)
 
 
 def init_peewee_database(
