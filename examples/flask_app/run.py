@@ -16,6 +16,10 @@ from pathlib import Path
 repo_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(repo_root))
 
+# Добавляем папку flask_app в PYTHONPATH для импорта app
+flask_app_root = Path(__file__).parent
+sys.path.insert(0, str(flask_app_root))
+
 from app import create_app
 from app.config import get_flask_config
 

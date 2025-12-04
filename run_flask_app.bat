@@ -13,7 +13,7 @@ echo.
 REM Добавляем путь к poetry в PATH
 set "PATH=%USERPROFILE%\AppData\Roaming\Python\Scripts;%PATH%"
 
-REM Переходим в корень проекта
+REM Переходим в корень проекта (откуда запущен батник)
 cd /d "%~dp0"
 
 REM Проверяем наличие poetry
@@ -28,19 +28,13 @@ REM Устанавливаем зависимости (если нужно)
 echo [*] Проверка зависимостей...
 call poetry install --quiet
 
-REM Добавляем корень проекта и папку flask_app в PYTHONPATH
-set "PYTHONPATH=%cd%;%cd%\examples\flask_app;%PYTHONPATH%"
-
-REM Переходим в папку Flask приложения
-cd /d "%~dp0examples\flask_app"
-
-REM Запускаем приложение
+REM Запускаем приложение из корня проекта
 echo.
 echo [OK] Запуск Flask приложения...
 echo     URL: http://127.0.0.1:5000
 echo     Нажмите Ctrl+C для остановки
 echo.
 
-call poetry run python run.py
+call poetry run python examples/flask_app/run.py
 
 pause
