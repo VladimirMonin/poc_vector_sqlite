@@ -109,7 +109,6 @@ def init_semantic_core(app: Flask) -> None:
 
         video_analyzer = GeminiVideoAnalyzer(
             api_key=api_key,
-            image_analyzer=image_analyzer,
             audio_analyzer=audio_analyzer,
         )
         logger.info("🎬 VideoAnalyzer инициализирован")
