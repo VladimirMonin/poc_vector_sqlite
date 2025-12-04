@@ -4,7 +4,7 @@
 Поддерживает разные режимы поиска, настройки LLM и slash-команды.
 
 Usage:
-    semantic chat                     # Гибридный поиск, gemini-2.0-flash
+    semantic chat                     # Гибридный поиск, gemini-2.5-flash-lite
     semantic chat --model gemini-1.5-pro  # Другая модель
     semantic chat --search vector     # Только векторный поиск
     semantic chat --context 10        # Больше контекста
@@ -43,7 +43,7 @@ chat_cmd = typer.Typer(
 def chat(
     ctx: typer.Context,
     model: str = typer.Option(
-        "gemini-2.0-flash",
+        "gemini-2.5-flash-lite",
         "--model",
         "-m",
         help="Модель LLM для генерации ответов",

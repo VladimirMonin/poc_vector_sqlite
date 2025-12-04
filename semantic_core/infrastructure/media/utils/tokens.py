@@ -120,7 +120,7 @@ GEMINI_PRICING = {
         "input": 0.00125,
         "output": 0.005,
     },
-    "gemini-2.0-flash": {
+    "gemini-2.5-flash-lite": {
         "input": 0.00001875,
         "output": 0.000075,
     },

@@ -185,7 +185,7 @@ CONTEXT:
 
 | Опция | Сокращение | Описание | Default |
 |-------|------------|----------|---------|
-| `--model` | `-m` | Модель LLM | gemini-2.0-flash |
+| `--model` | `-m` | Модель LLM | gemini-2.5-flash-lite |
 | `--context` | `-c` | Количество чанков | 5 |
 | `--search` | `-s` | Режим поиска | hybrid |
 | `--temperature` | `-t` | Температура | 0.7 |
@@ -393,7 +393,7 @@ RAGEngine использует синхронный API:
 ```python
 mock_llm = MockLLMProvider(
     response_text="Based on context, answer is 42.",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash-lite",
     input_tokens=100,
     output_tokens=50,
 )

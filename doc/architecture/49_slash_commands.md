@@ -211,7 +211,7 @@ query = input()
 2. Обновляет ctx.context_chunks
 3. Обновляет ctx.rag._context_chunks
 
-Пользователь может переключиться с `gemini-2.0-flash` на `gemini-1.5-pro` без перезапуска чата!
+Пользователь может переключиться с `gemini-2.5-flash-lite` на `gemini-1.5-pro` без перезапуска чата!
 
 ---
 

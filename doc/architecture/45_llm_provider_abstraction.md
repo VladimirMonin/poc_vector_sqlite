@@ -75,7 +75,7 @@ classDiagram
 
 Возвращает название модели для логирования:
 
-- `gemini-2.0-flash`
+- `gemini-2.5-flash-lite`
 - `gpt-4-turbo`
 - `llama-3-70b`
 
@@ -120,7 +120,7 @@ classDiagram
 | Параметр | Default | Описание |
 |----------|---------|----------|
 | `api_key` | Required | Ключ Gemini |
-| `model` | gemini-2.0-flash | Модель |
+| `model` | gemini-2.5-flash-lite | Модель |
 
 ### Генерация
 

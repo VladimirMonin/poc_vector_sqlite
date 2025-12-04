@@ -27,10 +27,10 @@ class TestGeminiLLMProvider:
 
         provider = GeminiLLMProvider(
             api_key="test-api-key",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash-lite",
         )
 
-        assert provider.model_name == "gemini-2.0-flash"
+        assert provider.model_name == "gemini-2.5-flash-lite"
         mock_genai.Client.assert_called_once_with(api_key="test-api-key")
 
     @patch("semantic_core.infrastructure.llm.gemini.genai")
@@ -56,7 +56,7 @@ class TestGeminiLLMProvider:
 
         assert isinstance(result, GenerationResult)
         assert result.text == "This is the generated response"
-        assert result.model == "gemini-2.0-flash"
+        assert result.model == "gemini-2.5-flash-lite"
         assert result.input_tokens == 50
         assert result.output_tokens == 30
 
@@ -85,7 +85,7 @@ class TestGeminiLLMProvider:
 
         # Проверяем вызов с правильными параметрами
         call_kwargs = mock_client.models.generate_content.call_args
-        assert call_kwargs.kwargs["model"] == "gemini-2.0-flash"
+        assert call_kwargs.kwargs["model"] == "gemini-2.5-flash-lite"
         assert call_kwargs.kwargs["contents"] == "What is Python?"
 
     @patch("semantic_core.infrastructure.llm.gemini.genai")
