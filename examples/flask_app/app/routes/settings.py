@@ -19,17 +19,21 @@ def index():
     config = current_app.extensions.get("semantic_config")
     flask_config = current_app.extensions.get("flask_config")
 
-    # Semantic Core конфигурация
+    # Semantic Core конфигурация — всегда загружаем из get_config()
     semantic_settings = {}
-    if config:
+    try:
+        from semantic_core.config import get_config
+        cfg = get_config()
         semantic_settings = {
-            "db_path": str(config.db_path),
-            "embedding_model": config.embedding_model,
-            "embedding_dimension": config.embedding_dimension,
-            "log_level": config.log_level,
-            "splitter": getattr(config, "splitter", "smart"),
-            "media_enabled": getattr(config, "media_enabled", False),
+            "db_path": str(cfg.db_path),
+            "embedding_model": cfg.embedding_model,
+            "embedding_dimension": cfg.embedding_dimension,
+            "log_level": cfg.log_level,
+            "splitter": getattr(cfg, "splitter", "smart"),
+            "media_enabled": getattr(cfg, "media_enabled", False),
         }
+    except Exception:
+        pass
 
     # Flask конфигурация (безопасные поля)
     flask_settings = {}
