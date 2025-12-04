@@ -75,17 +75,16 @@ semantic search "как работает гибридный поиск"
 
 | Документ | Описание |
 |----------|----------|
-| [Custom LLM](guides/extending/custom-llm.md) | OpenAI, Anthropic, Ollama |
+| [Custom LLM](guides/extending/custom-llm-provider.md) | OpenAI, Anthropic, Ollama |
 | [Custom Embedder](guides/extending/custom-embedder.md) | OpenAI, Cohere, local |
-| [Custom VectorStore](guides/extending/custom-vectorstore.md) | ChromaDB, Qdrant, Pinecone |
+| [Custom VectorStore](guides/extending/custom-vector-store.md) | ChromaDB, Qdrant, Pinecone |
 | [MCP Server](guides/extending/mcp-server.md) | Model Context Protocol интеграция |
 
 ### Deployment
 
 | Документ | Описание |
 |----------|----------|
-| [Checklist](guides/deployment/checklist.md) | Pre-deploy проверки |
-| [Production](guides/deployment/production.md) | WAL mode, настройки, мониторинг |
+| *(coming soon)* | Phase 11.10 |
 
 ---
 
@@ -97,7 +96,7 @@ semantic search "как работает гибридный поиск"
 |----------|----------|
 | [Interfaces](reference/interfaces.md) | Все интерфейсы и их методы |
 | [CLI Commands](reference/cli-commands.md) | Полный справочник команд |
-| [Configuration](reference/configuration.md) | Все опции semantic.toml |
+| [Configuration](reference/configuration-options.md) | Все опции semantic.toml |
 | [Chunk Types](reference/chunk-types.md) | TEXT, CODE, IMAGE_REF... |
 | [Error Codes](reference/error-codes.md) | Ошибки и их решения |
 | [Models](reference/models.md) | Gemini модели и размерности |
@@ -114,9 +113,8 @@ PlantUML диаграммы архитектуры в [diagrams/](diagrams/).
 
 | Документ | Описание |
 |----------|----------|
-| [Roadmap](internal/roadmap.md) | Статус фаз и планы |
-| [Testing Guide](internal/testing-guide.md) | Как запускать и писать тесты |
-| [Architecture Decisions](internal/architecture-decisions.md) | Почему так, а не иначе |
+| [doc/ideas/](../doc/ideas/) | Планы фаз и технические отчёты |
+| [tests/README.md](../tests/README.md) | Как запускать и писать тесты |
 
 ---
 
@@ -142,7 +140,7 @@ PlantUML диаграммы архитектуры в [diagrams/](diagrams/).
 
 - [GitHub Repository](https://github.com/VladimirMonin/poc_vector_sqlite)
 - [Архитектурный сериал](../doc/architecture/00_overview.md) — детальные технические документы
-- [Phase Reports](internal/phase-reports/) — история разработки
+- [Phase Reports](../doc/ideas/) — история разработки
 
 ---
 
