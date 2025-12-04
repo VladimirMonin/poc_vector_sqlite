@@ -131,6 +131,11 @@ def init_semantic_core(app: Flask) -> None:
     app.extensions["semantic_store"] = store
     app.extensions["query_cache"] = query_cache
 
+    # Flask config из app.config (сохраняем объект FlaskAppConfig)
+    from app.config import get_flask_config
+
+    app.extensions["flask_config"] = get_flask_config()
+
     # Chat Service (если есть core)
     chat_service = None
     if core:
