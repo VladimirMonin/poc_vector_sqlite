@@ -110,11 +110,13 @@ class SemanticConfig(BaseSettings):
     gemini_api_key: Optional[str] = Field(
         default=None,
         description="API ключ для Google Gemini",
+        validation_alias="GEMINI_API_KEY",  # Читается без префикса SEMANTIC_
     )
 
     gemini_batch_key: Optional[str] = Field(
         default=None,
         description="Отдельный ключ для Batch API (опционально)",
+        validation_alias="GEMINI_BATCH_KEY",  # Читается без префикса SEMANTIC_
     )
 
     embedding_model: str = Field(

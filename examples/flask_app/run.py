@@ -9,25 +9,30 @@ Usage:
     flask run --debug
 """
 
-import os
 import sys
 from pathlib import Path
 
-# Добавляем корень репозитория в PYTHONPATH для импорта semantic_core
-repo_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(repo_root))
+# === ВАЖНО: load_dotenv ПЕРЕД всеми импортами! ===
+# Pydantic Settings читает env vars при импорте модулей,
+# поэтому .env должен быть загружен ДО импорта semantic_core.
 
-# Добавляем папку flask_app в PYTHONPATH для импорта app
+repo_root = Path(__file__).parent.parent.parent
 flask_app_root = Path(__file__).parent
+
+# Добавляем пути в PYTHONPATH
+sys.path.insert(0, str(repo_root))
 sys.path.insert(0, str(flask_app_root))
 
-# Загружаем .env из корня репозитория (там GEMINI_API_KEY)
+# Загружаем .env ДО импорта app (который импортирует semantic_core)
 from dotenv import load_dotenv
 env_file = repo_root / ".env"
 if env_file.exists():
-    load_dotenv(env_file)
+    load_dotenv(env_file, override=True)  # override=True для перезаписи
     print(f"[OK] Загружен .env из {env_file}")
+else:
+    print(f"[WARN] Файл .env не найден: {env_file}")
 
+# Теперь безопасно импортировать app
 from app import create_app
 from app.config import get_flask_config
 
