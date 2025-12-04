@@ -26,6 +26,7 @@ from semantic_core.infrastructure.storage.peewee.models import (
     DocumentModel,
     ChunkModel,
     BatchJobModel,
+    MediaTaskModel,
 )
 from semantic_core.infrastructure.storage.peewee.engine import VectorDatabase
 from semantic_core.utils.logger import get_logger
@@ -61,6 +62,7 @@ class PeeweeVectorStore(BaseVectorStore):
         DocumentModel._meta.database = self.db
         ChunkModel._meta.database = self.db
         BatchJobModel._meta.database = self.db
+        MediaTaskModel._meta.database = self.db
 
         # Создаём таблицы
         self._create_tables()
@@ -75,7 +77,10 @@ class PeeweeVectorStore(BaseVectorStore):
         logger.debug("Creating tables and indexes")
         
         # Создаём обычные таблицы
-        self.db.create_tables([DocumentModel, BatchJobModel, ChunkModel], safe=True)
+        self.db.create_tables(
+            [DocumentModel, BatchJobModel, ChunkModel, MediaTaskModel], 
+            safe=True
+        )
 
         # Создаём векторную таблицу vec0
         self.db.execute_sql(f"""
