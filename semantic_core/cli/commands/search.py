@@ -166,13 +166,13 @@ def _render_rich(
         else:
             score_text = Text(f"{score:.3f}", style="red")
 
-        # Источник
-        source = result.metadata.get("source", "—")
+        # Источник из метаданных документа
+        source = result.document.metadata.get("source", "—")
         if len(source) > 28:
             source = "..." + source[-25:]
 
-        # Контент (превью)
-        content = result.content
+        # Контент документа (превью)
+        content = result.document.content
         if not verbose and len(content) > 100:
             content = content[:100] + "..."
 
@@ -184,12 +184,12 @@ def _render_rich(
     if verbose and results:
         console.print("\n[dim]Детали первого результата:[/dim]")
         first = results[0]
-        console.print(f"  Chunk ID: {getattr(first, 'chunk_id', '—')}")
-        console.print(f"  Doc ID: {getattr(first, 'document_id', '—')}")
-        console.print(f"  Match Type: {getattr(first, 'match_type', '—')}")
-        if first.metadata:
+        console.print(f"  Chunk ID: {first.chunk_id or '—'}")
+        console.print(f"  Doc ID: {first.document.id or '—'}")
+        console.print(f"  Match Type: {first.match_type.value}")
+        if first.document.metadata:
             console.print("  Metadata:")
-            for key, value in list(first.metadata.items())[:5]:
+            for key, value in list(first.document.metadata.items())[:5]:
                 console.print(f"    {key}: {value}")
 
 
@@ -205,11 +205,11 @@ def _render_json(query: str, results: list, search_type: str) -> None:
             {
                 "rank": i,
                 "score": r.score,
-                "content": r.content,
-                "metadata": r.metadata,
-                "chunk_id": getattr(r, "chunk_id", None),
-                "document_id": getattr(r, "document_id", None),
-                "match_type": str(getattr(r, "match_type", None)),
+                "content": r.document.content,
+                "metadata": r.document.metadata,
+                "chunk_id": r.chunk_id,
+                "document_id": r.document.id,
+                "match_type": r.match_type.value,
             }
             for i, r in enumerate(results, 1)
         ],
