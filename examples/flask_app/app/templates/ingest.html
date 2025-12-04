@@ -56,18 +56,29 @@
                     
                     <!-- Список выбранных файлов -->
                     <div id="file-list" class="mb-4" style="display: none;">
-                        <h6 class="text-muted mb-2">
-                            <i class="bi bi-files me-1"></i>
-                            Выбранные файлы:
-                        </h6>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-muted mb-0">
+                                <i class="bi bi-files me-1"></i>
+                                Выбранные файлы: <span id="file-count" class="badge bg-primary">0</span>
+                            </h6>
+                            <button type="button" class="btn btn-outline-danger btn-sm" id="clear-files">
+                                <i class="bi bi-x-circle me-1"></i>Очистить
+                            </button>
+                        </div>
                         <ul class="list-group" id="selected-files"></ul>
                     </div>
                     
                     <!-- Кнопка загрузки -->
-                    <div class="d-grid">
+                    <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary btn-lg" id="upload-btn" disabled>
-                            <i class="bi bi-upload me-2"></i>
-                            Загрузить и проиндексировать
+                            <span class="upload-text">
+                                <i class="bi bi-upload me-2"></i>
+                                Загрузить и проиндексировать
+                            </span>
+                            <span class="upload-spinner d-none">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                Загрузка...
+                            </span>
                         </button>
                     </div>
                 </form>
@@ -116,6 +127,10 @@ const fileInput = document.getElementById('file-input');
 const fileList = document.getElementById('file-list');
 const selectedFiles = document.getElementById('selected-files');
 const uploadBtn = document.getElementById('upload-btn');
+const uploadForm = document.getElementById('upload-form');
+
+// DataTransfer для хранения файлов (поддержка Drag-n-Drop + click)
+let dataTransfer = new DataTransfer();
 
 // Drag & Drop
 dropZone.addEventListener('dragover', (e) => {
@@ -136,19 +151,56 @@ dropZone.addEventListener('drop', (e) => {
     dropZone.style.borderColor = 'var(--bs-border-color)';
     
     const files = e.dataTransfer.files;
-    fileInput.files = files;
-    updateFileList(files);
+    // Добавляем файлы через DataTransfer API
+    for (const file of files) {
+        dataTransfer.items.add(file);
+    }
+    fileInput.files = dataTransfer.files;
+    updateFileList(dataTransfer.files);
 });
 
-dropZone.addEventListener('click', () => {
+dropZone.addEventListener('click', (e) => {
+    // Не открывать выбор файлов если кликнули по кнопке
+    if (e.target.tagName === 'BUTTON') return;
     fileInput.click();
 });
 
 fileInput.addEventListener('change', (e) => {
-    updateFileList(e.target.files);
+    // Обновляем DataTransfer при выборе через input
+    dataTransfer = new DataTransfer();
+    for (const file of e.target.files) {
+        dataTransfer.items.add(file);
+    }
+    updateFileList(dataTransfer.files);
 });
 
+// Очистка списка файлов
+document.getElementById('clear-files').addEventListener('click', () => {
+    dataTransfer = new DataTransfer();
+    fileInput.files = dataTransfer.files;
+    updateFileList(dataTransfer.files);
+});
+
+// Показываем спиннер при отправке формы
+uploadForm.addEventListener('submit', () => {
+    uploadBtn.disabled = true;
+    uploadBtn.querySelector('.upload-text').classList.add('d-none');
+    uploadBtn.querySelector('.upload-spinner').classList.remove('d-none');
+});
+
+function removeFile(index) {
+    const newDataTransfer = new DataTransfer();
+    const files = Array.from(dataTransfer.files);
+    files.splice(index, 1);
+    files.forEach(f => newDataTransfer.items.add(f));
+    dataTransfer = newDataTransfer;
+    fileInput.files = dataTransfer.files;
+    updateFileList(dataTransfer.files);
+}
+
 function updateFileList(files) {
+    const fileCount = document.getElementById('file-count');
+    
     if (files.length === 0) {
         fileList.style.display = 'none';
         uploadBtn.disabled = true;
@@ -158,12 +210,13 @@ function updateFileList(files) {
     fileList.style.display = 'block';
     uploadBtn.disabled = false;
     selectedFiles.innerHTML = '';
+    fileCount.textContent = files.length;
     
     const mdCount = Array.from(files).filter(f => 
         f.name.endsWith('.md') || f.name.endsWith('.markdown')
     ).length;
     
-    for (const file of files) {
+    Array.from(files).forEach((file, index) => {
         const icon = getFileIcon(file.name);
         const size = formatSize(file.size);
         
@@ -174,16 +227,22 @@ function updateFileList(files) {
                 <i class="bi ${icon} me-2"></i>
                 ${file.name}
             </span>
-            <span class="badge bg-secondary">${size}</span>
+            <div>
+                <span class="badge bg-secondary me-2">${size}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFile(${index})" title="Удалить">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
         `;
         selectedFiles.appendChild(li);
-    }
+    });
     
     // Обновляем текст кнопки
+    const btnText = uploadBtn.querySelector('.upload-text');
     if (mdCount >= 5) {
-        uploadBtn.innerHTML = '<i class="bi bi-upload me-2"></i>Загрузить (async режим)';
+        btnText.innerHTML = '<i class="bi bi-upload me-2"></i>Загрузить (async режим)';
     } else {
-        uploadBtn.innerHTML = '<i class="bi bi-upload me-2"></i>Загрузить и проиндексировать';
+        btnText.innerHTML = '<i class="bi bi-upload me-2"></i>Загрузить и проиндексировать';
     }
 }
 
