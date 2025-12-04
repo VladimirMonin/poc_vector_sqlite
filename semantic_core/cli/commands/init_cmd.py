@@ -167,7 +167,7 @@ level = "{log_level}"
 
 [gemini]
 # API ключ читается из переменной окружения GEMINI_API_KEY
-model = "text-embedding-004"
+model = "models/gemini-embedding-001"
 embedding_dimension = 768
 
 [processing]

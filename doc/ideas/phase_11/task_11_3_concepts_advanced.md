@@ -14,17 +14,18 @@
 
 ### 6. concepts/06_batch_processing.md
 
-**Источники**: doc/architecture/19-24 (Async Batching)
+**Источники**: doc/architecture/19-24 (Async Batching), doc/ideas/phase_10/
 
 **Содержание:**
 - Проблема: синхронный API блокирует UI
 - Google Batch API: 50% экономия
+- **Важно**: Batch API работает только с `gemini-embedding-001`
 - Статусы чанков: PENDING → PROCESSING → READY/FAILED
 - BatchManager: локальная очередь
 - JSONL формат запросов
 - **Диаграмма**: Sequence — ingest(mode=async) → flush → sync
 
-**Frontmatter tags**: `[batch, async, cost-optimization, queue]`
+**Frontmatter tags**: `[batch, async, cost-optimization, queue, gemini-embedding-001]`
 
 ---
 
@@ -34,13 +35,14 @@
 
 **Содержание:**
 - Три анализатора: Image, Audio, Video
-- Gemini Vision API: structured JSON output
+- Модель: `gemini-2.5-flash` (актуальная, multimodal)
+- Structured JSON output
 - Аудио: 32kbps оптимизация, 83 минуты в запросе
 - Видео: кадры + аудио в одном запросе
 - MediaTaskModel: персистентная очередь
 - **Диаграмма**: Component — Media Pipeline
 
-**Frontmatter tags**: `[multimodal, vision, audio, video, media]`
+**Frontmatter tags**: `[multimodal, vision, audio, video, media, gemini-2.5-flash]`
 
 ---
 
@@ -51,12 +53,16 @@
 **Содержание:**
 - RAG = Retrieval + Augmentation + Generation
 - Два режима: chunks vs full_docs
+- Модели для генерации:
+  - `gemini-2.5-flash` — быстрая, thinking mode
+  - `gemini-2.5-pro` — Deep Think, сложные задачи
+  - `gemini-3.0-pro` — новейшая (2025)
 - Prompt engineering: контекст + вопрос
 - History management: token budget, compression
 - Slash commands в чате
 - **Диаграмма**: Sequence — question → search → context → LLM → answer
 
-**Frontmatter tags**: `[rag, llm, chat, retrieval, generation]`
+**Frontmatter tags**: `[rag, llm, chat, retrieval, generation, gemini-2.5]`
 
 ---
 

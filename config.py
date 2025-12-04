@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     )
 
     embedding_model: str = Field(
-        default="models/text-embedding-004", description="Модель Gemini для эмбеддингов"
+        default="models/gemini-embedding-001", description="Модель Gemini для эмбеддингов"
     )
 
     embedding_dimension: int = Field(

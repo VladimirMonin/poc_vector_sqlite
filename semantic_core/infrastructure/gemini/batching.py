@@ -8,13 +8,18 @@
         Клиент для создания и управления батч-заданиями.
 """
 
+from __future__ import annotations
+
 import json
 import struct
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from semantic_core.utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from semantic_core.config import SemanticConfig
 
 logger = get_logger(__name__)
 
@@ -61,7 +66,7 @@ class GeminiBatchClient:
 
     Attributes:
         client: Инициализированный Google GenAI клиент.
-        model_name: Название модели (по умолчанию 'models/text-embedding-004').
+        model_name: Название модели (по умолчанию 'models/gemini-embedding-001').
         dimension: Размерность векторов (768 для MRL).
 
     Examples:
@@ -106,6 +111,36 @@ class GeminiBatchClient:
             "Batch client initialized",
             model=model_name,
             dimension=dimension,
+        )
+
+    @classmethod
+    def from_config(cls, config: SemanticConfig) -> "GeminiBatchClient":
+        """Создаёт batch client из конфигурации.
+
+        Factory-метод для создания экземпляра с параметрами из SemanticConfig.
+        Использует batch_key если настроен, иначе основной api_key.
+
+        Args:
+            config: Конфигурация Semantic Core.
+
+        Returns:
+            Инициализированный GeminiBatchClient.
+
+        Raises:
+            ValueError: Если API ключ не настроен.
+
+        Example:
+            >>> from semantic_core.config import get_config
+            >>> config = get_config()
+            >>> batch_client = GeminiBatchClient.from_config(config)
+        """
+        # Предпочитаем batch_key, fallback на основной
+        api_key = config.gemini_batch_key or config.require_api_key()
+        
+        return cls(
+            api_key=api_key,
+            model_name=config.embedding_model,
+            dimension=config.embedding_dimension,
         )
 
     def create_embedding_job(

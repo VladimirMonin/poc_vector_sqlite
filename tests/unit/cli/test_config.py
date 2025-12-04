@@ -382,7 +382,7 @@ path = "my_semantic.db"
 [gemini]
 api_key = "my-gemini-key"
 batch_key = "my-batch-key"
-model = "text-embedding-004"
+model = "gemini-embedding-001"
 embedding_dimension = 512
 
 [processing]
@@ -417,7 +417,7 @@ file = "semantic.log"
                     # Gemini
                     assert config.gemini_api_key == "my-gemini-key"
                     assert config.gemini_batch_key == "my-batch-key"
-                    assert config.embedding_model == "text-embedding-004"
+                    assert config.embedding_model == "gemini-embedding-001"
                     assert config.embedding_dimension == 512
 
                     # Processing

@@ -146,7 +146,7 @@ CLI --> User: formatted output
 
 note over Embedder
     Gemini API
-    text-embedding-004
+    gemini-embedding-001
 end note
 
 legend right

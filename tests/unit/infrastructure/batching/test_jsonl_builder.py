@@ -77,7 +77,7 @@ class TestJSONLBuilder:
         """
         client = GeminiBatchClient(
             api_key="MOCK_KEY",
-            model_name="models/text-embedding-004",
+            model_name="models/gemini-embedding-001",
             dimension=768,
         )
 
@@ -110,7 +110,7 @@ class TestJSONLBuilder:
             # Проверяем структуру request
             req = request["request"]
             assert "model" in req, "Должна быть model"
-            assert req["model"] == "models/text-embedding-004", "Неверная модель"
+            assert req["model"] == "models/gemini-embedding-001", "Неверная модель"
 
             # ВАЖНО: contents - массив, не content объект!
             assert "contents" in req, "Должен быть contents (массив)"

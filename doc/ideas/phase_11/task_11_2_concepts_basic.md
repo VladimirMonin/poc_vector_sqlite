@@ -18,12 +18,18 @@
 
 **Содержание:**
 - Что такое эмбеддинги (аналогия с координатами)
-- Почему 768 измерений
+- MRL (Matryoshka Representation Learning) — выбор размерности
 - task_type: RETRIEVAL_DOCUMENT vs RETRIEVAL_QUERY
 - Нормализация векторов
 - **Диаграмма**: Sequence — текст → API → вектор
 
-**Frontmatter tags**: `[embeddings, gemini, vectors, basics]`
+**Актуальные модели**:
+| Модель | Размерности (MRL) | Рекомендация |
+|--------|-------------------|--------------|
+| `gemini-embedding-001` | 768 / 1536 / 3072 | Production |
+| `text-embedding-004` | 768 | Legacy |
+
+**Frontmatter tags**: `[embeddings, gemini, vectors, mrl, basics]`
 
 ---
 

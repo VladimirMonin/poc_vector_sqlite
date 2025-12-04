@@ -118,7 +118,7 @@ class SemanticConfig(BaseSettings):
     )
 
     embedding_model: str = Field(
-        default="text-embedding-004",
+        default="models/gemini-embedding-001",
         description="Модель для генерации эмбеддингов",
     )
 

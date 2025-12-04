@@ -21,10 +21,18 @@
 - Метод generate(): параметры и возврат
 - GenerationResult DTO
 - Mapping параметров для разных API (таблица)
-- Пример: OpenAI GPT-4 (псевдокод)
-- Пример: Anthropic Claude (псевдокод)
+- Пример: OpenAI GPT-4o (псевдокод)
+- Пример: Anthropic Claude 3.5/4 (псевдокод)
 - Пример: Ollama локальный (псевдокод)
 - Регистрация в SemanticCore
+
+**Актуальные модели для примеров**:
+| Провайдер | Модели |
+|-----------|--------|
+| Google | gemini-2.5-flash, gemini-2.5-pro, gemini-3.0-pro |
+| OpenAI | gpt-4o, gpt-4o-mini, o1, o3 |
+| Anthropic | claude-3.5-sonnet, claude-4-opus |
+| Ollama | llama3.3, mistral, qwen2.5 |
 
 **Диаграмма**: Class — BaseLLMProvider + 3 реализации
 
@@ -58,16 +66,26 @@
 **Содержание:**
 - Интерфейс BaseEmbedder (диаграмма)
 - embed_documents() vs embed_query()
-- Размерность: 768 vs 1536 vs 3072
+- Размерность и MRL
+
+**Актуальные embedding модели**:
+| Провайдер | Модель | Размерности |
+|-----------|--------|-------------|
+| Google | gemini-embedding-001 | 768 / 1536 / 3072 (MRL) |
+| OpenAI | text-embedding-3-large | 256-3072 (MRL) |
+| OpenAI | text-embedding-3-small | 512-1536 |
+| Cohere | embed-v4 | 1024 |
+| Local | sentence-transformers | 384-1024 |
+
 - Нормализация векторов
 - Пример: OpenAI Embeddings (псевдокод)
 - Пример: Cohere Embed (псевдокод)
 - Пример: Локальный sentence-transformers (псевдокод)
-- Важно: все embeddings должны быть одной размерности в БД
+- **Важно**: все embeddings должны быть одной размерности в БД
 
 **Диаграмма**: Class — BaseEmbedder + реализации
 
-**Frontmatter tags**: `[extending, embedder, openai, cohere, sentence-transformers]`
+**Frontmatter tags**: `[extending, embedder, openai, cohere, sentence-transformers, mrl]`
 
 ---
 
