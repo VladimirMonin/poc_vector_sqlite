@@ -338,7 +338,7 @@ class SemanticCore:
         """Индексирует изображение.
 
         Создаёт задачу на анализ изображения. В sync режиме
-        обрабатывает сразу, в async — помещает в очередь.
+        обрабатывает сразу и создаёт searchable Document.
 
         Args:
             path: Путь к файлу изображения.
@@ -347,19 +347,22 @@ class SemanticCore:
             mode: Режим обработки ('sync' или 'async').
 
         Returns:
-            sync: chunk_id (ID созданного чанка).
+            sync: document_id (ID созданного документа).
             async: task_id (ID задачи в очереди).
 
         Raises:
             ValueError: Если файл не является поддерживаемым изображением.
             RuntimeError: Если image_analyzer не настроен.
         """
+        import json
+        from pathlib import Path
         from semantic_core.infrastructure.media.utils import (
             is_image_valid,
             get_media_type,
             get_file_mime_type,
         )
         from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+        from semantic_core.domain import Document, MediaType
 
         # Проверяем, что image_analyzer настроен
         if self.image_analyzer is None:
@@ -390,8 +393,57 @@ class SemanticCore:
                     f"Failed to process image: {task.error_message or 'Unknown error'}"
                 )
 
-            # Возвращаем task_id (chunk_id будет добавлен в Phase 6.1)
-            return task_id
+            # Получаем результат анализа
+            task = MediaTaskModel.get_by_id(task_id)
+
+            # Формируем content из результатов анализа
+            content_parts = []
+            if task.result_description:
+                content_parts.append(task.result_description)
+            if task.result_alt_text:
+                content_parts.append(f"Alt: {task.result_alt_text}")
+            if task.result_ocr_text:
+                content_parts.append(f"OCR: {task.result_ocr_text}")
+
+            content = "\n\n".join(content_parts) if content_parts else f"Image: {Path(path).name}"
+
+            # Формируем метаданные
+            metadata = {
+                "source": path,
+                "filename": Path(path).name,
+                "media_type": "image",
+                "mime_type": task.mime_type,
+                "task_id": task_id,
+            }
+            if task.result_keywords:
+                try:
+                    metadata["keywords"] = json.loads(task.result_keywords)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            # Создаём Document и индексируем
+            doc = Document(
+                content=content,
+                metadata=metadata,
+                media_type=MediaType.IMAGE,
+            )
+            saved_doc = self.ingest(doc, mode="sync")
+
+            # Получаем chunk_id из базы
+            from semantic_core.infrastructure.storage.peewee.models import ChunkModel
+            chunk = ChunkModel.select().where(
+                ChunkModel.document_id == saved_doc.id
+            ).first()
+            if chunk:
+                task.result_chunk_id = chunk.id
+                task.save()
+
+            logger.info(
+                "Image indexed as document",
+                document_id=saved_doc.id,
+                path=path,
+            )
+            return str(saved_doc.id)
 
         else:  # async
             return task_id
