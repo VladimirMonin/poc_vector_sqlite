@@ -1,4 +1,4 @@
-# 📖 Подфаза 11.2: Concepts (базовые 1-5)
+# 📖 Phase 11.2: Concepts (базовые 1-5)
 
 > Фундаментальные концепции библиотеки
 
@@ -7,6 +7,38 @@
 ## 🎯 Цель
 
 Написать 5 документов по базовым концепциям, переработав doc/architecture/01-05 и 15-18.
+
+---
+
+## 📊 Диаграмма: Связи между концепциями
+
+```plantuml
+@startuml
+!theme plain
+left to right direction
+
+rectangle "01_embeddings" as emb
+rectangle "02_vector_search" as vec
+rectangle "03_hybrid_rrf" as rrf
+rectangle "04_chunking" as chunk
+rectangle "05_smart_parsing" as parse
+
+emb --> vec : vectors
+vec --> rrf : search
+parse --> chunk : AST nodes
+chunk --> emb : text chunks
+
+note bottom of emb
+  gemini-embedding-001
+  MRL: 768/1536/3072
+end note
+
+note bottom of rrf
+  Vector + FTS5
+  RRF fusion
+end note
+@enduml
+```
 
 ---
 

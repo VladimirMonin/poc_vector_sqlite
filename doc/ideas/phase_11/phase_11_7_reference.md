@@ -1,4 +1,4 @@
-# 📋 Подфаза 11.6: Reference
+# 📚 Phase 11.7: Reference
 
 > Справочные документы для быстрого поиска информации
 
@@ -7,6 +7,53 @@
 ## 🎯 Цель
 
 Написать 6 справочников в формате таблиц и списков.
+
+---
+
+## 📊 Диаграмма: Структура справочников
+
+```plantuml
+@startuml
+!theme plain
+left to right direction
+
+rectangle "reference/" {
+    rectangle "interfaces.md" as iface {
+        (BaseEmbedder)
+        (BaseLLMProvider)
+        (BaseVectorStore)
+    }
+    
+    rectangle "cli-commands.md" as cli {
+        (ingest)
+        (search)
+        (chat)
+    }
+    
+    rectangle "models.md" as models {
+        (gemini-embedding-001)
+        (gemini-2.5-flash)
+        (gemini-2.5-pro)
+    }
+    
+    rectangle "configuration.md" as config {
+        (semantic.toml)
+        (env vars)
+    }
+    
+    rectangle "chunk-types.md" as chunks {
+        (TEXT)
+        (CODE)
+        (IMAGE_REF)
+    }
+    
+    rectangle "error-codes.md" as errors {
+        (API errors)
+        (Storage errors)
+    }
+}
+@enduml
+```
 
 ---
 

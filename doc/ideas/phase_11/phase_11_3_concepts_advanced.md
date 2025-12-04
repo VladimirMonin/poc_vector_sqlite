@@ -1,4 +1,4 @@
-# 📖 Подфаза 11.3: Concepts (продвинутые 6-10)
+# 📖 Phase 11.3: Concepts (продвинутые 6-10)
 
 > Продвинутые концепции: batch, multimodal, RAG, observability
 
@@ -7,6 +7,61 @@
 ## 🎯 Цель
 
 Написать 5 документов по продвинутым концепциям, переработав doc/architecture/19-49.
+
+---
+
+## 📊 Диаграмма: Архитектура продвинутых компонентов
+
+```plantuml
+@startuml
+!theme plain
+
+package "Core" {
+    [SemanticCore] as core
+}
+
+package "Batch Processing" {
+    [BatchManager] as batch
+    [GeminiBatchClient] as client
+    database "JSONL Queue" as queue
+}
+
+package "Multimodal" {
+    [ImageAnalyzer] as img
+    [AudioAnalyzer] as audio
+    [VideoAnalyzer] as video
+}
+
+package "RAG" {
+    [RAGEngine] as rag
+    [ChatHistory] as hist
+}
+
+package "Observability" {
+    [SemanticLogger] as log
+    [SecretRedactor] as redact
+}
+
+core --> batch : async mode
+batch --> client
+client --> queue
+
+core --> img
+core --> audio
+core --> video
+
+core --> rag
+rag --> hist
+
+core ..> log : logging
+log --> redact
+
+note right of batch
+  gemini-embedding-001
+  50% cost savings
+end note
+@enduml
+```
 
 ---
 

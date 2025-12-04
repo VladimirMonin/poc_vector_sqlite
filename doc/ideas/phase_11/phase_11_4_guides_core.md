@@ -1,4 +1,4 @@
-# 🛠️ Подфаза 11.4: Guides (основные)
+# 🛠️ Phase 11.4: Guides (основные)
 
 > Практические руководства для повседневной работы
 
@@ -7,6 +7,39 @@
 ## 🎯 Цель
 
 Написать 6 пошаговых гайдов для типичных сценариев использования.
+
+---
+
+## 📊 Диаграмма: Путь пользователя
+
+```plantuml
+@startuml
+!theme plain
+|User|
+start
+:Quickstart;
+note right: poetry install\nGEMINI_API_KEY
+
+|Configuration|
+:semantic.toml;
+note right: модель, размерности\nbatch mode
+
+|Daily Usage|
+if (CLI или Python?) then (CLI)
+    :semantic ingest;
+    :semantic search;
+else (Python)
+    :SemanticCore.from_config();
+    :core.ingest() / core.search();
+endif
+
+|Advanced|
+:RAG Chat;
+:Media Processing;
+
+stop
+@enduml
+```
 
 ---
 

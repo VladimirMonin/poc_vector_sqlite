@@ -1,12 +1,60 @@
-# 🔌 Подфаза 11.5: Guides (extending)
+# 🔌 Phase 11.6: Guides (extending)
 
-> Гайды по расширению библиотеки новыми провайдерами
+> Гайды по расширению библиотеки новыми провайдерами (LLM, Embedder, VectorStore, MCP)
 
 ---
 
 ## 🎯 Цель
 
 Написать 4 гайда для разработчиков, добавляющих новые компоненты.
+
+---
+
+## 📊 Диаграмма: Plugin Architecture
+
+```plantuml
+@startuml
+!theme plain
+
+interface BaseEmbedder {
+    +embed_documents(texts): list[vector]
+    +embed_query(query): vector
+}
+
+interface BaseLLMProvider {
+    +generate(prompt, context): GenerationResult
+}
+
+interface BaseVectorStore {
+    +add_chunks(chunks)
+    +search_vector(query, limit)
+    +search_fts(query, limit)
+    +search_hybrid(query, limit)
+}
+
+class GeminiEmbedder implements BaseEmbedder
+class OpenAIEmbedder implements BaseEmbedder
+class OllamaEmbedder implements BaseEmbedder
+
+class GeminiLLM implements BaseLLMProvider
+class OpenAILLM implements BaseLLMProvider
+class AnthropicLLM implements BaseLLMProvider
+
+class PeeweeVectorStore implements BaseVectorStore
+class ChromaDBStore implements BaseVectorStore
+class QdrantStore implements BaseVectorStore
+
+class SemanticCore {
+    -embedder: BaseEmbedder
+    -llm: BaseLLMProvider
+    -store: BaseVectorStore
+}
+
+SemanticCore o-- BaseEmbedder
+SemanticCore o-- BaseLLMProvider
+SemanticCore o-- BaseVectorStore
+@enduml
+```
 
 ---
 

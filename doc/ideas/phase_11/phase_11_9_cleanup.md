@@ -1,4 +1,4 @@
-# 🧹 Подфаза 11.8: Internal + Cleanup
+# 🧹 Phase 11.9: Internal + Cleanup
 
 > Архивация внутренних документов и удаление устаревших
 
@@ -9,6 +9,45 @@
 1. Создать internal/ документы для контрибьюторов
 2. Переместить phase reports из doc/ideas/
 3. Удалить устаревшие doc/architecture/06-09
+
+---
+
+## 📊 Диаграмма: Cleanup Workflow
+
+```plantuml
+@startuml
+!theme plain
+start
+
+:Проверить что docs/ готова;
+
+if (Все ссылки валидны?) then (yes)
+    :Создать internal/;
+    :roadmap.md;
+    :testing-guide.md;
+    :architecture-decisions.md;
+else (no)
+    :Исправить ссылки;
+    stop
+endif
+
+:Перенести phase-reports;
+note right
+  doc/ideas/phase_N/ →
+  docs/internal/phase-reports/
+end note
+
+if (Готово к удалению?) then (yes)
+    #pink:Удалить doc/architecture/06-09;
+    :Обновить 00_overview.md;
+else (no)
+    :Оставить с DEPRECATED;
+endif
+
+:Git commit;
+stop
+@enduml
+```
 
 ---
 
