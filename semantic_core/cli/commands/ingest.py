@@ -78,6 +78,7 @@ def _create_document(path: Path) -> Document:
             "source": str(path),
             "filename": path.name,
             "doc_id": path.stem,  # Для логов SmartSplitter
+            "media_type": media_type.value,  # Для Flask UI
         },
     )
 
