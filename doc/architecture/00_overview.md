@@ -230,6 +230,53 @@
 
 ---
 
+### 🌐 Flask Web Application (Фаза 12)
+
+55. [**Flask Integration**](55_flask_integration.md)  
+    Интеграция SemanticCore в веб-приложение: Application Factory, DI через extensions, HTTP logging
+
+56. [**Query Cache Architecture**](56_query_cache.md)  
+    Кэширование эмбеддингов запросов: экономия API-вызовов, автокомплит, статистика
+
+57. [**Search Interface Architecture**](57_search_interface.md)  
+    HTMX + Flask: интеллектуальный поиск с фильтрами, Markdown рендеринг, Score визуализация
+
+58. [**Content Management Architecture**](58_content_management.md)  
+    Drag-n-Drop загрузка, UUID-именование, sync/async индексация, управление документами
+
+59. [**RAG Chat Web Architecture**](59_rag_chat_web.md)  
+    Интерактивный чат через HTMX, персистентные сессии, визуализация источников
+
+60. [**Settings & About Pages**](60_settings_about.md)  
+    Страницы конфигурации и информации о проекте, динамический sidebar
+
+61. [**Flask Integration Lessons: Анатомия проёба**](61_flask_integration_lessons.md)  
+    Честный разбор багов: кнопки в никуда, две БД, исчезающие изображения и chunk_type
+
+---
+
+### 🏁 Total Visual Check (Фаза 13)
+
+62. [**Концептуальный обзор Phase 13: Total Visual Check**](62_phase_13_overview.md)  
+    Методология E2E аудита: зачем, как работает, 3 критических сценария (chunking, media, search)
+
+63. [**Детальные результаты аудита**](63_phase_13_results.md)  
+    Что работает отлично (chunking, media API, rate limiting), что требует внимания (hybrid scores, duplicates, FTS)
+
+64. [**Риски и ограничения**](64_phase_13_risks.md)  
+    Long video timeout, document-level search gap, FTS granularity mismatch, duplicate chunks waste
+
+65. [**FTS Refactoring: Chunk-Level Search**](65_fts_chunk_level_refactoring.md)  
+    Починка RRF: перевод FTS с документов на чанки, автомиграция и RRF boost
+
+66. [**Direct Media Ingestion**](66_direct_media_ingestion.md)  
+    Развилка на входе: медиа-файлы идут напрямую в Gemini API, минуя SmartSplitter
+
+67. [**Context Window: Гений или Дед с деменцией**](67_context_window.md)  
+    Расширение контекста соседними чанками: context_window, MatchType.CONTEXT и полный документ при большом window
+
+---
+
 ## 🚀 Быстрый старт
 
 ```bash

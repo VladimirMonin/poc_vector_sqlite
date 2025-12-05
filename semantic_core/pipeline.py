@@ -23,6 +23,7 @@ from semantic_core.domain import (
     ChunkResult,
     MediaConfig,
     MediaType,
+    MatchType,
 )
 from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
@@ -168,6 +169,10 @@ class SemanticCore:
             ValueError: Если данные некорректны.
             RuntimeError: Если произошла ошибка.
         """
+        # 0. Прямая загрузка медиа-файлов (без парсера/сплиттера)
+        if document.media_type in (MediaType.IMAGE, MediaType.AUDIO, MediaType.VIDEO):
+            return self._ingest_direct_media(document, mode, enrich_media)
+
         # 1. Нарезаем на чанки
         chunks = self.splitter.split(document)
 
@@ -206,6 +211,169 @@ class SemanticCore:
         saved_document = self.store.save(document, chunks)
 
         return saved_document
+
+    def _ingest_direct_media(
+        self,
+        document: Document,
+        mode: IngestionMode,
+        enrich_media: bool,
+    ) -> Document:
+        """Обрабатывает медиа-файл напрямую (без парсера/сплиттера).
+
+        Вызывается когда document.media_type != TEXT.
+        Создаёт единственный чанк с правильным типом (IMAGE_REF/AUDIO_REF/VIDEO_REF).
+
+        Args:
+            document: Документ с content=путь_к_файлу.
+            mode: Режим обработки ('sync' или 'async').
+            enrich_media: Вызывать ли Vision/Audio/Video API.
+
+        Returns:
+            Сохранённый Document с ID.
+        """
+        media_path = Path(document.content)
+
+        # 1. Определяем chunk_type по media_type
+        chunk_type_map = {
+            MediaType.IMAGE: ChunkType.IMAGE_REF,
+            MediaType.AUDIO: ChunkType.AUDIO_REF,
+            MediaType.VIDEO: ChunkType.VIDEO_REF,
+        }
+        chunk_type = chunk_type_map[document.media_type]
+
+        logger.debug(
+            "Direct media ingestion",
+            media_type=document.media_type.value,
+            chunk_type=chunk_type.value,
+            path=str(media_path),
+            enrich_media=enrich_media,
+        )
+
+        # 2. Формируем контент и metadata
+        content = str(media_path)
+        metadata: dict = {"_original_path": str(media_path)}
+
+        if enrich_media and mode == "sync":
+            # Вызываем соответствующий анализатор
+            result = self._analyze_media_for_chunk(chunk_type, media_path, context_text="")
+
+            if result is not None:
+                content = self._build_content_from_analysis(result)
+                metadata.update(self._build_metadata_from_analysis(result, media_path))
+                logger.debug("Media enriched", content_preview=content[:100])
+            else:
+                metadata["_media_error"] = "Analysis failed"
+                logger.warning("Media analysis failed", path=str(media_path))
+
+        elif enrich_media and mode == "async":
+            # Создаём задачу на обогащение (обработается позже)
+            try:
+                task_id = self._create_media_task(
+                    path=str(media_path),
+                    context_text="",
+                )
+                metadata["_media_task_id"] = task_id
+                metadata["_pending_enrichment"] = True
+            except Exception as e:
+                logger.error(f"Failed to create media task: {e}")
+                metadata["_media_error"] = str(e)
+
+        # 3. Создаём единственный чанк
+        chunk = Chunk(
+            content=content,
+            chunk_index=0,
+            chunk_type=chunk_type,
+            metadata=metadata,
+        )
+
+        # 4. Векторизация
+        if mode == "sync":
+            vector_text = self.context_strategy.form_vector_text(chunk, document)
+            embeddings = self.embedder.embed_documents([vector_text])
+            chunk.embedding = embeddings[0]
+        else:
+            chunk.metadata["_vector_source"] = content
+            chunk.metadata["_embedding_status"] = EmbeddingStatus.PENDING.value
+            chunk.embedding = None
+
+        # 5. Сохраняем
+        saved_document = self.store.save(document, [chunk])
+
+        logger.info(
+            "Direct media ingested",
+            doc_id=saved_document.id,
+            chunk_type=chunk_type.value,
+            enriched=enrich_media and result is not None if enrich_media else False,
+        )
+
+        return saved_document
+
+    def _build_content_from_analysis(self, result: dict) -> str:
+        """Формирует текстовый контент из результата анализа медиа.
+
+        Args:
+            result: Словарь с результатами от анализатора.
+
+        Returns:
+            Текст для chunk.content.
+        """
+        media_type = result.get("type", "unknown")
+
+        if media_type == "image":
+            return result.get("description", "")
+
+        elif media_type == "audio":
+            # Приоритет: транскрипция > описание
+            return result.get("transcription") or result.get("description", "")
+
+        elif media_type == "video":
+            # Описание + транскрипция (если есть)
+            parts = []
+            if result.get("description"):
+                parts.append(result["description"])
+            if result.get("transcription"):
+                parts.append(f"\n\nTranscription:\n{result['transcription']}")
+            return "".join(parts)
+
+        return ""
+
+    def _build_metadata_from_analysis(self, result: dict, media_path: Path) -> dict:
+        """Формирует metadata из результата анализа медиа.
+
+        Args:
+            result: Словарь с результатами от анализатора.
+            media_path: Путь к медиа-файлу.
+
+        Returns:
+            Словарь метаданных.
+        """
+        metadata: dict = {"_original_path": str(media_path)}
+        media_type = result.get("type", "unknown")
+
+        if media_type == "image":
+            metadata["_vision_alt"] = result.get("alt_text", "")
+            metadata["_vision_keywords"] = result.get("keywords", [])
+            if result.get("ocr_text"):
+                metadata["_vision_ocr"] = result["ocr_text"]
+
+        elif media_type == "audio":
+            metadata["_audio_description"] = result.get("description", "")
+            metadata["_audio_keywords"] = result.get("keywords", [])
+            metadata["_audio_participants"] = result.get("participants", [])
+            metadata["_audio_action_items"] = result.get("action_items", [])
+            if result.get("duration_seconds"):
+                metadata["_audio_duration"] = result["duration_seconds"]
+
+        elif media_type == "video":
+            metadata["_video_keywords"] = result.get("keywords", [])
+            if result.get("transcription"):
+                metadata["_video_transcription"] = result["transcription"]
+            if result.get("ocr_text"):
+                metadata["_video_ocr"] = result["ocr_text"]
+            if result.get("duration_seconds"):
+                metadata["_video_duration"] = result["duration_seconds"]
+
+        return metadata
 
     def search(
         self,
@@ -258,6 +426,7 @@ class SemanticCore:
         mode: str = "hybrid",
         k: int = 60,
         chunk_type_filter: Optional[str] = None,
+        context_window: int = 0,
     ) -> list[ChunkResult]:
         """Выполняет гранулярный поиск по отдельным чанкам.
 
@@ -271,6 +440,10 @@ class SemanticCore:
             mode: Режим поиска ('vector', 'fts', 'hybrid').
             k: Константа для RRF алгоритма (по умолчанию 60).
             chunk_type_filter: Фильтр по типу чанка ('text', 'code', 'table', 'image_ref').
+            context_window: Количество соседних чанков в каждую сторону.
+                0 = только найденные чанки (по умолчанию).
+                1 = найденный + по 1 соседу с каждой стороны.
+                N = если N >= количества чанков в документе, возвращается весь документ.
 
         Returns:
             Список ChunkResult с чанками и их скорами.
@@ -297,7 +470,74 @@ class SemanticCore:
             chunk_type_filter=chunk_type_filter,
         )
 
+        # Расширяем результаты соседними чанками если нужно
+        if context_window > 0 and results:
+            results = self._expand_with_context(results, context_window)
+
         return results
+
+    def _expand_with_context(
+        self,
+        results: list[ChunkResult],
+        window: int,
+    ) -> list[ChunkResult]:
+        """Расширяет результаты соседними чанками.
+
+        Дедуплицирует чанки (если соседи пересекаются).
+        Сохраняет оригинальные скоры для найденных чанков.
+        Соседние чанки получают match_type=CONTEXT и score=0.
+
+        Args:
+            results: Исходные результаты поиска.
+            window: Количество соседей в каждую сторону.
+
+        Returns:
+            Расширенный список ChunkResult.
+        """
+        seen_ids: set[int] = set()
+        expanded: list[ChunkResult] = []
+
+        # Сначала собираем ID всех оригинальных результатов
+        original_ids = {r.chunk_id for r in results}
+
+        for result in results:
+            if result.chunk_id is None:
+                continue
+
+            # Получаем соседние чанки
+            siblings = self.store.get_sibling_chunks(result.chunk_id, window)
+
+            for sibling in siblings:
+                if sibling.id in seen_ids:
+                    continue
+                seen_ids.add(sibling.id)
+
+                # Если это оригинальный результат — используем его
+                if sibling.id in original_ids:
+                    # Находим оригинальный результат
+                    original = next(
+                        (r for r in results if r.chunk_id == sibling.id),
+                        None,
+                    )
+                    if original:
+                        expanded.append(original)
+                else:
+                    # Соседи получают score=0 и match_type=CONTEXT
+                    expanded.append(
+                        ChunkResult(
+                            chunk=sibling,
+                            score=0.0,
+                            match_type=MatchType.CONTEXT,
+                            parent_doc_id=result.parent_doc_id,
+                            parent_doc_title=result.parent_doc_title,
+                            parent_metadata=result.parent_metadata,
+                        )
+                    )
+
+        # Сортируем по документу и chunk_index для правильного порядка
+        expanded.sort(key=lambda r: (r.parent_doc_id, r.chunk_index))
+
+        return expanded
 
     def delete(self, document_id: int) -> int:
         """Удаляет документ и все его чанки.

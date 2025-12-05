@@ -1,0 +1,83 @@
+@startuml
+title Архитектура Semantic Core (Architecture)
+
+package "Domain Layer" <<Infrastructure>> {
+    [Document] as doc
+    [Chunk] as chunk
+    [SearchResult] as sr
+    [MediaAnalysisResult] as mar
+}
+
+package "Interfaces Layer" <<Adapter>> {
+    interface "BaseEmbedder" as emb
+    interface "BaseVectorStore" as vs
+    interface "BaseSplitter" as sp
+    interface "BaseLLMProvider" as llm
+    interface "DocumentParser" as dp
+}
+
+package "Infrastructure Layer" <<Infrastructure>> {
+    package "Gemini" {
+        [GeminiEmbedder] as ge <<Adapter>>
+        [GeminiLLMProvider] as glp <<Adapter>>
+        [ImageAnalyzer] as ia <<Adapter>>
+        [AudioAnalyzer] as aa <<Adapter>>
+        [VideoAnalyzer] as va <<Adapter>>
+    }
+    package "Storage" {
+        [PeeweeVectorStore] as pvs <<Infrastructure>>
+    }
+    package "Processing" {
+        [SmartSplitter] as ss <<Adapter>>
+        [MarkdownNodeParser] as mnp <<Adapter>>
+    }
+}
+
+package "Core Layer" <<Core>> {
+    [SemanticCore] as sc <<Core>>
+    [RAGEngine] as rag <<Core>>
+    [MediaQueueProcessor] as mqp <<Core>>
+    [BatchManager] as bm <<Core>>
+}
+
+package "CLI Layer" <<Adapter>> {
+    [ingest] as cli_i
+    [search] as cli_s
+    [chat] as cli_c
+}
+
+cli_i --> sc
+cli_s --> sc
+cli_c --> rag
+
+sc --> emb
+sc --> vs
+sc --> sp
+rag --> llm
+rag --> sc
+
+ge ..|> emb
+glp ..|> llm
+pvs ..|> vs
+ss ..|> sp
+mnp ..|> dp
+
+sc --> mqp
+mqp --> ia
+mqp --> aa
+mqp --> va
+
+note right of sc
+    Центральный оркестратор
+    всех операций
+end note
+
+legend right
+    |= Символ |= Значение |
+    | --> | Использует |
+    | ..|> | Реализует |
+    | <<Adapter>> | Адаптер (входные точки) |
+    | <<Core>> | Бизнес-логика |
+    | <<Infrastructure>> | Инфраструктура |
+endlegend
+@enduml

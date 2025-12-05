@@ -6,6 +6,7 @@
 """
 
 import json
+import re
 import time
 from typing import Optional, Any
 
@@ -31,6 +32,51 @@ from semantic_core.infrastructure.storage.peewee.engine import VectorDatabase
 from semantic_core.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _sanitize_fts_query(query: str) -> str:
+    """Экранирует запрос для FTS5.
+
+    FTS5 использует специальные операторы:
+    - `-` (минус/дефис) = NOT оператор
+    - `*` = prefix match
+    - `"..."` = phrase match
+    - `[...]` = column filter
+    - `OR`, `AND`, `NOT` = логические операторы
+
+    Стратегия:
+    - Токены с дефисами (не в начале) оборачиваем в кавычки
+    - Токены с квадратными скобками оборачиваем в кавычки
+
+    Args:
+        query: Пользовательский запрос.
+
+    Returns:
+        Экранированный запрос для FTS5 MATCH.
+    """
+    # Разбиваем на токены
+    tokens = query.split()
+    result = []
+
+    for token in tokens:
+        needs_quoting = False
+
+        # Дефис внутри токена (не в начале) — нужно экранировать
+        if "-" in token and not token.startswith("-"):
+            needs_quoting = True
+
+        # Квадратные скобки — FTS5 column filter syntax
+        if "[" in token or "]" in token:
+            needs_quoting = True
+
+        if needs_quoting:
+            # Удаляем кавычки если уже есть
+            token = token.strip('"')
+            result.append(f'"{token}"')
+        else:
+            result.append(token)
+
+    return " ".join(result)
 
 
 class PeeweeVectorStore(BaseVectorStore):
@@ -64,7 +110,7 @@ class PeeweeVectorStore(BaseVectorStore):
 
         # Создаём таблицы
         self._create_tables()
-        
+
         logger.debug(
             "PeeweeVectorStore initialized",
             dimension=dimension,
@@ -73,7 +119,7 @@ class PeeweeVectorStore(BaseVectorStore):
     def _create_tables(self) -> None:
         """Создаёт таблицы и виртуальные индексы."""
         logger.debug("Creating tables and indexes")
-        
+
         # Создаём обычные таблицы
         self.db.create_tables([DocumentModel, BatchJobModel, ChunkModel], safe=True)
 
@@ -86,14 +132,14 @@ class PeeweeVectorStore(BaseVectorStore):
             )
         """)
 
-        # Создаём FTS5 таблицу для документов
+        # Создаём FTS5 таблицу для чанков (не документов!)
+        # Это позволяет RRF объединять результаты на уровне chunk_id
         self.db.execute_sql("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts
+            CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts
             USING fts5(
-                id UNINDEXED,
                 content,
-                content=documents,
-                content_rowid=id
+                content='chunks',
+                content_rowid='id'
             )
         """)
 
@@ -103,30 +149,87 @@ class PeeweeVectorStore(BaseVectorStore):
             ON chunks(chunk_type, language)
         """)
 
-        # Триггеры для автоматического обновления FTS
+        # Триггеры для автоматического обновления chunks_fts
         self.db.execute_sql("""
-            CREATE TRIGGER IF NOT EXISTS documents_fts_insert
-            AFTER INSERT ON documents BEGIN
-                INSERT INTO documents_fts(rowid, content)
+            CREATE TRIGGER IF NOT EXISTS chunks_fts_insert
+            AFTER INSERT ON chunks BEGIN
+                INSERT INTO chunks_fts(rowid, content)
                 VALUES (new.id, new.content);
             END
         """)
 
         self.db.execute_sql("""
-            CREATE TRIGGER IF NOT EXISTS documents_fts_delete
-            AFTER DELETE ON documents BEGIN
-                DELETE FROM documents_fts WHERE rowid = old.id;
+            CREATE TRIGGER IF NOT EXISTS chunks_fts_delete
+            AFTER DELETE ON chunks BEGIN
+                DELETE FROM chunks_fts WHERE rowid = old.id;
             END
         """)
 
         self.db.execute_sql("""
-            CREATE TRIGGER IF NOT EXISTS documents_fts_update
-            AFTER UPDATE ON documents BEGIN
-                UPDATE documents_fts
+            CREATE TRIGGER IF NOT EXISTS chunks_fts_update
+            AFTER UPDATE ON chunks BEGIN
+                UPDATE chunks_fts
                 SET content = new.content
                 WHERE rowid = new.id;
             END
         """)
+
+        # Автомиграция: если chunks_fts пуста, но chunks полна — заполняем
+        self._migrate_fts_if_needed()
+
+    def _migrate_fts_if_needed(self) -> None:
+        """Автоматически заполняет chunks_fts из существующих чанков.
+
+        Проверяет, есть ли расхождение между chunks и chunks_fts.
+        Если chunks не пуста, а chunks_fts пуста — выполняет миграцию.
+        """
+        try:
+            # Проверяем количество записей в chunks
+            cursor = self.db.execute_sql("SELECT COUNT(*) FROM chunks")
+            chunks_count = cursor.fetchone()[0]
+
+            # Проверяем количество записей в chunks_fts
+            cursor = self.db.execute_sql("SELECT COUNT(*) FROM chunks_fts")
+            fts_count = cursor.fetchone()[0]
+
+            if chunks_count > 0 and fts_count == 0:
+                logger.warning(
+                    "FTS index is empty, populating from existing chunks",
+                    chunks_count=chunks_count,
+                )
+
+                # Массовая вставка существующих чанков в FTS
+                self.db.execute_sql("""
+                    INSERT INTO chunks_fts(rowid, content)
+                    SELECT id, content FROM chunks
+                """)
+
+                logger.info(
+                    "FTS index populated from existing chunks",
+                    migrated_count=chunks_count,
+                )
+            elif chunks_count > 0 and fts_count > 0 and chunks_count != fts_count:
+                logger.warning(
+                    "FTS index count mismatch, rebuilding",
+                    chunks_count=chunks_count,
+                    fts_count=fts_count,
+                )
+                # Ребилдим FTS индекс
+                self.db.execute_sql("DELETE FROM chunks_fts")
+                self.db.execute_sql("""
+                    INSERT INTO chunks_fts(rowid, content)
+                    SELECT id, content FROM chunks
+                """)
+                logger.info(
+                    "FTS index rebuilt",
+                    migrated_count=chunks_count,
+                )
+        except Exception as e:
+            # FTS таблица может ещё не существовать
+            logger.debug(
+                "FTS migration check skipped",
+                reason=str(e),
+            )
 
     def save(self, document: Document, chunks: list[Chunk]) -> Document:
         """Сохраняет документ с чанками атомарно.
@@ -148,7 +251,7 @@ class PeeweeVectorStore(BaseVectorStore):
             chunk_count=len(chunks),
             media_type=document.media_type.value,
         )
-        
+
         with self.db.atomic():
             # Сохраняем документ
             doc_model = DocumentModel.create(
@@ -244,7 +347,7 @@ class PeeweeVectorStore(BaseVectorStore):
             has_text=query_text is not None,
             has_filters=filters is not None,
         )
-        
+
         if mode == "vector":
             results = self._vector_search(query_vector, filters, limit)
         elif mode == "fts":
@@ -254,7 +357,7 @@ class PeeweeVectorStore(BaseVectorStore):
         else:
             logger.error("Unknown search mode", mode=mode)
             raise ValueError(f"Неизвестный режим поиска: {mode}")
-        
+
         latency_ms = (time.perf_counter() - start_time) * 1000
         logger.info(
             "Search completed",
@@ -262,7 +365,7 @@ class PeeweeVectorStore(BaseVectorStore):
             results_count=len(results),
             latency_ms=round(latency_ms, 2),
         )
-        
+
         return results
 
     def _vector_search(
@@ -348,27 +451,31 @@ class PeeweeVectorStore(BaseVectorStore):
         filters: Optional[dict],
         limit: int,
     ) -> list[SearchResult]:
-        """Полнотекстовый поиск через FTS5.
+        """Полнотекстовый поиск через FTS5 на уровне чанков.
 
         Args:
             query_text: Текст запроса.
-            filters: Фильтры по метаданным (JSON).
+            filters: Фильтры по метаданным документа (JSON).
             limit: Количество результатов.
 
         Returns:
-            Список SearchResult.
+            Список SearchResult с chunk_id.
         """
         if not query_text:
             logger.warning("FTS search called without query_text")
             raise ValueError("Для FTS поиска нужен query_text")
 
+        # Экранируем специальные символы FTS5
+        sanitized_query = _sanitize_fts_query(query_text)
+
         logger.trace(
-            "FTS search",
+            "FTS chunk search",
             query_length=len(query_text),
+            sanitized_query=sanitized_query,
             limit=limit,
         )
 
-        # Формируем WHERE условия для фильтров
+        # Формируем WHERE условия для фильтров по метаданным документа
         where_conditions = []
         where_params = []
         if filters:
@@ -380,24 +487,27 @@ class PeeweeVectorStore(BaseVectorStore):
             f"AND {' AND '.join(where_conditions)}" if where_conditions else ""
         )
 
+        # Поиск по chunks_fts (вместо documents_fts)
         sql = f"""
             SELECT
-                d.id,
+                c.id as chunk_id,
+                c.document_id,
                 fts.rank
-            FROM documents_fts fts
-            JOIN documents d ON d.id = fts.rowid
-            WHERE documents_fts MATCH ?
+            FROM chunks_fts fts
+            JOIN chunks c ON c.id = fts.rowid
+            JOIN documents d ON d.id = c.document_id
+            WHERE chunks_fts MATCH ?
             {where_clause}
             ORDER BY fts.rank
             LIMIT ?
         """
 
-        params = [query_text] + where_params + [limit]
+        params = [sanitized_query] + where_params + [limit]
         cursor = self.db.execute_sql(sql, params)
         results = []
 
         for row in cursor.fetchall():
-            doc_id, rank = row
+            chunk_id, doc_id, rank = row
 
             doc_model = DocumentModel.get_by_id(doc_id)
             document = self._model_to_document(doc_model)
@@ -407,6 +517,7 @@ class PeeweeVectorStore(BaseVectorStore):
                     document=document,
                     score=abs(rank),  # rank отрицательный, инвертируем
                     match_type=MatchType.FTS,
+                    chunk_id=chunk_id,  # Теперь возвращаем chunk_id
                 )
             )
 
@@ -443,7 +554,7 @@ class PeeweeVectorStore(BaseVectorStore):
             raise ValueError("Нужен хотя бы один параметр: query_vector или query_text")
 
         logger.trace(
-            "Hybrid search (RRF)",
+            "Hybrid search (RRF) at chunk level",
             k=k,
             limit=limit,
         )
@@ -454,13 +565,15 @@ class PeeweeVectorStore(BaseVectorStore):
         if query_text is None:
             return self._vector_search(query_vector, filters, limit)
 
-        # Формируем WHERE условия для фильтров
+        # Экранируем специальные символы FTS5 для query_text
+        sanitized_query = _sanitize_fts_query(query_text)
+
+        # Формируем WHERE условия для фильтров по метаданным документа
         where_conditions = []
         where_params = []
         if filters:
             for key, value in filters.items():
-                # Фильтруем по metadata JSON
-                where_conditions.append(f"json_extract(main.metadata, '$.{key}') = ?")
+                where_conditions.append(f"json_extract(d.metadata, '$.{key}') = ?")
                 where_params.append(value)
 
         where_clause = (
@@ -470,57 +583,63 @@ class PeeweeVectorStore(BaseVectorStore):
         # Подготовка blob для векторного поиска
         blob = query_vector.tobytes()
 
-        # SQL запрос с RRF через CTE
+        # SQL запрос с RRF через CTE — теперь на уровне chunk_id!
+        # Это ключевое изменение: оба метода возвращают chunk_id,
+        # что позволяет RRF корректно находить пересечения
         sql = f"""
             WITH vector_results AS (
                 SELECT 
-                    c.document_id as doc_id,
+                    cv.id as chunk_id,
                     ROW_NUMBER() OVER (
                         ORDER BY vec_distance_cosine(cv.embedding, ?)
                     ) as rank
                 FROM chunks_vec cv
                 JOIN chunks c ON c.id = cv.id
-                JOIN documents main ON main.id = c.document_id
+                JOIN documents d ON d.id = c.document_id
                 {where_clause}
                 LIMIT 100
             ),
             fts_results AS (
                 SELECT 
-                    main.id as doc_id,
+                    fts.rowid as chunk_id,
                     ROW_NUMBER() OVER (ORDER BY fts.rank) as rank
-                FROM documents_fts fts
-                JOIN documents main ON main.id = fts.rowid
-                WHERE documents_fts MATCH ?
+                FROM chunks_fts fts
+                JOIN chunks c ON c.id = fts.rowid
+                JOIN documents d ON d.id = c.document_id
+                WHERE chunks_fts MATCH ?
                 {f"AND {' AND '.join(where_conditions)}" if where_conditions else ""}
                 LIMIT 100
             ),
             rrf_scores AS (
                 SELECT 
-                    COALESCE(v.doc_id, f.doc_id) as doc_id,
+                    COALESCE(v.chunk_id, f.chunk_id) as chunk_id,
                     (
                         COALESCE(1.0 / (? + v.rank), 0.0) + 
                         COALESCE(1.0 / (? + f.rank), 0.0)
                     ) as rrf_score
                 FROM vector_results v
-                FULL OUTER JOIN fts_results f ON v.doc_id = f.doc_id
+                FULL OUTER JOIN fts_results f ON v.chunk_id = f.chunk_id
             )
-            SELECT doc_id, rrf_score
+            SELECT chunk_id, rrf_score
             FROM rrf_scores
             ORDER BY rrf_score DESC
             LIMIT ?
         """
 
-        # Собираем параметры: blob, where_params, query_text, where_params, k, k, limit
-        params = [blob] + where_params + [query_text] + where_params + [k, k, limit]
+        # Собираем параметры: blob, where_params, sanitized_query, where_params, k, k, limit
+        params = (
+            [blob] + where_params + [sanitized_query] + where_params + [k, k, limit]
+        )
 
         cursor = self.db.execute_sql(sql, params)
         results = []
 
         for row in cursor.fetchall():
-            doc_id, rrf_score = row
+            chunk_id, rrf_score = row
 
-            # Загружаем документ
-            doc_model = DocumentModel.get_by_id(doc_id)
+            # Загружаем чанк и документ
+            chunk_model = ChunkModel.get_by_id(chunk_id)
+            doc_model = DocumentModel.get_by_id(chunk_model.document_id)
             document = self._model_to_document(doc_model)
 
             results.append(
@@ -528,6 +647,7 @@ class PeeweeVectorStore(BaseVectorStore):
                     document=document,
                     score=rrf_score,
                     match_type=MatchType.HYBRID,
+                    chunk_id=chunk_id,  # Теперь возвращаем chunk_id
                 )
             )
 
@@ -546,7 +666,7 @@ class PeeweeVectorStore(BaseVectorStore):
             "Deleting document",
             doc_id=document_id,
         )
-        
+
         with self.db.atomic():
             doc_model = DocumentModel.get_by_id(document_id)
 
@@ -561,13 +681,13 @@ class PeeweeVectorStore(BaseVectorStore):
 
             # Удаляем документ (чанки удалятся каскадно)
             result = doc_model.delete_instance()
-            
+
             logger.info(
                 "Document deleted",
                 doc_id=document_id,
                 chunks_deleted=len(chunk_ids),
             )
-            
+
             return result
 
     def delete_by_metadata(self, filters: dict) -> int:
@@ -583,7 +703,7 @@ class PeeweeVectorStore(BaseVectorStore):
             "Deleting chunks by metadata",
             filters=filters,
         )
-        
+
         # Находим все чанки, которые соответствуют фильтрам
         query = ChunkModel.select()
 
@@ -655,7 +775,7 @@ class PeeweeVectorStore(BaseVectorStore):
             chunk_type_filter=chunk_type_filter,
             language_filter=language_filter,
         )
-        
+
         if mode == "vector":
             results = self._vector_search_chunks(
                 query_vector, filters, limit, chunk_type_filter, language_filter
@@ -672,7 +792,7 @@ class PeeweeVectorStore(BaseVectorStore):
         else:
             logger.error("Unknown search mode", mode=mode)
             raise ValueError(f"Неизвестный режим поиска: {mode}")
-        
+
         latency_ms = (time.perf_counter() - start_time) * 1000
         logger.info(
             "Chunk search completed",
@@ -680,7 +800,7 @@ class PeeweeVectorStore(BaseVectorStore):
             results_count=len(results),
             latency_ms=round(latency_ms, 2),
         )
-        
+
         return results
 
     def _vector_search_chunks(
@@ -911,3 +1031,95 @@ class PeeweeVectorStore(BaseVectorStore):
                 count=len(vectors_dict),
             )
             raise RuntimeError(f"Ошибка при массовом обновлении векторов: {e}")
+
+    def get_sibling_chunks(
+        self,
+        chunk_id: int,
+        window: int = 1,
+    ) -> list[Chunk]:
+        """Получает соседние чанки того же документа.
+
+        Args:
+            chunk_id: ID центрального чанка.
+            window: Количество соседей в каждую сторону.
+
+        Returns:
+            Список Chunk, отсортированный по chunk_index.
+        """
+        try:
+            center = ChunkModel.get_by_id(chunk_id)
+        except ChunkModel.DoesNotExist:
+            logger.warning("Chunk not found for siblings", chunk_id=chunk_id)
+            return []
+
+        doc_id = center.document_id
+        position = center.chunk_index
+
+        # Получаем общее количество чанков в документе
+        total_chunks = self.get_document_chunks_count(doc_id)
+
+        # Если window >= количества чанков, возвращаем все
+        if window * 2 + 1 >= total_chunks:
+            siblings = (
+                ChunkModel.select()
+                .where(ChunkModel.document == doc_id)
+                .order_by(ChunkModel.chunk_index)
+            )
+        else:
+            # Запрос соседей в диапазоне
+            siblings = (
+                ChunkModel.select()
+                .where(ChunkModel.document == doc_id)
+                .where(
+                    ChunkModel.chunk_index.between(
+                        position - window,
+                        position + window,
+                    )
+                )
+                .order_by(ChunkModel.chunk_index)
+            )
+
+        return [self._chunk_model_to_chunk(s) for s in siblings]
+
+    def get_document_chunks_count(self, document_id: int) -> int:
+        """Возвращает количество чанков в документе.
+
+        Args:
+            document_id: ID документа.
+
+        Returns:
+            Количество чанков.
+        """
+        return (
+            ChunkModel.select()
+            .where(ChunkModel.document == document_id)
+            .count()
+        )
+
+    def _chunk_model_to_chunk(self, model: ChunkModel) -> Chunk:
+        """Конвертирует ChunkModel в Chunk DTO.
+
+        Args:
+            model: Модель чанка из БД.
+
+        Returns:
+            Chunk DTO.
+        """
+        # Парсим metadata
+        metadata = {}
+        if model.metadata:
+            try:
+                metadata = json.loads(model.metadata)
+            except json.JSONDecodeError:
+                pass
+
+        return Chunk(
+            id=model.id,
+            content=model.content,
+            chunk_index=model.chunk_index,
+            chunk_type=ChunkType(model.chunk_type),
+            language=model.language,
+            metadata=metadata,
+            parent_doc_id=model.document_id,
+            created_at=model.created_at,
+        )

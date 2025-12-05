@@ -161,11 +161,34 @@ class CLIContext:
         # Context Strategy
         context_strategy = HierarchicalContextStrategy()
 
+        # Media Analyzers (если включены в конфиге)
+        image_analyzer = None
+        audio_analyzer = None
+        video_analyzer = None
+
+        if config.media_enabled:
+            try:
+                from semantic_core.infrastructure.gemini import (
+                    GeminiImageAnalyzer,
+                    GeminiAudioAnalyzer,
+                    GeminiVideoAnalyzer,
+                )
+
+                image_analyzer = GeminiImageAnalyzer(api_key=api_key)
+                audio_analyzer = GeminiAudioAnalyzer(api_key=api_key)
+                video_analyzer = GeminiVideoAnalyzer(api_key=api_key)
+            except ImportError:
+                # Media dependencies not installed
+                pass
+
         return SemanticCore(
             embedder=embedder,
             store=store,
             splitter=splitter,
             context_strategy=context_strategy,
+            image_analyzer=image_analyzer,
+            audio_analyzer=audio_analyzer,
+            video_analyzer=video_analyzer,
         )
 
     def _build_batch_manager(self, config: SemanticConfig) -> "BatchManager":

@@ -17,20 +17,12 @@ from rich.table import Table
 from rich.text import Text
 
 
-search_cmd = typer.Typer(
-    name="search",
-    help="Семантический поиск по документам",
-    no_args_is_help=True,
-)
-
 console = Console()
 
 
-@search_cmd.callback(invoke_without_command=True)
 def search(
-    ctx: typer.Context,
     query: str = typer.Argument(
-        ...,
+        None,
         help="Поисковый запрос",
     ),
     limit: int = typer.Option(
@@ -62,6 +54,13 @@ def search(
         help="Параметр k для RRF (Reciprocal Rank Fusion)",
         min=1,
     ),
+    context_window: int = typer.Option(
+        0,
+        "--context-window",
+        "-cw",
+        help="Количество соседних чанков (0=только найденные, N=±N соседей)",
+        min=0,
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -76,6 +75,19 @@ def search(
         semantic search "rate limiting" --type vector --limit 5
         semantic search "обработка ошибок" -T 0.5
     """
+    # Проверка обязательного аргумента
+    if query is None:
+        console.print(
+            Panel(
+                "[red]Укажите поисковый запрос[/red]\n\n"
+                "Примеры:\n"
+                '  semantic search "как работает эмбеддинг"\n'
+                '  semantic search "python" --type fts',
+                title="❌ Ошибка",
+            )
+        )
+        raise typer.Exit(1)
+
     # Late import to avoid circular dependency
     from semantic_core.cli.app import get_cli_context
 
@@ -93,12 +105,25 @@ def search(
 
     # Выполняем поиск
     try:
-        results = core.search(
-            query=query,
-            limit=limit,
-            mode=search_type,
-            k=k,
-        )
+        if context_window > 0:
+            # Гранулярный поиск с расширением контекста
+            results = core.search_chunks(
+                query=query,
+                limit=limit,
+                mode=search_type,
+                k=k,
+                context_window=context_window,
+            )
+            is_chunk_search = True
+        else:
+            # Стандартный поиск по документам
+            results = core.search(
+                query=query,
+                limit=limit,
+                mode=search_type,
+                k=k,
+            )
+            is_chunk_search = False
     except Exception as e:
         console.print(
             Panel(
@@ -116,7 +141,10 @@ def search(
     if cli_ctx.json_output:
         _render_json(query, results, search_type)
     else:
-        _render_rich(query, results, search_type, verbose)
+        if is_chunk_search:
+            _render_chunks_rich(query, results, search_type, context_window, verbose)
+        else:
+            _render_rich(query, results, search_type, verbose)
 
 
 def _render_rich(
@@ -191,6 +219,94 @@ def _render_rich(
             console.print("  Metadata:")
             for key, value in list(first.document.metadata.items())[:5]:
                 console.print(f"    {key}: {value}")
+
+
+def _render_chunks_rich(
+    query: str,
+    results: list,
+    search_type: str,
+    context_window: int,
+    verbose: bool,
+) -> None:
+    """Отображает результаты гранулярного поиска чанков."""
+    if not results:
+        console.print(
+            Panel(
+                "[yellow]Ничего не найдено[/yellow]",
+                title=f"🔍 Поиск: {query}",
+            )
+        )
+        return
+
+    # Заголовок
+    type_label = {
+        "vector": "🎯 Векторный",
+        "fts": "📝 Полнотекстовый",
+        "hybrid": "🔀 Гибридный",
+    }.get(search_type, search_type)
+
+    # Считаем найденные и контекстные
+    found_count = sum(1 for r in results if r.match_type.value != "context")
+    context_count = len(results) - found_count
+
+    console.print(
+        Panel(
+            f"[cyan]Найдено: {found_count} чанков + {context_count} контекстных (window=±{context_window})[/cyan]",
+            title=f"🔍 {type_label} поиск: [bold]{query}[/bold]",
+        )
+    )
+
+    # Таблица результатов
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Score", justify="right", width=8)
+    table.add_column("Тип", width=12)
+    table.add_column("Источник", width=25)
+    table.add_column("Контент", overflow="fold")
+
+    for i, result in enumerate(results, 1):
+        # Score с цветовой индикацией
+        score = result.score
+        is_context = result.match_type.value == "context"
+        
+        if is_context:
+            score_text = Text("ctx", style="dim cyan")
+        elif score >= 0.8:
+            score_text = Text(f"{score:.3f}", style="green")
+        elif score >= 0.5:
+            score_text = Text(f"{score:.3f}", style="yellow")
+        else:
+            score_text = Text(f"{score:.3f}", style="red")
+
+        # Тип чанка
+        chunk_type = result.chunk_type.value
+        if is_context:
+            chunk_type = f"[dim]{chunk_type}[/dim]"
+
+        # Источник
+        source = result.parent_doc_title or f"Doc#{result.parent_doc_id}"
+        if len(source) > 23:
+            source = "..." + source[-20:]
+
+        # Контент (превью)
+        content = result.content
+        if not verbose and len(content) > 80:
+            content = content[:80] + "..."
+        if is_context:
+            content = f"[dim]{content}[/dim]"
+
+        table.add_row(str(i), score_text, chunk_type, source, content)
+
+    console.print(table)
+
+    # Детальная информация (verbose)
+    if verbose and results:
+        console.print("\n[dim]Детали первого результата:[/dim]")
+        first = results[0]
+        console.print(f"  Chunk ID: {first.chunk_id or '—'}")
+        console.print(f"  Chunk Index: {first.chunk_index}")
+        console.print(f"  Doc ID: {first.parent_doc_id}")
+        console.print(f"  Match Type: {first.match_type.value}")
 
 
 def _render_json(query: str, results: list, search_type: str) -> None:
