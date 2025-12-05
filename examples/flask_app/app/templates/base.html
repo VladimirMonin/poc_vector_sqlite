@@ -111,6 +111,9 @@
         .score-high { color: var(--bs-success); }
         .score-medium { color: var(--bs-warning); }
         .score-low { color: var(--bs-secondary); }
+        
+        /* Custom purple for semantic match */
+        .bg-purple { background-color: #6f42c1 !important; }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -154,7 +157,7 @@
                 
                 <div class="d-flex align-items-center">
                     <!-- About -->
-                    <a class="btn btn-link nav-link" href="{{ url_for('settings.about') }}" title="О приложении">
+                    <a class="btn btn-link nav-link me-2" href="{{ url_for('settings.about') }}" title="О приложении">
                         <i class="bi bi-info-circle"></i>
                     </a>
                     <!-- Theme toggle -->
