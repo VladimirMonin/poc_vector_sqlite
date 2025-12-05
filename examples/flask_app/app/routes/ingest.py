@@ -22,6 +22,8 @@ from flask import (
     url_for,
     flash,
     jsonify,
+    send_file,
+    abort,
 )
 
 from app.services.upload_service import UploadService
@@ -56,6 +58,7 @@ def _get_document_stats(doc_id: int) -> dict:
         "code": 0,
         "image": 0,
         "audio": 0,
+        "video": 0,
         "pending": 0,
     }
 
@@ -70,6 +73,8 @@ def _get_document_stats(doc_id: int) -> dict:
             stats["image"] += 1
         elif chunk_type == "audio_ref":
             stats["audio"] += 1
+        elif chunk_type == "video_ref":
+            stats["video"] += 1
 
         if chunk.embedding_status == "pending":
             stats["pending"] += 1
@@ -345,8 +350,18 @@ def document_detail(doc_id: int):
         .order_by(ChunkModel.chunk_index)
     )
 
-    # Определяем тип медиа для иконки
-    media_type = meta.get("media_type", "text") if isinstance(meta, dict) else "text"
+    # Определяем тип медиа из chunk_type первого чанка (надёжнее чем metadata)
+    # Баг: CLI не записывает media_type в metadata документа
+    CHUNK_TYPE_TO_MEDIA = {
+        "image_ref": "image",
+        "audio_ref": "audio",
+        "video_ref": "video",
+        "text": "text",
+        "code": "text",
+    }
+    first_chunk = chunks[0] if chunks else None
+    media_type = CHUNK_TYPE_TO_MEDIA.get(first_chunk.chunk_type, "text") if first_chunk else "text"
+
     media_icons = {
         "text": "bi-file-text",
         "image": "bi-image",
@@ -438,3 +453,53 @@ def reindex_document(doc_id: int):
         flash(f"Ошибка: {e}", "danger")
 
     return redirect(url_for("ingest.documents_page"))
+
+
+@ingest_bp.route("/media/<int:doc_id>")
+def serve_media(doc_id: int):
+    """Отдать медиа файл документа.
+
+    Читает путь из метаданных документа и отдаёт файл.
+    Безопасно: проверяет существование и тип файла.
+    """
+    import json
+    import mimetypes
+
+    doc = DocumentModel.get_or_none(DocumentModel.id == doc_id)
+    if not doc:
+        abort(404)
+
+    # Парсим метаданные
+    meta = doc.metadata
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except (json.JSONDecodeError, TypeError):
+            meta = {}
+
+    # Получаем путь к файлу
+    source = meta.get("source", "")
+    if not source:
+        abort(404)
+
+    file_path = Path(source)
+    
+    # Если путь относительный, ищем от корня проекта
+    if not file_path.is_absolute():
+        # root_path = examples/flask_app/app, нужно 3 уровня вверх до poc_vector_sqlite
+        project_root = Path(current_app.root_path).parent.parent.parent
+        file_path = project_root / source
+    
+    if not file_path.exists():
+        abort(404)
+
+    # Определяем MIME type
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    return send_file(
+        file_path,
+        mimetype=mime_type,
+        as_attachment=False,
+    )
