@@ -4,12 +4,14 @@ Blueprints:
     chat_bp: Интерфейс чата с историей и источниками.
 
 HTMX endpoints:
-    GET  /chat              — Страница чата
-    POST /chat/send         — Отправить сообщение
-    GET  /chat/messages     — Загрузить историю сессии
-    POST /chat/new          — Создать новую сессию
-    POST /chat/clear        — Очистить сессию
-    GET  /chat/sessions     — Список сессий (sidebar)
+    GET  /chat                      — Страница чата
+    POST /chat/send                 — Отправить сообщение
+    GET  /chat/messages             — Загрузить историю сессии
+    POST /chat/new                  — Создать новую сессию
+    POST /chat/clear                — Очистить сессию
+    GET  /chat/sessions             — Список сессий (sidebar)
+    DELETE /chat/message/<id>       — Удалить сообщение
+    GET  /chat/tokens/<session_id>  — Получить счётчик токенов
 """
 
 from flask import (
@@ -20,6 +22,7 @@ from flask import (
     jsonify,
     redirect,
     url_for,
+    make_response,
 )
 
 from app.utils.markdown import render_markdown
@@ -72,6 +75,7 @@ def index():
     sessions = []
     current_session = None
     messages = []
+    total_tokens = 0
 
     if service:
         sessions = service.get_recent_sessions(limit=10)
@@ -80,6 +84,7 @@ def index():
             current_session = service.get_session(session_id)
             if current_session:
                 messages = service.get_session_messages(session_id)
+                total_tokens = service.get_session_total_tokens(session_id)
 
     return render_template(
         "chat.html",
@@ -87,6 +92,7 @@ def index():
         sessions=sessions,
         current_session=current_session,
         messages=messages,
+        total_tokens=total_tokens,
         render_markdown=render_markdown,
     )
 
@@ -236,3 +242,58 @@ def delete_session(session_id: str):
         service.delete_session(session_id)
 
     return redirect(url_for("chat.index"))
+
+
+@chat_bp.route("/message/<int:message_id>", methods=["DELETE"])
+def delete_message(message_id: int):
+    """HTMX endpoint: удалить сообщение.
+
+    Args:
+        message_id: ID сообщения.
+
+    Returns:
+        OOB swap для обновления счётчика токенов.
+    """
+    service = _get_chat_service()
+    if not service:
+        return "", 404
+
+    session_id = service.delete_message(message_id)
+    if not session_id:
+        return "", 404
+
+    # Получаем обновлённый счётчик токенов
+    total_tokens = service.get_session_total_tokens(session_id)
+
+    # OOB swap для обновления счётчика
+    response = make_response(
+        render_template(
+            "partials/chat_tokens_counter.html",
+            total_tokens=total_tokens,
+            session_id=session_id,
+        )
+    )
+    return response
+
+
+@chat_bp.route("/tokens/<session_id>")
+def get_tokens(session_id: str):
+    """HTMX endpoint: получить счётчик токенов сессии.
+
+    Args:
+        session_id: UUID сессии.
+
+    Returns:
+        HTML partial со счётчиком токенов.
+    """
+    service = _get_chat_service()
+    if not service:
+        return "", 404
+
+    total_tokens = service.get_session_total_tokens(session_id)
+
+    return render_template(
+        "partials/chat_tokens_counter.html",
+        total_tokens=total_tokens,
+        session_id=session_id,
+    )
