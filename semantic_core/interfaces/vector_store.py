@@ -146,3 +146,44 @@ class BaseVectorStore(ABC):
             >>> count = store.bulk_update_vectors(vectors)
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def get_sibling_chunks(
+        self,
+        chunk_id: int,
+        window: int = 1,
+    ) -> list[Chunk]:
+        """Получает соседние чанки того же документа.
+
+        Возвращает чанки в диапазоне [position - window, position + window],
+        отсортированные по chunk_index. Если window больше чем доступно
+        чанков — возвращает все чанки документа.
+
+        Args:
+            chunk_id: ID центрального чанка.
+            window: Количество соседей в каждую сторону (по умолчанию 1).
+
+        Returns:
+            Список Chunk, включая центральный, отсортированный по chunk_index.
+            Пустой список если chunk_id не найден.
+
+        Examples:
+            >>> # Документ с 5 чанками [0, 1, 2, 3, 4], центр=2
+            >>> store.get_sibling_chunks(chunk_id=2, window=1)
+            [Chunk(index=1), Chunk(index=2), Chunk(index=3)]
+            >>> store.get_sibling_chunks(chunk_id=2, window=10)
+            [Chunk(index=0), ..., Chunk(index=4)]  # Весь документ
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_document_chunks_count(self, document_id: int) -> int:
+        """Возвращает количество чанков в документе.
+
+        Args:
+            document_id: ID документа.
+
+        Returns:
+            Количество чанков.
+        """
+        raise NotImplementedError

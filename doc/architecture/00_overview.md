@@ -269,6 +269,9 @@
 65. [**FTS Refactoring: Chunk-Level Search**](65_fts_chunk_level_refactoring.md)  
     Починка RRF: перевод FTS с документов на чанки, автомиграция и RRF boost
 
+66. [**Direct Media Ingestion**](66_direct_media_ingestion.md)  
+    Развилка на входе: медиа-файлы идут напрямую в Gemini API, минуя SmartSplitter
+
 ---
 
 ## 🚀 Быстрый старт

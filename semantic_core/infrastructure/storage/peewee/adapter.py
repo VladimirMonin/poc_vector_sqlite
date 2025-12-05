@@ -1031,3 +1031,95 @@ class PeeweeVectorStore(BaseVectorStore):
                 count=len(vectors_dict),
             )
             raise RuntimeError(f"Ошибка при массовом обновлении векторов: {e}")
+
+    def get_sibling_chunks(
+        self,
+        chunk_id: int,
+        window: int = 1,
+    ) -> list[Chunk]:
+        """Получает соседние чанки того же документа.
+
+        Args:
+            chunk_id: ID центрального чанка.
+            window: Количество соседей в каждую сторону.
+
+        Returns:
+            Список Chunk, отсортированный по chunk_index.
+        """
+        try:
+            center = ChunkModel.get_by_id(chunk_id)
+        except ChunkModel.DoesNotExist:
+            logger.warning("Chunk not found for siblings", chunk_id=chunk_id)
+            return []
+
+        doc_id = center.document_id
+        position = center.chunk_index
+
+        # Получаем общее количество чанков в документе
+        total_chunks = self.get_document_chunks_count(doc_id)
+
+        # Если window >= количества чанков, возвращаем все
+        if window * 2 + 1 >= total_chunks:
+            siblings = (
+                ChunkModel.select()
+                .where(ChunkModel.document == doc_id)
+                .order_by(ChunkModel.chunk_index)
+            )
+        else:
+            # Запрос соседей в диапазоне
+            siblings = (
+                ChunkModel.select()
+                .where(ChunkModel.document == doc_id)
+                .where(
+                    ChunkModel.chunk_index.between(
+                        position - window,
+                        position + window,
+                    )
+                )
+                .order_by(ChunkModel.chunk_index)
+            )
+
+        return [self._chunk_model_to_chunk(s) for s in siblings]
+
+    def get_document_chunks_count(self, document_id: int) -> int:
+        """Возвращает количество чанков в документе.
+
+        Args:
+            document_id: ID документа.
+
+        Returns:
+            Количество чанков.
+        """
+        return (
+            ChunkModel.select()
+            .where(ChunkModel.document == document_id)
+            .count()
+        )
+
+    def _chunk_model_to_chunk(self, model: ChunkModel) -> Chunk:
+        """Конвертирует ChunkModel в Chunk DTO.
+
+        Args:
+            model: Модель чанка из БД.
+
+        Returns:
+            Chunk DTO.
+        """
+        # Парсим metadata
+        metadata = {}
+        if model.metadata:
+            try:
+                metadata = json.loads(model.metadata)
+            except json.JSONDecodeError:
+                pass
+
+        return Chunk(
+            id=model.id,
+            content=model.content,
+            chunk_index=model.chunk_index,
+            chunk_type=ChunkType(model.chunk_type),
+            language=model.language,
+            metadata=metadata,
+            parent_doc_id=model.document_id,
+            created_at=model.created_at,
+        )

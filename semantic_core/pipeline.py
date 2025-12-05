@@ -23,6 +23,7 @@ from semantic_core.domain import (
     ChunkResult,
     MediaConfig,
     MediaType,
+    MatchType,
 )
 from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
@@ -425,6 +426,7 @@ class SemanticCore:
         mode: str = "hybrid",
         k: int = 60,
         chunk_type_filter: Optional[str] = None,
+        context_window: int = 0,
     ) -> list[ChunkResult]:
         """Выполняет гранулярный поиск по отдельным чанкам.
 
@@ -438,6 +440,10 @@ class SemanticCore:
             mode: Режим поиска ('vector', 'fts', 'hybrid').
             k: Константа для RRF алгоритма (по умолчанию 60).
             chunk_type_filter: Фильтр по типу чанка ('text', 'code', 'table', 'image_ref').
+            context_window: Количество соседних чанков в каждую сторону.
+                0 = только найденные чанки (по умолчанию).
+                1 = найденный + по 1 соседу с каждой стороны.
+                N = если N >= количества чанков в документе, возвращается весь документ.
 
         Returns:
             Список ChunkResult с чанками и их скорами.
@@ -464,7 +470,74 @@ class SemanticCore:
             chunk_type_filter=chunk_type_filter,
         )
 
+        # Расширяем результаты соседними чанками если нужно
+        if context_window > 0 and results:
+            results = self._expand_with_context(results, context_window)
+
         return results
+
+    def _expand_with_context(
+        self,
+        results: list[ChunkResult],
+        window: int,
+    ) -> list[ChunkResult]:
+        """Расширяет результаты соседними чанками.
+
+        Дедуплицирует чанки (если соседи пересекаются).
+        Сохраняет оригинальные скоры для найденных чанков.
+        Соседние чанки получают match_type=CONTEXT и score=0.
+
+        Args:
+            results: Исходные результаты поиска.
+            window: Количество соседей в каждую сторону.
+
+        Returns:
+            Расширенный список ChunkResult.
+        """
+        seen_ids: set[int] = set()
+        expanded: list[ChunkResult] = []
+
+        # Сначала собираем ID всех оригинальных результатов
+        original_ids = {r.chunk_id for r in results}
+
+        for result in results:
+            if result.chunk_id is None:
+                continue
+
+            # Получаем соседние чанки
+            siblings = self.store.get_sibling_chunks(result.chunk_id, window)
+
+            for sibling in siblings:
+                if sibling.id in seen_ids:
+                    continue
+                seen_ids.add(sibling.id)
+
+                # Если это оригинальный результат — используем его
+                if sibling.id in original_ids:
+                    # Находим оригинальный результат
+                    original = next(
+                        (r for r in results if r.chunk_id == sibling.id),
+                        None,
+                    )
+                    if original:
+                        expanded.append(original)
+                else:
+                    # Соседи получают score=0 и match_type=CONTEXT
+                    expanded.append(
+                        ChunkResult(
+                            chunk=sibling,
+                            score=0.0,
+                            match_type=MatchType.CONTEXT,
+                            parent_doc_id=result.parent_doc_id,
+                            parent_doc_title=result.parent_doc_title,
+                            parent_metadata=result.parent_metadata,
+                        )
+                    )
+
+        # Сортируем по документу и chunk_index для правильного порядка
+        expanded.sort(key=lambda r: (r.parent_doc_id, r.chunk_index))
+
+        return expanded
 
     def delete(self, document_id: int) -> int:
         """Удаляет документ и все его чанки.
