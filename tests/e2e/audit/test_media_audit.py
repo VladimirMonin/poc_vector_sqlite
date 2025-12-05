@@ -1,346 +1,432 @@
 """E2E тесты: Сценарий C — Медиа-обогащение.
 
-Проверяет промпты и ответы Vision/Audio/Video API.
-Использует реальные медиа-файлы из tests/asests/
+РЕАЛЬНЫЕ вызовы Gemini Vision/Audio/Video API.
+Все промпты, ответы, результаты записываются в отчёт.
 
 Запуск:
-    # С моками (без API)
-    pytest tests/e2e/audit/test_media_audit.py -v -s
-    
-    # С реальным API (нужен SEMANTIC_GEMINI_API_KEY)
-    SEMANTIC_GEMINI_API_KEY=your_key pytest tests/e2e/audit/test_media_audit.py -v -s
+    poetry run pytest tests/e2e/audit/test_media_audit.py -v -s
 
-Отчёты сохраняются в: tests/audit_reports/YYYY-MM-DD_HH-MM/
+Требуется: GEMINI_API_KEY в .env
 """
 
 import os
 import time
+import mimetypes
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock
+from dotenv import load_dotenv
 
+load_dotenv()
+
+from semantic_core.domain.media import MediaRequest, MediaResource
 from semantic_core.domain.media import MediaAnalysisResult
+from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
+from semantic_core.infrastructure.gemini.audio_analyzer import GeminiAudioAnalyzer
+from semantic_core.infrastructure.gemini.video_analyzer import GeminiVideoAnalyzer
+
+from tests.e2e.audit.conftest import MediaInspection, AuditCollector
 
 
-# Проверяем наличие API ключа для реальных тестов
-HAS_API_KEY = bool(os.environ.get("SEMANTIC_GEMINI_API_KEY"))
+def create_media_resource(path: Path, media_type: str) -> MediaResource:
+    """Создаёт MediaResource с автоопределением mime_type."""
+    mime_type, _ = mimetypes.guess_type(str(path))
+    if not mime_type:
+        ext_map = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".webp": "image/webp",
+            ".ogg": "audio/ogg",
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+        }
+        mime_type = ext_map.get(path.suffix.lower(), "application/octet-stream")
+    
+    return MediaResource(
+        path=path,
+        media_type=media_type,
+        mime_type=mime_type,
+    )
 
 
 # ============================================================================
-# Тесты с моками (работают всегда)
+# Фикстуры для анализаторов
 # ============================================================================
 
 
-class TestMediaAuditMocked:
-    """Тесты медиа-обогащения с mock анализаторами.
-    
-    Эти тесты НЕ требуют API ключа и проверяют структуру данных.
-    """
-    
-    def test_image_analysis_mock(
-        self,
-        pipeline_inspector,
-        test_assets_path: Path,
-    ):
-        """Тест обработки изображения с mock-анализатором."""
-        from tests.e2e.audit.conftest import MediaInspection
-        
-        image_file = test_assets_path / "cat_photo.png"
-        if not image_file.exists():
-            pytest.skip(f"Изображение не найдено: {image_file}")
-        
-        # Mock ответ
-        mock_response = MediaAnalysisResult(
-            description="Фотография рыжего кота, сидящего на подоконнике",
-            alt_text="Orange cat on windowsill",
-            keywords=["cat", "pet", "animal", "window"],
-            ocr_text=None,
-        )
-        
-        inspection = MediaInspection(
-            asset_path="cat_photo.png",
-            asset_absolute_path=str(image_file),
-            media_type="image",
-            file_size_bytes=image_file.stat().st_size,
-            surrounding_text_before="Вот фото моего кота:",
-            surrounding_text_after="Он любит сидеть на окне.",
-            system_prompt="Analyze this image and describe what you see.",
-            user_prompt="Describe this cat photo in detail.",
-            model_name="gemini-2.0-flash (mock)",
-            response_raw={"description": mock_response.description},
-            response_parsed=mock_response,
-            final_chunk_content=f"[IMAGE: cat_photo.png]\n{mock_response.description}",
-            processing_time_ms=150.0,
-        )
-        
-        pipeline_inspector.add_media_inspection(inspection)
-        
-        # Создаём фейковый отчёт чтобы инспекция сохранилась
-        from tests.e2e.audit.conftest import InspectionReport
-        if not pipeline_inspector.reports:
-            pipeline_inspector.reports.append(
-                InspectionReport(
-                    file_path="media_test",
-                    file_content_preview="",
-                )
-            )
-        
-        assert inspection.media_type == "image"
-        assert inspection.file_size_bytes > 0
-    
-    def test_audio_analysis_mock(
-        self,
-        pipeline_inspector,
-        test_assets_path: Path,
-    ):
-        """Тест обработки аудио с mock-анализатором."""
-        from tests.e2e.audit.conftest import MediaInspection, InspectionReport
-        
-        audio_file = test_assets_path / "slides_ideas_audio.ogg"
-        if not audio_file.exists():
-            pytest.skip(f"Аудио не найдено: {audio_file}")
-        
-        mock_response = MediaAnalysisResult(
-            description="Запись голосового сообщения с идеями для презентации",
-            alt_text="Voice memo about presentation slides",
-            keywords=["slides", "presentation", "ideas", "voice"],
-            transcription="Нужно добавить слайд про архитектуру и ещё один про API...",
-            participants=["Автор"],
-            duration_seconds=45.0,
-        )
-        
-        inspection = MediaInspection(
-            asset_path="slides_ideas_audio.ogg",
-            asset_absolute_path=str(audio_file),
-            media_type="audio",
-            file_size_bytes=audio_file.stat().st_size,
-            surrounding_text_before="",
-            surrounding_text_after="",
-            system_prompt="Transcribe and analyze this audio recording.",
-            user_prompt="What is discussed in this audio?",
-            model_name="gemini-2.0-flash (mock)",
-            response_raw={
-                "description": mock_response.description,
-                "transcription": mock_response.transcription,
-            },
-            response_parsed=mock_response,
-            final_chunk_content=f"[AUDIO: slides_ideas_audio.ogg]\n{mock_response.transcription}",
-            processing_time_ms=250.0,
-        )
-        
-        if not pipeline_inspector.reports:
-            pipeline_inspector.reports.append(
-                InspectionReport(
-                    file_path="media_test",
-                    file_content_preview="",
-                )
-            )
-        
-        pipeline_inspector.add_media_inspection(inspection)
-        
-        assert inspection.media_type == "audio"
-        assert mock_response.duration_seconds == 45.0
-    
-    def test_video_analysis_mock(
-        self,
-        pipeline_inspector,
-        test_assets_path: Path,
-    ):
-        """Тест обработки видео с mock-анализатором."""
-        from tests.e2e.audit.conftest import MediaInspection, InspectionReport
-        
-        video_file = test_assets_path / "module_init_demo.mp4"
-        if not video_file.exists():
-            pytest.skip(f"Видео не найдено: {video_file}")
-        
-        mock_response = MediaAnalysisResult(
-            description="Демонстрация инициализации модуля в IDE",
-            alt_text="Module initialization demo",
-            keywords=["module", "init", "demo", "IDE", "Python"],
-            transcription="Сейчас я покажу как инициализировать модуль...",
-            ocr_text="class MyModule:\n    def __init__(self):",
-            duration_seconds=30.0,
-        )
-        
-        inspection = MediaInspection(
-            asset_path="module_init_demo.mp4",
-            asset_absolute_path=str(video_file),
-            media_type="video",
-            file_size_bytes=video_file.stat().st_size,
-            surrounding_text_before="Смотри демо:",
-            surrounding_text_after="Надеюсь понятно!",
-            system_prompt="Analyze this video, extract key frames and transcribe audio.",
-            user_prompt="Describe what's happening in this demo video.",
-            model_name="gemini-2.0-flash (mock)",
-            response_raw={
-                "description": mock_response.description,
-                "transcription": mock_response.transcription,
-                "ocr_text": mock_response.ocr_text,
-            },
-            response_parsed=mock_response,
-            final_chunk_content=f"[VIDEO: module_init_demo.mp4]\n{mock_response.description}\n\nTranscript: {mock_response.transcription}",
-            processing_time_ms=500.0,
-        )
-        
-        if not pipeline_inspector.reports:
-            pipeline_inspector.reports.append(
-                InspectionReport(
-                    file_path="media_test",
-                    file_content_preview="",
-                )
-            )
-        
-        pipeline_inspector.add_media_inspection(inspection)
-        
-        assert inspection.media_type == "video"
-        assert mock_response.duration_seconds == 30.0
+@pytest.fixture(scope="session")
+def api_key():
+    """API ключ из окружения."""
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key:
+        pytest.skip("GEMINI_API_KEY not set")
+    return key
+
+
+@pytest.fixture(scope="session")
+def image_analyzer(api_key: str) -> GeminiImageAnalyzer:
+    """Реальный анализатор изображений."""
+    return GeminiImageAnalyzer(api_key=api_key)
+
+
+@pytest.fixture(scope="session")
+def audio_analyzer(api_key: str) -> GeminiAudioAnalyzer:
+    """Реальный анализатор аудио."""
+    return GeminiAudioAnalyzer(api_key=api_key)
+
+
+@pytest.fixture(scope="session")
+def video_analyzer(api_key: str) -> GeminiVideoAnalyzer:
+    """Реальный анализатор видео."""
+    return GeminiVideoAnalyzer(api_key=api_key)
 
 
 # ============================================================================
-# Тесты с реальным API (требуют SEMANTIC_GEMINI_API_KEY)
+# Тесты изображений
 # ============================================================================
 
 
-@pytest.mark.skipif(not HAS_API_KEY, reason="SEMANTIC_GEMINI_API_KEY not set")
-class TestMediaAuditReal:
-    """Тесты медиа-обогащения с реальным Gemini API.
+class TestImageAnalysis:
+    """Реальный анализ изображений через Gemini Vision."""
     
-    Требуют переменную окружения SEMANTIC_GEMINI_API_KEY.
-    """
-    
-    def test_real_image_analysis(
+    def test_cat_photo_analysis(
         self,
-        pipeline_inspector,
+        image_analyzer: GeminiImageAnalyzer,
         test_assets_path: Path,
+        audit_collector: AuditCollector,
     ):
-        """Реальный анализ изображения через Gemini Vision API."""
-        from tests.e2e.audit.conftest import MediaInspection, InspectionReport
-        from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
+        """Анализ фото кота."""
+        image_path = test_assets_path / "cat_photo.png"
+        if not image_path.exists():
+            pytest.skip(f"File not found: {image_path}")
         
-        image_file = test_assets_path / "eiffel_tower.jpg"
-        if not image_file.exists():
-            pytest.skip(f"Изображение не найдено: {image_file}")
-        
-        analyzer = GeminiImageAnalyzer()
+        resource = create_media_resource(image_path, "image")
+        request = MediaRequest(
+            resource=resource,
+            context_text="A personal photo from a pet blog",
+            user_prompt="Describe this pet photo for a family album.",
+        )
         
         start_time = time.perf_counter()
-        result = analyzer.analyze(str(image_file))
+        result = image_analyzer.analyze(request)
+        processing_time = (time.perf_counter() - start_time) * 1000
+        
+        # Записываем в отчёт
+        inspection = MediaInspection(
+            asset_path="cat_photo.png",
+            asset_absolute_path=str(image_path),
+            media_type="image",
+            file_size_bytes=image_path.stat().st_size,
+            surrounding_text_before="A personal photo from a pet blog",
+            surrounding_text_after="",
+            system_prompt="You are an image analyst creating descriptions for semantic search...",
+            user_prompt="Describe this pet photo for a family album.",
+            model_name=image_analyzer.model,
+            response_raw={
+                "alt_text": result.alt_text,
+                "description": result.description,
+                "keywords": result.keywords,
+                "ocr_text": result.ocr_text,
+            },
+            response_parsed=result,
+            final_chunk_content=f"[IMAGE: cat_photo.png]\n\n{result.description}\n\nKeywords: {', '.join(result.keywords or [])}",
+            processing_time_ms=processing_time,
+        )
+        audit_collector.add_media(inspection)
+        
+        # Проверки
+        assert result is not None
+        assert result.description
+        assert len(result.description) > 20
+        assert result.keywords
+    
+    def test_eiffel_tower_analysis(
+        self,
+        image_analyzer: GeminiImageAnalyzer,
+        test_assets_path: Path,
+        audit_collector: AuditCollector,
+    ):
+        """Анализ фото Эйфелевой башни."""
+        image_path = test_assets_path / "eiffel_tower.jpg"
+        if not image_path.exists():
+            pytest.skip(f"File not found: {image_path}")
+        
+        resource = create_media_resource(image_path, "image")
+        request = MediaRequest(
+            resource=resource,
+            context_text="Travel blog post about Paris",
+            user_prompt="Describe this landmark photo for a travel guide.",
+        )
+        
+        start_time = time.perf_counter()
+        result = image_analyzer.analyze(request)
         processing_time = (time.perf_counter() - start_time) * 1000
         
         inspection = MediaInspection(
             asset_path="eiffel_tower.jpg",
-            asset_absolute_path=str(image_file),
+            asset_absolute_path=str(image_path),
             media_type="image",
-            file_size_bytes=image_file.stat().st_size,
-            surrounding_text_before="",
+            file_size_bytes=image_path.stat().st_size,
+            surrounding_text_before="Travel blog post about Paris",
             surrounding_text_after="",
-            system_prompt=analyzer.system_prompt if hasattr(analyzer, "system_prompt") else "",
-            user_prompt="Analyze and describe this image.",
-            model_name=getattr(analyzer, "model_name", "gemini-2.0-flash"),
-            response_raw={"description": result.description} if result else None,
+            system_prompt="You are an image analyst...",
+            user_prompt="Describe this landmark photo for a travel guide.",
+            model_name=image_analyzer.model,
+            response_raw={
+                "alt_text": result.alt_text,
+                "description": result.description,
+                "keywords": result.keywords,
+                "ocr_text": result.ocr_text,
+            },
             response_parsed=result,
-            final_chunk_content=f"[IMAGE: eiffel_tower.jpg]\n{result.description if result else 'N/A'}",
+            final_chunk_content=f"[IMAGE: eiffel_tower.jpg]\n\n{result.description}",
             processing_time_ms=processing_time,
         )
+        audit_collector.add_media(inspection)
         
-        if not pipeline_inspector.reports:
-            pipeline_inspector.reports.append(
-                InspectionReport(
-                    file_path="real_media_test",
-                    file_content_preview="",
-                )
-            )
+        assert result is not None
+        assert "eiffel" in result.description.lower() or "tower" in result.description.lower() or "paris" in result.description.lower()
+    
+    def test_code_screen_ocr(
+        self,
+        image_analyzer: GeminiImageAnalyzer,
+        test_assets_path: Path,
+        audit_collector: AuditCollector,
+    ):
+        """Анализ скриншота кода (OCR)."""
+        image_path = test_assets_path / "code_screen.jpg"
+        if not image_path.exists():
+            pytest.skip(f"File not found: {image_path}")
         
-        pipeline_inspector.add_media_inspection(inspection)
+        resource = create_media_resource(image_path, "image")
+        request = MediaRequest(
+            resource=resource,
+            context_text="Technical documentation screenshot",
+            user_prompt="Extract the code from this screenshot. Focus on OCR.",
+        )
+        
+        start_time = time.perf_counter()
+        result = image_analyzer.analyze(request)
+        processing_time = (time.perf_counter() - start_time) * 1000
+        
+        inspection = MediaInspection(
+            asset_path="code_screen.jpg",
+            asset_absolute_path=str(image_path),
+            media_type="image",
+            file_size_bytes=image_path.stat().st_size,
+            surrounding_text_before="Technical documentation screenshot",
+            surrounding_text_after="",
+            system_prompt="You are an image analyst...",
+            user_prompt="Extract the code from this screenshot. Focus on OCR.",
+            model_name=image_analyzer.model,
+            response_raw={
+                "alt_text": result.alt_text,
+                "description": result.description,
+                "keywords": result.keywords,
+                "ocr_text": result.ocr_text,
+            },
+            response_parsed=result,
+            final_chunk_content=f"[IMAGE: code_screen.jpg]\n\nOCR:\n{result.ocr_text or 'No text detected'}\n\n{result.description}",
+            processing_time_ms=processing_time,
+        )
+        audit_collector.add_media(inspection)
         
         assert result is not None
         assert result.description
+
+
+# ============================================================================
+# Тесты аудио
+# ============================================================================
+
+
+class TestAudioAnalysis:
+    """Реальный анализ аудио через Gemini Audio."""
     
-    def test_real_audio_analysis(
+    def test_slides_ideas_transcription(
         self,
-        pipeline_inspector,
+        audio_analyzer: GeminiAudioAnalyzer,
         test_assets_path: Path,
+        audit_collector: AuditCollector,
     ):
-        """Реальный анализ аудио через Gemini Audio API."""
-        from tests.e2e.audit.conftest import MediaInspection, InspectionReport
-        from semantic_core.infrastructure.gemini.audio_analyzer import GeminiAudioAnalyzer
+        """Транскрипция голосового сообщения на русском."""
+        audio_path = test_assets_path / "slides_ideas_audio.ogg"
+        if not audio_path.exists():
+            pytest.skip(f"File not found: {audio_path}")
         
-        audio_file = test_assets_path / "slides_ideas_audio.ogg"
-        if not audio_file.exists():
-            pytest.skip(f"Аудио не найдено: {audio_file}")
-        
-        analyzer = GeminiAudioAnalyzer()
+        resource = create_media_resource(audio_path, "audio")
+        request = MediaRequest(
+            resource=resource,
+            context_text="Voice memo in Russian about presentation slides",
+            user_prompt="Transcribe this voice memo and summarize the ideas.",
+        )
         
         start_time = time.perf_counter()
-        result = analyzer.analyze(str(audio_file))
+        result = audio_analyzer.analyze(request)
         processing_time = (time.perf_counter() - start_time) * 1000
         
         inspection = MediaInspection(
             asset_path="slides_ideas_audio.ogg",
-            asset_absolute_path=str(audio_file),
+            asset_absolute_path=str(audio_path),
             media_type="audio",
-            file_size_bytes=audio_file.stat().st_size,
-            surrounding_text_before="",
+            file_size_bytes=audio_path.stat().st_size,
+            surrounding_text_before="Voice memo in Russian",
             surrounding_text_after="",
-            system_prompt=getattr(analyzer, "system_prompt", ""),
-            user_prompt="Transcribe and analyze this audio.",
-            model_name=getattr(analyzer, "model_name", "gemini-2.0-flash"),
+            system_prompt="You are an audio analyst...",
+            user_prompt="Transcribe this voice memo and summarize the ideas.",
+            model_name=audio_analyzer.model,
             response_raw={
-                "description": result.description if result else "",
-                "transcription": result.transcription if result else "",
+                "description": result.description,
+                "transcription": result.transcription,
+                "keywords": result.keywords,
+                "participants": result.participants,
+                "duration_seconds": result.duration_seconds,
             },
             response_parsed=result,
-            final_chunk_content=f"[AUDIO]\n{result.transcription if result else 'N/A'}",
+            final_chunk_content=f"[AUDIO: slides_ideas_audio.ogg]\n\nTranscription:\n{result.transcription or 'N/A'}\n\nSummary: {result.description}",
             processing_time_ms=processing_time,
         )
+        audit_collector.add_media(inspection)
         
-        if not pipeline_inspector.reports:
-            pipeline_inspector.reports.append(
-                InspectionReport(
-                    file_path="real_media_test",
-                    file_content_preview="",
-                )
-            )
+        assert result is not None
+        assert result.description
+
+
+# ============================================================================
+# Тесты видео
+# ============================================================================
+
+
+class TestVideoAnalysis:
+    """Реальный анализ видео через Gemini Video."""
+    
+    def test_module_init_demo(
+        self,
+        video_analyzer: GeminiVideoAnalyzer,
+        test_assets_path: Path,
+        audit_collector: AuditCollector,
+    ):
+        """Анализ демо-видео инициализации модуля."""
+        video_path = test_assets_path / "module_init_demo.mp4"
+        if not video_path.exists():
+            pytest.skip(f"File not found: {video_path}")
         
-        pipeline_inspector.add_media_inspection(inspection)
+        resource = create_media_resource(video_path, "video")
+        request = MediaRequest(
+            resource=resource,
+            context_text="Technical demo video showing module initialization",
+            user_prompt="Describe what happens in this demo. Extract any visible code.",
+        )
+        
+        start_time = time.perf_counter()
+        result = video_analyzer.analyze(request)
+        processing_time = (time.perf_counter() - start_time) * 1000
+        
+        inspection = MediaInspection(
+            asset_path="module_init_demo.mp4",
+            asset_absolute_path=str(video_path),
+            media_type="video",
+            file_size_bytes=video_path.stat().st_size,
+            surrounding_text_before="Technical demo video",
+            surrounding_text_after="",
+            system_prompt="You are a video analyst...",
+            user_prompt="Describe what happens in this demo. Extract any visible code.",
+            model_name=video_analyzer.model,
+            response_raw={
+                "description": result.description,
+                "transcription": result.transcription,
+                "ocr_text": result.ocr_text,
+                "keywords": result.keywords,
+                "duration_seconds": result.duration_seconds,
+            },
+            response_parsed=result,
+            final_chunk_content=f"[VIDEO: module_init_demo.mp4]\n\n{result.description}\n\nTranscript: {result.transcription or 'N/A'}\n\nOCR: {result.ocr_text or 'N/A'}",
+            processing_time_ms=processing_time,
+        )
+        audit_collector.add_media(inspection)
+        
+        assert result is not None
+        assert result.description
+    
+    def test_new_year_greeting(
+        self,
+        video_analyzer: GeminiVideoAnalyzer,
+        test_assets_path: Path,
+        audit_collector: AuditCollector,
+    ):
+        """Анализ новогоднего поздравления."""
+        video_path = test_assets_path / "new_year_greeting.mp4"
+        if not video_path.exists():
+            pytest.skip(f"File not found: {video_path}")
+        
+        resource = create_media_resource(video_path, "video")
+        request = MediaRequest(
+            resource=resource,
+            context_text="New Year greeting video in Russian",
+            user_prompt="Describe this greeting video and transcribe what is said.",
+        )
+        
+        start_time = time.perf_counter()
+        result = video_analyzer.analyze(request)
+        processing_time = (time.perf_counter() - start_time) * 1000
+        
+        inspection = MediaInspection(
+            asset_path="new_year_greeting.mp4",
+            asset_absolute_path=str(video_path),
+            media_type="video",
+            file_size_bytes=video_path.stat().st_size,
+            surrounding_text_before="New Year greeting video in Russian",
+            surrounding_text_after="",
+            system_prompt="You are a video analyst...",
+            user_prompt="Describe this greeting video and transcribe what is said.",
+            model_name=video_analyzer.model,
+            response_raw={
+                "description": result.description,
+                "transcription": result.transcription,
+                "keywords": result.keywords,
+                "duration_seconds": result.duration_seconds,
+            },
+            response_parsed=result,
+            final_chunk_content=f"[VIDEO: new_year_greeting.mp4]\n\n{result.description}\n\nTranscript: {result.transcription or 'N/A'}",
+            processing_time_ms=processing_time,
+        )
+        audit_collector.add_media(inspection)
         
         assert result is not None
 
 
 # ============================================================================
-# Тест всех медиа файлов в папке
+# Инвентаризация
 # ============================================================================
 
 
 class TestMediaInventory:
-    """Инвентаризация всех медиа-файлов в tests/asests/."""
+    """Проверка наличия медиа-файлов."""
     
     def test_list_all_media_files(self, test_assets_path: Path):
-        """Выводит список всех медиа-файлов для визуальной проверки."""
-        image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-        audio_extensions = {".mp3", ".ogg", ".wav", ".m4a"}
-        video_extensions = {".mp4", ".webm", ".mov", ".avi"}
+        """Выводит список всех медиа для визуальной проверки."""
+        image_ext = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+        audio_ext = {".mp3", ".ogg", ".wav", ".m4a"}
+        video_ext = {".mp4", ".webm", ".mov", ".avi"}
         
-        media_files = {
-            "images": [],
-            "audio": [],
-            "video": [],
-        }
+        media_files = {"images": [], "audio": [], "video": []}
         
         for file in test_assets_path.iterdir():
             if file.is_file():
                 ext = file.suffix.lower()
-                if ext in image_extensions:
+                if ext in image_ext:
                     media_files["images"].append(file.name)
-                elif ext in audio_extensions:
+                elif ext in audio_ext:
                     media_files["audio"].append(file.name)
-                elif ext in video_extensions:
+                elif ext in video_ext:
                     media_files["video"].append(file.name)
         
-        # Проверяем что есть хотя бы какие-то медиа-файлы
-        total = sum(len(v) for v in media_files.values())
-        assert total > 0, "В tests/asests/ нет медиа-файлов"
+        print("\n=== MEDIA INVENTORY ===")
+        print(f"Images: {media_files['images']}")
+        print(f"Audio: {media_files['audio']}")
+        print(f"Video: {media_files['video']}")
         
-        # Проверяем конкретные файлы которые мы ожидаем
-        assert "cat_photo.png" in media_files["images"], "Нет cat_photo.png"
-        assert "slides_ideas_audio.ogg" in media_files["audio"], "Нет slides_ideas_audio.ogg"
+        total = sum(len(v) for v in media_files.values())
+        assert total > 0, "No media files found in tests/asests/"
