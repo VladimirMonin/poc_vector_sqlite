@@ -17,20 +17,12 @@ from rich.table import Table
 from rich.text import Text
 
 
-search_cmd = typer.Typer(
-    name="search",
-    help="Семантический поиск по документам",
-    no_args_is_help=True,
-)
-
 console = Console()
 
 
-@search_cmd.callback(invoke_without_command=True)
 def search(
-    ctx: typer.Context,
     query: str = typer.Argument(
-        ...,
+        None,
         help="Поисковый запрос",
     ),
     limit: int = typer.Option(
@@ -76,6 +68,19 @@ def search(
         semantic search "rate limiting" --type vector --limit 5
         semantic search "обработка ошибок" -T 0.5
     """
+    # Проверка обязательного аргумента
+    if query is None:
+        console.print(
+            Panel(
+                "[red]Укажите поисковый запрос[/red]\n\n"
+                "Примеры:\n"
+                '  semantic search "как работает эмбеддинг"\n'
+                '  semantic search "python" --type fts',
+                title="❌ Ошибка",
+            )
+        )
+        raise typer.Exit(1)
+
     # Late import to avoid circular dependency
     from semantic_core.cli.app import get_cli_context
 
