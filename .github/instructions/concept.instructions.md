@@ -47,10 +47,11 @@ Production-ready библиотека для локального семанти
 - **Phase 9:** RAG Integration — {DONE}
 - **Phase 10:** Batch API Real Implementation — {DONE}
 - **Phase 11:** Documentation & Diagrams — {DONE}
-- **Phase 12:** Flask Web Application — {IN PROGRESS}
+- **Phase 12:** Flask Web Application — {IN ANOTHER BRANCH. IN PAUSE}
   - **12.0:** App Skeleton, DI, Logging, Dashboard — {DONE}
   - **12.1:** Search Query Cache — {CURRENT}
   - **12.2-12.5:** Search UI, Ingest, Chat, Polish — {TODO}
+- **Phase 13:** Total Visual Check & Audit Tools — {IN PROGRESS} - `doc\ideas\phase_13\phase_13.md`
 
 ### 🌐 Flask App (`examples/flask_app/`)
 

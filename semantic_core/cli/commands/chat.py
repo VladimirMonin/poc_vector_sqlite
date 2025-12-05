@@ -85,6 +85,13 @@ def chat(
         "--full-docs",
         help="Использовать полные документы вместо чанков для контекста",
     ),
+    context_window: int = typer.Option(
+        0,
+        "--context-window",
+        "-cw",
+        help="Количество соседних чанков (0=только найденные, N=±N соседей)",
+        min=0,
+    ),
     history_limit: int = typer.Option(
         10,
         "--history-limit",
@@ -251,6 +258,7 @@ def chat(
     # Сохраняем дополнительные настройки в extra_context
     chat_context.extra_context["_show_sources"] = str(show_sources)
     chat_context.extra_context["_full_docs"] = str(full_docs)
+    chat_context.extra_context["_context_window"] = str(context_window)
     chat_context.extra_context["_max_tokens"] = str(max_tokens) if max_tokens else ""
     chat_context.extra_context["_model"] = model
 
@@ -272,7 +280,7 @@ def chat(
     slash_handler.register(ContextCommand())
 
     # Приветствие
-    _show_welcome(console, model, search_mode, context_chunks, full_docs, history_label)
+    _show_welcome(console, model, search_mode, context_chunks, full_docs, context_window, history_label)
 
     # REPL цикл
     while True:
@@ -301,12 +309,16 @@ def chat(
                     current_full_docs = (
                         chat_context.extra_context.get("_full_docs", "False") == "True"
                     )
+                    current_context_window = int(
+                        chat_context.extra_context.get("_context_window", "0")
+                    )
                     _show_welcome(
                         console,
                         current_model,
                         chat_context.search_mode,
                         chat_context.context_chunks,
                         current_full_docs,
+                        current_context_window,
                         history_label,
                     )
                     console.print("[green]✓ Экран очищен[/green]")
@@ -339,6 +351,9 @@ def chat(
                     current_full_docs = (
                         chat_context.extra_context.get("_full_docs", "False") == "True"
                     )
+                    current_context_window = int(
+                        chat_context.extra_context.get("_context_window", "0")
+                    )
 
                     result = rag.ask(
                         query=query,
@@ -346,6 +361,7 @@ def chat(
                         temperature=chat_context.temperature,
                         max_tokens=current_max_tokens,
                         full_docs=current_full_docs,
+                        context_window=current_context_window,
                         history=history,
                     )
 
@@ -419,6 +435,7 @@ def _show_welcome(
     search_mode: str,
     context_chunks: int,
     full_docs: bool = False,
+    context_window: int = 0,
     history_label: str = "до 10 сообщений",
 ) -> None:
     """Показывает приветственное сообщение."""
@@ -428,7 +445,13 @@ def _show_welcome(
         "hybrid": "🔀 Гибридный",
     }
     mode_label = mode_icons.get(search_mode, search_mode)
-    context_mode = "документов" if full_docs else "чанков"
+    
+    if full_docs:
+        context_mode = "документов (полные)"
+    elif context_window > 0:
+        context_mode = f"чанков (±{context_window} соседей)"
+    else:
+        context_mode = "чанков"
 
     welcome_text = (
         f"[bold]🤖 Semantic Chat[/bold]\n\n"

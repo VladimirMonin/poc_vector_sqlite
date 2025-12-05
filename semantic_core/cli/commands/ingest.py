@@ -25,12 +25,7 @@ from rich.progress import (
 from semantic_core.domain import Document, MediaType
 
 
-ingest_cmd = typer.Typer(
-    name="ingest",
-    help="Индексация документов в семантическую базу данных",
-    no_args_is_help=True,
-)
-
+# Простая команда вместо Typer-группы
 console = Console()
 
 
@@ -117,13 +112,10 @@ def _collect_files(
         return sorted(path.glob(pattern))
 
 
-@ingest_cmd.callback(invoke_without_command=True)
 def ingest(
-    ctx: typer.Context,
     path: Path = typer.Argument(
-        ...,
+        None,  # Не обязательный, проверяем вручную
         help="Путь к файлу или директории для индексации",
-        exists=True,
     ),
     mode: str = typer.Option(
         "sync",
@@ -163,6 +155,29 @@ def ingest(
         semantic ingest ./docs/ --recursive --pattern "*.md"
         semantic ingest ./media/ -r -e  # С анализом медиа
     """
+    # Проверка обязательного аргумента
+    if path is None:
+        console.print(
+            Panel(
+                "[red]Укажите путь к файлу или директории[/red]\n\n"
+                "Примеры:\n"
+                "  semantic ingest document.md\n"
+                "  semantic ingest ./docs/ --recursive",
+                title="❌ Ошибка",
+            )
+        )
+        raise typer.Exit(1)
+
+    # Проверка существования пути
+    if not path.exists():
+        console.print(
+            Panel(
+                f"[red]Путь не существует: {path}[/red]",
+                title="❌ Ошибка",
+            )
+        )
+        raise typer.Exit(1)
+
     # Late import to avoid circular dependency
     from semantic_core.cli.app import get_cli_context
 

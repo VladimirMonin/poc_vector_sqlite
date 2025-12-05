@@ -117,6 +117,7 @@ CONTEXT:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         full_docs: bool = False,
+        context_window: int = 0,
         history: Optional[list[ChatMessage]] = None,
     ) -> RAGResult:
         """Выполняет RAG-запрос: поиск + генерация.
@@ -128,6 +129,10 @@ CONTEXT:
             max_tokens: Ограничение токенов ответа.
             full_docs: Использовать полные документы вместо чанков.
                        По умолчанию False — используются гранулярные чанки.
+            context_window: Количество соседних чанков в каждую сторону.
+                0 = только найденные чанки (по умолчанию).
+                N = найденный + по N соседей с каждой стороны.
+                Игнорируется если full_docs=True.
             history: История чата для контекста (опционально).
                      Если передана, будет включена в запрос к LLM.
 
@@ -147,6 +152,7 @@ CONTEXT:
             search_mode=search_mode,
             context_chunks=self.context_chunks,
             full_docs=full_docs,
+            context_window=context_window,
             history_messages=len(history) if history else 0,
         )
 
@@ -160,11 +166,12 @@ CONTEXT:
             )
             context = self._build_full_docs_context(sources)
         else:
-            # Режим гранулярных чанков (по умолчанию)
+            # Режим гранулярных чанков (по умолчанию) с возможным расширением
             sources = self.core.search_chunks(
                 query=query,
                 limit=self.context_chunks,
                 mode=search_mode,
+                context_window=context_window,
             )
             context = self._build_chunks_context(sources)
 
@@ -211,7 +218,7 @@ CONTEXT:
         """Формирует контекст из найденных чанков.
 
         Args:
-            sources: Найденные чанки.
+            sources: Найденные чанки (включая контекстные соседи).
 
         Returns:
             Отформатированный текст контекста.
@@ -231,6 +238,10 @@ CONTEXT:
             chunk_info = f"[{source.chunk_type.value}]"
             if source.language:
                 chunk_info += f" ({source.language})"
+            
+            # Помечаем контекстные чанки (соседи)
+            if source.match_type.value == "context":
+                chunk_info += " [context]"
 
             # Контент чанка
             content = source.content
@@ -238,8 +249,9 @@ CONTEXT:
             if len(content) > 2000:
                 content = content[:2000] + "..."
 
-            # Форматируем блок
-            block = f"[{i}] {source_label} {chunk_info} (score: {source.score:.3f})\n{content}"
+            # Форматируем блок (score=0 для контекстных чанков)
+            score_str = f"score: {source.score:.3f}" if source.score > 0 else "context"
+            block = f"[{i}] {source_label} {chunk_info} ({score_str})\n{content}"
             context_parts.append(block)
 
         return "\n\n---\n\n".join(context_parts)

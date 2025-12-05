@@ -9,7 +9,8 @@ level = "INFO"
 # file = "semantic.log"  # Раскомментируйте для записи в файл
 
 [gemini]
-# API ключ читается из переменной окружения GEMINI_API_KEY
+# API ключ: раскомментируй и вставь свой ключ, ИЛИ установи переменную GEMINI_API_KEY
+# api_key = "AIza..."
 model = "models/gemini-embedding-001"
 embedding_dimension = 768
 
