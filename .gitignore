@@ -13,3 +13,10 @@ examples/flask_app/instance/uploads/
 
 # Audit reports (Phase 13) - результаты визуального аудита
 audit_reports/
+
+# Test media files (audio/video) - большие файлы для тестов
+tests/asests/*.mp4
+tests/asests/*.ogg
+tests/asests/*.mov
+tests/asests/*.avi
+tests/asests/*.webm
