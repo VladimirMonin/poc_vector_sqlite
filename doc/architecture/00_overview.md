@@ -266,6 +266,9 @@
 64. [**Риски и ограничения**](64_phase_13_risks.md)  
     Long video timeout, document-level search gap, FTS granularity mismatch, duplicate chunks waste
 
+65. [**FTS Refactoring: Chunk-Level Search**](65_fts_chunk_level_refactoring.md)  
+    Починка RRF: перевод FTS с документов на чанки, автомиграция и RRF boost
+
 ---
 
 ## 🚀 Быстрый старт
