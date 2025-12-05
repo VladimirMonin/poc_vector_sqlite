@@ -64,7 +64,8 @@ class ChatResponse:
         sources: Список источников.
         session_id: ID сессии.
         message_id: ID сообщения.
-        tokens_used: Использованные токены.
+        tokens_used: Использованные токены текущего ответа.
+        total_tokens: Общее количество токенов в сессии.
         has_sources: Найдены ли источники.
     """
 
@@ -73,6 +74,7 @@ class ChatResponse:
     session_id: str
     message_id: int
     tokens_used: Optional[int] = None
+    total_tokens: int = 0
     has_sources: bool = True
 
 
@@ -226,11 +228,15 @@ class ChatService:
             tokens_used=rag_result.total_tokens,
         )
 
+        # Считаем общее количество токенов в сессии
+        total_tokens = self.get_session_total_tokens(session.session_id)
+
         logger.info(
             "✅ Chat response generated",
             session_id=session.session_id,
             sources_count=len(sources),
             tokens=rag_result.total_tokens,
+            total_tokens=total_tokens,
         )
 
         return ChatResponse(
@@ -239,6 +245,7 @@ class ChatService:
             session_id=session.session_id,
             message_id=msg.id,
             tokens_used=rag_result.total_tokens,
+            total_tokens=total_tokens,
             has_sources=len(sources) > 0,
         )
 
@@ -311,6 +318,51 @@ class ChatService:
 
         logger.info(f"🗑️ Session cleared: {session_id}")
         return True
+
+    def delete_message(self, message_id: int) -> Optional[str]:
+        """Удалить сообщение из истории.
+
+        Args:
+            message_id: ID сообщения.
+
+        Returns:
+            session_id если успешно, None если сообщение не найдено.
+        """
+        try:
+            message = ChatMessageModel.get_by_id(message_id)
+            session = message.session
+            session_id = session.session_id
+            message.delete_instance()
+            session.touch()
+            logger.info(f"🗑️ Message deleted: {message_id}")
+            return session_id
+        except ChatMessageModel.DoesNotExist:
+            return None
+
+    def get_session_total_tokens(self, session_id: str) -> int:
+        """Получить общее количество токенов в сессии.
+
+        Args:
+            session_id: UUID сессии.
+
+        Returns:
+            Сумма токенов всех assistant-сообщений.
+        """
+        session = self.get_session(session_id)
+        if not session:
+            return 0
+
+        from peewee import fn
+
+        result = (
+            ChatMessageModel.select(fn.SUM(ChatMessageModel.tokens_used))
+            .where(
+                (ChatMessageModel.session == session)
+                & (ChatMessageModel.tokens_used.is_null(False))
+            )
+            .scalar()
+        )
+        return result or 0
 
     def delete_session(self, session_id: str) -> bool:
         """Полностью удалить сессию с сообщениями.
