@@ -22,7 +22,7 @@
                     <i class="bi {{ media_icon }} me-2"></i>
                     {{ meta.get('title', 'Документ #' ~ document.id) }}
                 </h4>
-                <div class="btn-group">
+                <div class="d-flex gap-2">
                     <form action="{{ url_for('ingest.reindex_document', doc_id=document.id) }}" method="POST" class="d-inline">
                         <button type="submit" class="btn btn-outline-secondary btn-sm" title="Переиндексировать">
                             <i class="bi bi-arrow-clockwise me-1"></i> Обновить
@@ -90,7 +90,7 @@
                 <div class="mb-3">
                     <strong class="text-muted">Ключевые слова:</strong>
                     {% for kw in meta.get('keywords', []) %}
-                        <span class="badge bg-light text-dark me-1">{{ kw }}</span>
+                        <span class="badge bg-body-secondary me-1">{{ kw }}</span>
                     {% endfor %}
                 </div>
                 {% endif %}
@@ -116,15 +116,43 @@
                 {% if media_type == 'image' and meta.get('source') %}
                     <!-- Превью изображения -->
                     <div class="text-center mb-3">
-                        <img src="{{ url_for('static', filename='uploads/' ~ meta.get('filename', '')) }}" 
+                        <img src="{{ url_for('ingest.serve_media', doc_id=document.id) }}" 
                              alt="{{ meta.get('title', 'Image') }}"
                              class="img-fluid rounded shadow-sm"
                              style="max-height: 400px;"
-                             onerror="this.style.display='none'">
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <p class="text-muted mt-2" style="display: none;">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Файл недоступен: {{ meta.get('source', '') }}
+                        </p>
+                    </div>
+                {% elif media_type == 'audio' and meta.get('source') %}
+                    <!-- Аудио плеер -->
+                    <div class="text-center mb-3">
+                        <audio controls class="w-100" style="max-width: 600px;">
+                            <source src="{{ url_for('ingest.serve_media', doc_id=document.id) }}">
+                            Ваш браузер не поддерживает аудио.
+                        </audio>
+                        <p class="text-muted small mt-2">
+                            <i class="bi bi-file-earmark-music me-1"></i>
+                            {{ meta.get('filename', meta.get('source', '')|basename) }}
+                        </p>
+                    </div>
+                {% elif media_type == 'video' and meta.get('source') %}
+                    <!-- Видео плеер -->
+                    <div class="text-center mb-3">
+                        <video controls class="w-100 rounded shadow-sm" style="max-height: 400px;">
+                            <source src="{{ url_for('ingest.serve_media', doc_id=document.id) }}">
+                            Ваш браузер не поддерживает видео.
+                        </video>
+                        <p class="text-muted small mt-2">
+                            <i class="bi bi-file-earmark-play me-1"></i>
+                            {{ meta.get('filename', meta.get('source', '')|basename) }}
+                        </p>
                     </div>
                 {% endif %}
                 
-                <pre class="bg-light p-3 rounded" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;">{{ document.content[:5000] }}{% if document.content|length > 5000 %}...{% endif %}</pre>
+                <pre class="bg-body-secondary p-3 rounded" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;">{{ document.content[:5000] }}{% if document.content|length > 5000 %}...{% endif %}</pre>
             </div>
         </div>
         
@@ -160,7 +188,7 @@
                             </div>
                             <small class="text-muted">{{ chunk.content|length }} символов</small>
                         </div>
-                        <pre class="mb-0 small bg-light p-2 rounded" style="white-space: pre-wrap; max-height: 150px; overflow-y: auto;">{{ chunk.content[:500] }}{% if chunk.content|length > 500 %}...{% endif %}</pre>
+                        <pre class="mb-0 small bg-body-secondary p-2 rounded" style="white-space: pre-wrap; max-height: 150px; overflow-y: auto;">{{ chunk.content[:500] }}{% if chunk.content|length > 500 %}...{% endif %}</pre>
                     </div>
                     {% endfor %}
                 </div>
