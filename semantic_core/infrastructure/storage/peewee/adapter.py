@@ -6,6 +6,7 @@
 """
 
 import json
+import re
 import time
 from typing import Optional, Any
 
@@ -31,6 +32,51 @@ from semantic_core.infrastructure.storage.peewee.engine import VectorDatabase
 from semantic_core.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _sanitize_fts_query(query: str) -> str:
+    """Экранирует запрос для FTS5.
+    
+    FTS5 использует специальные операторы:
+    - `-` (минус/дефис) = NOT оператор
+    - `*` = prefix match  
+    - `"..."` = phrase match
+    - `[...]` = column filter
+    - `OR`, `AND`, `NOT` = логические операторы
+    
+    Стратегия: 
+    - Токены с дефисами (не в начале) оборачиваем в кавычки
+    - Токены с квадратными скобками оборачиваем в кавычки
+    
+    Args:
+        query: Пользовательский запрос.
+        
+    Returns:
+        Экранированный запрос для FTS5 MATCH.
+    """
+    # Разбиваем на токены
+    tokens = query.split()
+    result = []
+    
+    for token in tokens:
+        needs_quoting = False
+        
+        # Дефис внутри токена (не в начале) — нужно экранировать
+        if '-' in token and not token.startswith('-'):
+            needs_quoting = True
+        
+        # Квадратные скобки — FTS5 column filter syntax
+        if '[' in token or ']' in token:
+            needs_quoting = True
+        
+        if needs_quoting:
+            # Удаляем кавычки если уже есть
+            token = token.strip('"')
+            result.append(f'"{token}"')
+        else:
+            result.append(token)
+    
+    return ' '.join(result)
 
 
 class PeeweeVectorStore(BaseVectorStore):
@@ -362,9 +408,13 @@ class PeeweeVectorStore(BaseVectorStore):
             logger.warning("FTS search called without query_text")
             raise ValueError("Для FTS поиска нужен query_text")
 
+        # Экранируем специальные символы FTS5
+        sanitized_query = _sanitize_fts_query(query_text)
+        
         logger.trace(
             "FTS search",
             query_length=len(query_text),
+            sanitized_query=sanitized_query,
             limit=limit,
         )
 
@@ -392,7 +442,7 @@ class PeeweeVectorStore(BaseVectorStore):
             LIMIT ?
         """
 
-        params = [query_text] + where_params + [limit]
+        params = [sanitized_query] + where_params + [limit]
         cursor = self.db.execute_sql(sql, params)
         results = []
 
@@ -454,6 +504,9 @@ class PeeweeVectorStore(BaseVectorStore):
         if query_text is None:
             return self._vector_search(query_vector, filters, limit)
 
+        # Экранируем специальные символы FTS5 для query_text
+        sanitized_query = _sanitize_fts_query(query_text)
+
         # Формируем WHERE условия для фильтров
         where_conditions = []
         where_params = []
@@ -510,8 +563,8 @@ class PeeweeVectorStore(BaseVectorStore):
             LIMIT ?
         """
 
-        # Собираем параметры: blob, where_params, query_text, where_params, k, k, limit
-        params = [blob] + where_params + [query_text] + where_params + [k, k, limit]
+        # Собираем параметры: blob, where_params, sanitized_query, where_params, k, k, limit
+        params = [blob] + where_params + [sanitized_query] + where_params + [k, k, limit]
 
         cursor = self.db.execute_sql(sql, params)
         results = []

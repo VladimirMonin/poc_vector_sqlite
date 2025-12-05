@@ -9,3 +9,7 @@ semantic.toml
 project_docs.db-shm
 project_docs.db-wal
 semantic.db-journal
+examples/flask_app/instance/uploads/
+
+# Audit reports (Phase 13) - результаты визуального аудита
+audit_reports/
