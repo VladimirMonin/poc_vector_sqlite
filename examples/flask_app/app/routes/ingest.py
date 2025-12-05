@@ -121,11 +121,15 @@ def upload_files():
     uploaded_files: dict[str, Path] = {}
     text_files: list[Path] = []  # .md, .markdown, .txt
     image_files: list[Path] = []  # .png, .jpg, .jpeg, .gif, .webp
+    audio_files: list[Path] = []  # .mp3, .wav, .ogg, .m4a, .flac
+    video_files: list[Path] = []  # .mp4, .webm, .mov, .avi
     errors: list[str] = []
 
     # Расширения по категориям
     TEXT_EXTENSIONS = {".md", ".markdown", ".txt"}
     IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+    AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
+    VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".avi"}
 
     # Сохраняем все файлы
     for file in files:
@@ -138,6 +142,10 @@ def upload_files():
                     text_files.append(result.path)
                 elif ext in IMAGE_EXTENSIONS:
                     image_files.append(result.path)
+                elif ext in AUDIO_EXTENSIONS:
+                    audio_files.append(result.path)
+                elif ext in VIDEO_EXTENSIONS:
+                    video_files.append(result.path)
             else:
                 errors.append(f"{result.original_name}: {result.error}")
 
@@ -146,12 +154,18 @@ def upload_files():
             flash(error, "danger")
 
     # Определяем режим (sync/async)
-    total_files = len(text_files) + len(image_files)
+    total_files = len(text_files) + len(image_files) + len(audio_files) + len(video_files)
     mode = "async" if total_files >= ASYNC_THRESHOLD else "sync"
-    logger.info(f"📤 Загружено {len(files)} файлов (text={len(text_files)}, images={len(image_files)}), mode={mode}")
+    logger.info(
+        f"📤 Загружено {len(files)} файлов "
+        f"(text={len(text_files)}, images={len(image_files)}, "
+        f"audio={len(audio_files)}, video={len(video_files)}), mode={mode}"
+    )
 
     ingested_docs = 0
     ingested_images = 0
+    ingested_audio = 0
+    ingested_video = 0
 
     # === Индексируем текстовые файлы (.md, .markdown, .txt) ===
     for text_path in text_files:
@@ -202,14 +216,50 @@ def upload_files():
             logger.error(f"🔥 Ошибка индексации изображения {image_path}: {e}")
             flash(f"Ошибка индексации {image_path.name}: {e}", "danger")
 
+    # === Индексируем аудио через Audio API ===
+    for audio_path in audio_files:
+        try:
+            if core.audio_analyzer is None:
+                logger.warning(f"⚠️ AudioAnalyzer не настроен, пропускаем {audio_path.name}")
+                flash(f"⚠️ {audio_path.name}: Audio API не настроен", "warning")
+                continue
+
+            logger.info(f"🎵 Анализируем аудио: {audio_path.name}")
+            core.ingest_audio(str(audio_path), mode=mode)
+            ingested_audio += 1
+
+        except Exception as e:
+            logger.error(f"🔥 Ошибка индексации аудио {audio_path}: {e}")
+            flash(f"Ошибка индексации {audio_path.name}: {e}", "danger")
+
+    # === Индексируем видео через Video API ===
+    for video_path in video_files:
+        try:
+            if core.video_analyzer is None:
+                logger.warning(f"⚠️ VideoAnalyzer не настроен, пропускаем {video_path.name}")
+                flash(f"⚠️ {video_path.name}: Video API не настроен", "warning")
+                continue
+
+            logger.info(f"🎬 Анализируем видео: {video_path.name}")
+            core.ingest_video(str(video_path), mode=mode)
+            ingested_video += 1
+
+        except Exception as e:
+            logger.error(f"🔥 Ошибка индексации видео {video_path}: {e}")
+            flash(f"Ошибка индексации {video_path.name}: {e}", "danger")
+
     # === Формируем сообщение ===
-    total_ingested = ingested_docs + ingested_images
+    total_ingested = ingested_docs + ingested_images + ingested_audio + ingested_video
     if total_ingested > 0:
         parts = []
         if ingested_docs > 0:
             parts.append(f"{ingested_docs} документ(ов)")
         if ingested_images > 0:
             parts.append(f"{ingested_images} изображений")
+        if ingested_audio > 0:
+            parts.append(f"{ingested_audio} аудио")
+        if ingested_video > 0:
+            parts.append(f"{ingested_video} видео")
 
         message = f"✅ Загружено и проиндексировано: {', '.join(parts)}"
         if mode == "async":
@@ -261,6 +311,56 @@ def documents_page():
     return render_template(
         "documents.html",
         documents=documents,
+        core_available=core is not None,
+    )
+
+
+@ingest_bp.route("/documents/<int:doc_id>")
+def document_detail(doc_id: int):
+    """Детальное представление документа.
+
+    Показывает содержимое документа и все его чанки.
+    """
+    import json
+
+    core = current_app.extensions.get("semantic_core")
+
+    doc = DocumentModel.get_or_none(DocumentModel.id == doc_id)
+    if not doc:
+        flash("Документ не найден", "warning")
+        return redirect(url_for("ingest.documents_page"))
+
+    # Парсим метаданные
+    meta = doc.metadata
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except (json.JSONDecodeError, TypeError):
+            meta = {}
+
+    # Получаем все чанки документа
+    chunks = list(
+        ChunkModel.select()
+        .where(ChunkModel.document_id == doc_id)
+        .order_by(ChunkModel.chunk_index)
+    )
+
+    # Определяем тип медиа для иконки
+    media_type = meta.get("media_type", "text") if isinstance(meta, dict) else "text"
+    media_icons = {
+        "text": "bi-file-text",
+        "image": "bi-image",
+        "audio": "bi-music-note",
+        "video": "bi-camera-video",
+    }
+
+    return render_template(
+        "document_detail.html",
+        document=doc,
+        meta=meta,
+        chunks=chunks,
+        media_type=media_type,
+        media_icon=media_icons.get(media_type, "bi-file-earmark"),
         core_available=core is not None,
     )
 

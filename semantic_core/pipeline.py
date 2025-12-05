@@ -407,8 +407,15 @@ class SemanticCore:
 
             content = "\n\n".join(content_parts) if content_parts else f"Image: {Path(path).name}"
 
+            # Формируем title из alt_text или имени файла
+            title = (
+                task.result_alt_text
+                or Path(path).stem.replace("_", " ").replace("-", " ").title()
+            )
+
             # Формируем метаданные
             metadata = {
+                "title": title,
                 "source": path,
                 "filename": Path(path).name,
                 "media_type": "image",
@@ -560,8 +567,12 @@ class SemanticCore:
 
             content = "\n\n".join(content_parts) if content_parts else f"Audio: {Path(path).name}"
 
+            # Формируем title из описания или имени файла
+            title = Path(path).stem.replace("_", " ").replace("-", " ").title()
+
             # Метаданные
             metadata = {
+                "title": title,
                 "source": path,
                 "filename": Path(path).name,
                 "media_type": "audio",
@@ -701,8 +712,12 @@ class SemanticCore:
 
             content = "\n\n".join(content_parts) if content_parts else f"Video: {Path(path).name}"
 
+            # Формируем title из описания или имени файла
+            title = Path(path).stem.replace("_", " ").replace("-", " ").title()
+
             # Метаданные
             metadata = {
+                "title": title,
                 "source": path,
                 "filename": Path(path).name,
                 "media_type": "video",

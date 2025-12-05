@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}{{ meta.get('title', 'Документ') }} — Semantic Knowledge Base{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        
+        <!-- Хлебные крошки -->
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Главная</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('ingest.documents_page') }}">Документы</a></li>
+                <li class="breadcrumb-item active">{{ meta.get('title', 'Документ #' ~ document.id)|truncate(40) }}</li>
+            </ol>
+        </nav>
+        
+        <!-- Заголовок документа -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi {{ media_icon }} me-2"></i>
+                    {{ meta.get('title', 'Документ #' ~ document.id) }}
+                </h4>
+                <div class="btn-group">
+                    <form action="{{ url_for('ingest.reindex_document', doc_id=document.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm" title="Переиндексировать">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Обновить
+                        </button>
+                    </form>
+                    <form action="{{ url_for('ingest.delete_document', doc_id=document.id) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('Удалить документ?')">
+                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Удалить">
+                            <i class="bi bi-trash me-1"></i> Удалить
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <!-- Метаданные -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <th class="text-muted" style="width: 120px;">Тип:</th>
+                                <td>
+                                    {% if media_type == 'image' %}
+                                        <span class="badge bg-info"><i class="bi bi-image me-1"></i>Изображение</span>
+                                    {% elif media_type == 'audio' %}
+                                        <span class="badge bg-success"><i class="bi bi-music-note me-1"></i>Аудио</span>
+                                    {% elif media_type == 'video' %}
+                                        <span class="badge bg-danger"><i class="bi bi-camera-video me-1"></i>Видео</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary"><i class="bi bi-file-text me-1"></i>Документ</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">ID:</th>
+                                <td><code>{{ document.id }}</code></td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Создан:</th>
+                                <td>{{ document.created_at.strftime('%d.%m.%Y %H:%M') if document.created_at else '—' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <th class="text-muted" style="width: 120px;">Файл:</th>
+                                <td><code>{{ meta.get('filename', '—') }}</code></td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Чанков:</th>
+                                <td><span class="badge bg-primary">{{ chunks|length }}</span></td>
+                            </tr>
+                            {% if meta.get('duration_seconds') %}
+                            <tr>
+                                <th class="text-muted">Длительность:</th>
+                                <td>{{ (meta.get('duration_seconds')|int // 60) }}:{{ '%02d'|format(meta.get('duration_seconds')|int % 60) }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+                
+                {% if meta.get('keywords') %}
+                <div class="mb-3">
+                    <strong class="text-muted">Ключевые слова:</strong>
+                    {% for kw in meta.get('keywords', []) %}
+                        <span class="badge bg-light text-dark me-1">{{ kw }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% if meta.get('source') %}
+                <div class="mb-3">
+                    <strong class="text-muted">Источник:</strong>
+                    <code class="small">{{ meta.get('source') }}</code>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Содержимое документа -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-body-text me-2"></i>
+                    Содержимое
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if media_type == 'image' and meta.get('source') %}
+                    <!-- Превью изображения -->
+                    <div class="text-center mb-3">
+                        <img src="{{ url_for('static', filename='uploads/' ~ meta.get('filename', '')) }}" 
+                             alt="{{ meta.get('title', 'Image') }}"
+                             class="img-fluid rounded shadow-sm"
+                             style="max-height: 400px;"
+                             onerror="this.style.display='none'">
+                    </div>
+                {% endif %}
+                
+                <pre class="bg-light p-3 rounded" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;">{{ document.content[:5000] }}{% if document.content|length > 5000 %}...{% endif %}</pre>
+            </div>
+        </div>
+        
+        <!-- Чанки -->
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-puzzle me-2"></i>
+                    Чанки ({{ chunks|length }})
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                {% if chunks %}
+                <div class="list-group list-group-flush">
+                    {% for chunk in chunks %}
+                    <div class="list-group-item" id="chunk-{{ chunk.chunk_index }}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="badge bg-secondary me-1">#{{ chunk.chunk_index }}</span>
+                                <span class="badge 
+                                    {% if chunk.chunk_type == 'text' %}bg-primary
+                                    {% elif chunk.chunk_type == 'code' %}bg-dark
+                                    {% elif chunk.chunk_type == 'image_ref' %}bg-info
+                                    {% elif chunk.chunk_type == 'audio_ref' %}bg-success
+                                    {% elif chunk.chunk_type == 'video_ref' %}bg-danger
+                                    {% else %}bg-secondary{% endif %}
+                                ">{{ chunk.chunk_type }}</span>
+                                <span class="badge 
+                                    {% if chunk.embedding_status == 'READY' %}bg-success
+                                    {% elif chunk.embedding_status == 'PENDING' %}bg-warning text-dark
+                                    {% else %}bg-danger{% endif %}
+                                ">{{ chunk.embedding_status or 'N/A' }}</span>
+                            </div>
+                            <small class="text-muted">{{ chunk.content|length }} символов</small>
+                        </div>
+                        <pre class="mb-0 small bg-light p-2 rounded" style="white-space: pre-wrap; max-height: 150px; overflow-y: auto;">{{ chunk.content[:500] }}{% if chunk.content|length > 500 %}...{% endif %}</pre>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-inbox display-4"></i>
+                    <p class="mt-2">У документа нет чанков</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}
