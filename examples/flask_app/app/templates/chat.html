@@ -143,6 +143,7 @@
     .typing-indicator {
         display: none;
         align-self: flex-start;
+        margin: 0 1rem 0.5rem;
         padding: 0.75rem 1rem;
         background: var(--bs-tertiary-bg);
         border-radius: 1rem;
@@ -206,6 +207,46 @@
             max-width: 95%;
         }
     }
+    
+    /* Message delete button */
+    .message {
+        position: relative;
+    }
+    
+    .message-delete-btn {
+        position: absolute;
+        top: 0.25rem;
+        right: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.15s;
+        padding: 0.15rem 0.35rem;
+        font-size: 0.75rem;
+        line-height: 1;
+    }
+    
+    .message:hover .message-delete-btn {
+        opacity: 0.7;
+    }
+    
+    .message-delete-btn:hover {
+        opacity: 1 !important;
+    }
+    
+    .message-user .message-delete-btn {
+        background: rgba(255,255,255,0.2);
+        border-color: rgba(255,255,255,0.3);
+        color: white;
+    }
+    
+    /* Source badges as links */
+    a.source-badge {
+        color: inherit;
+    }
+    
+    a.source-badge:hover {
+        background: var(--bs-primary-bg-subtle) !important;
+        transform: translateY(-1px);
+    }
 </style>
 {% endblock %}
 
@@ -216,7 +257,18 @@
         RAG Чат
     </h4>
     
-    <div class="d-flex gap-2">
+    <div class="d-flex align-items-center gap-3">
+        <!-- Счётчик токенов -->
+        <div id="tokens-counter">
+            {% if total_tokens > 0 %}
+            <small class="text-muted">
+                <i class="bi bi-lightning-charge me-1"></i>
+                Всего: {{ "{:,}".format(total_tokens) }} токенов
+            </small>
+            {% endif %}
+        </div>
+        
+        <div class="d-flex gap-2">
         <!-- New chat button -->
         <form action="{{ url_for('chat.new_session') }}" method="post">
             <button type="submit" class="btn btn-outline-primary btn-sm">
@@ -236,6 +288,7 @@
             </button>
         </form>
         {% endif %}
+        </div>
     </div>
 </div>
 
@@ -277,7 +330,16 @@
         <div class="chat-messages" id="chat-messages">
             {% if messages %}
                 {% for msg in messages %}
-                <div class="message message-{{ msg.role }}">
+                <div class="message message-{{ msg.role }}" id="message-{{ msg.id }}">
+                    <button class="btn btn-sm btn-outline-danger message-delete-btn"
+                            hx-delete="{{ url_for('chat.delete_message', message_id=msg.id) }}"
+                            hx-target="#message-{{ msg.id }}"
+                            hx-swap="outerHTML"
+                            hx-confirm="Удалить это сообщение?"
+                            title="Удалить сообщение">
+                        <i class="bi bi-x"></i>
+                    </button>
+                    
                     {% if msg.is_user() %}
                         {{ msg.content }}
                     {% else %}
@@ -285,10 +347,36 @@
                             {{ render_markdown(msg.content) | safe }}
                         </div>
                         {% if msg.sources_json %}
+                        {% set sources = msg.sources_json | from_json %}
                         <div class="message-sources">
-                            <small class="text-muted">Источники:</small>
-                            {% set sources = msg.sources_json | tojson | safe %}
-                            <!-- Sources rendered from JSON -->
+                            <small class="text-muted d-block mb-2">
+                                <i class="bi bi-bookmark me-1"></i>
+                                Источники ({{ sources | length }}):
+                            </small>
+                            <div class="d-flex flex-wrap gap-1">
+                                {% for source in sources %}
+                                <a href="{{ url_for('ingest.document_detail', doc_id=source.doc_id) }}" 
+                                   target="_blank"
+                                   class="source-badge text-decoration-none" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="top"
+                                   title="{{ source.content_preview }}">
+                                    <span class="source-index">{{ source.index }}</span>
+                                    <span class="source-title text-truncate" style="max-width: 150px;">
+                                        {{ source.title }}
+                                    </span>
+                                    <span class="badge bg-secondary">{{ source.chunk_type }}</span>
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if msg.tokens_used %}
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="bi bi-lightning me-1"></i>
+                                {{ msg.tokens_used }} токенов
+                            </small>
                         </div>
                         {% endif %}
                     {% endif %}
@@ -301,23 +389,22 @@
                     <p>Я отвечу на основе загруженных документов</p>
                 </div>
             {% endif %}
-            
-            <!-- Typing indicator -->
-            <div class="typing-indicator" id="typing-indicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
         </div>
         
-        <!-- Response container (for HTMX) -->
-        <div id="chat-response"></div>
+        <!-- Typing indicator (outside chat-messages for correct HTMX swap) -->
+        <div class="typing-indicator" id="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
         
         <!-- Input form -->
         <div class="chat-input">
             <form id="chat-form"
+                  method="post"
+                  action="{{ url_for('chat.send') }}"
                   hx-post="{{ url_for('chat.send') }}"
-                  hx-target="#chat-response"
+                  hx-target="#chat-messages"
                   hx-swap="beforeend"
                   hx-indicator="#typing-indicator">
                 
@@ -372,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
     input.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            form.dispatchEvent(new Event('submit', { bubbles: true }));
+            htmx.trigger(form, 'submit');
         }
     });
     
@@ -389,7 +476,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const userMsg = document.createElement('div');
             userMsg.className = 'message message-user';
             userMsg.textContent = question;
-            messages.insertBefore(userMsg, typing);
+            messages.appendChild(userMsg);
             
             // Clear input
             input.value = '';
@@ -403,24 +490,31 @@ document.addEventListener('DOMContentLoaded', function() {
         messages.scrollTop = messages.scrollHeight;
     });
     
-    // After HTMX response
+    // After HTMX response (works for both success and error)
+    document.body.addEventListener('htmx:afterRequest', function(e) {
+        if (e.detail.elt === form || e.detail.elt.closest('#chat-form')) {
+            // Always hide typing indicator
+            typing.classList.remove('show');
+            
+            // Scroll to bottom
+            messages.scrollTop = messages.scrollHeight;
+        }
+    });
+    
+    // After successful swap
     form.addEventListener('htmx:afterSwap', function(e) {
-        // Hide typing indicator
-        typing.classList.remove('show');
-        
         // Scroll to bottom
         messages.scrollTop = messages.scrollHeight;
         
         // Highlight code blocks
-        document.querySelectorAll('#chat-response pre code').forEach((block) => {
+        document.querySelectorAll('#chat-messages pre code').forEach((block) => {
             hljs.highlightElement(block);
         });
         
         // Update session ID if new
-        const responseDiv = document.getElementById('chat-response');
-        const sessionId = responseDiv.querySelector('[data-session-id]');
-        if (sessionId) {
-            document.getElementById('session-id-input').value = sessionId.dataset.sessionId;
+        const lastMessage = messages.querySelector('.message-assistant:last-child');
+        if (lastMessage && lastMessage.dataset.sessionId) {
+            document.getElementById('session-id-input').value = lastMessage.dataset.sessionId;
         }
     });
     
@@ -429,9 +523,9 @@ document.addEventListener('DOMContentLoaded', function() {
         typing.classList.remove('show');
         
         const errorMsg = document.createElement('div');
-        errorMsg.className = 'alert alert-danger';
+        errorMsg.className = 'alert alert-danger m-3';
         errorMsg.textContent = 'Ошибка соединения. Попробуйте ещё раз.';
-        messages.insertBefore(errorMsg, typing);
+        messages.appendChild(errorMsg);
     });
 });
 </script>
