@@ -63,9 +63,19 @@ def create_app(config: dict | FlaskAppConfig | None = None) -> Flask:
     app.register_blueprint(settings_bp)
 
     # Регистрация Jinja фильтров
+    import json
+
     @app.template_filter("basename")
     def basename_filter(path: str) -> str:
         """Извлечь имя файла из пути."""
         return Path(path).name if path else ""
+
+    @app.template_filter("from_json")
+    def from_json_filter(value: str) -> any:
+        """Парсинг JSON строки в объект."""
+        try:
+            return json.loads(value) if value else []
+        except (json.JSONDecodeError, TypeError):
+            return []
 
     return app
