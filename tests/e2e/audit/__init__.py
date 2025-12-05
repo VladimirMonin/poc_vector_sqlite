@@ -10,10 +10,10 @@
 Запуск:
     # Все тесты аудита
     pytest tests/e2e/audit/ -v -s
-    
+
     # Только чанкинг
     pytest tests/e2e/audit/test_chunking_audit.py -v -s
-    
+
     # С реальным API
     SEMANTIC_GEMINI_API_KEY=your_key pytest tests/e2e/audit/ -v -s
 

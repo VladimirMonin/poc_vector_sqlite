@@ -401,6 +401,7 @@ rrf_results = rrf_merge(vector_results, fts_results, top_k=10)
 ### Recommended Fixes
 
 **P0 (Immediate):**
+
 1. Fix RRF score normalization
 2. Add adaptive video frame sampling
 
@@ -416,21 +417,21 @@ rrf_results = rrf_merge(vector_results, fts_results, top_k=10)
 
 ## 📚 Ключевые выводы
 
-### ✅ Можно использовать в production:
+### ✅ Можно использовать в production
 
 - ✅ Chunking для **малых-средних файлов** (<50KB)
 - ✅ Media analysis для **коротких видео** (<5 мин)
 - ✅ Vector search (игнорируя hybrid)
 - ✅ Rate limiting для **одиночных запросов**
 
-### ❌ Нельзя использовать без фиксов:
+### ❌ Нельзя использовать без фиксов
 
 - ❌ **Hybrid search** (некорректные скоры)
 - ❌ **Длинные видео** (timeout risk)
 - ❌ **Bulk ingestion** (RPM bottleneck)
 - ❌ **Document-level retrieval** (API отсутствует)
 
-### 🔄 Требует мониторинга:
+### 🔄 Требует мониторинга
 
 - 📊 RRF score distribution (должны быть 0.6-0.9)
 - 📊 Video processing time (должно быть <30 сек для 5 мин)

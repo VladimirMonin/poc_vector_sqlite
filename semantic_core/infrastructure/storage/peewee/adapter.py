@@ -36,47 +36,47 @@ logger = get_logger(__name__)
 
 def _sanitize_fts_query(query: str) -> str:
     """Экранирует запрос для FTS5.
-    
+
     FTS5 использует специальные операторы:
     - `-` (минус/дефис) = NOT оператор
-    - `*` = prefix match  
+    - `*` = prefix match
     - `"..."` = phrase match
     - `[...]` = column filter
     - `OR`, `AND`, `NOT` = логические операторы
-    
-    Стратегия: 
+
+    Стратегия:
     - Токены с дефисами (не в начале) оборачиваем в кавычки
     - Токены с квадратными скобками оборачиваем в кавычки
-    
+
     Args:
         query: Пользовательский запрос.
-        
+
     Returns:
         Экранированный запрос для FTS5 MATCH.
     """
     # Разбиваем на токены
     tokens = query.split()
     result = []
-    
+
     for token in tokens:
         needs_quoting = False
-        
+
         # Дефис внутри токена (не в начале) — нужно экранировать
-        if '-' in token and not token.startswith('-'):
+        if "-" in token and not token.startswith("-"):
             needs_quoting = True
-        
+
         # Квадратные скобки — FTS5 column filter syntax
-        if '[' in token or ']' in token:
+        if "[" in token or "]" in token:
             needs_quoting = True
-        
+
         if needs_quoting:
             # Удаляем кавычки если уже есть
             token = token.strip('"')
             result.append(f'"{token}"')
         else:
             result.append(token)
-    
-    return ' '.join(result)
+
+    return " ".join(result)
 
 
 class PeeweeVectorStore(BaseVectorStore):
@@ -110,7 +110,7 @@ class PeeweeVectorStore(BaseVectorStore):
 
         # Создаём таблицы
         self._create_tables()
-        
+
         logger.debug(
             "PeeweeVectorStore initialized",
             dimension=dimension,
@@ -119,7 +119,7 @@ class PeeweeVectorStore(BaseVectorStore):
     def _create_tables(self) -> None:
         """Создаёт таблицы и виртуальные индексы."""
         logger.debug("Creating tables and indexes")
-        
+
         # Создаём обычные таблицы
         self.db.create_tables([DocumentModel, BatchJobModel, ChunkModel], safe=True)
 
@@ -194,7 +194,7 @@ class PeeweeVectorStore(BaseVectorStore):
             chunk_count=len(chunks),
             media_type=document.media_type.value,
         )
-        
+
         with self.db.atomic():
             # Сохраняем документ
             doc_model = DocumentModel.create(
@@ -290,7 +290,7 @@ class PeeweeVectorStore(BaseVectorStore):
             has_text=query_text is not None,
             has_filters=filters is not None,
         )
-        
+
         if mode == "vector":
             results = self._vector_search(query_vector, filters, limit)
         elif mode == "fts":
@@ -300,7 +300,7 @@ class PeeweeVectorStore(BaseVectorStore):
         else:
             logger.error("Unknown search mode", mode=mode)
             raise ValueError(f"Неизвестный режим поиска: {mode}")
-        
+
         latency_ms = (time.perf_counter() - start_time) * 1000
         logger.info(
             "Search completed",
@@ -308,7 +308,7 @@ class PeeweeVectorStore(BaseVectorStore):
             results_count=len(results),
             latency_ms=round(latency_ms, 2),
         )
-        
+
         return results
 
     def _vector_search(
@@ -410,7 +410,7 @@ class PeeweeVectorStore(BaseVectorStore):
 
         # Экранируем специальные символы FTS5
         sanitized_query = _sanitize_fts_query(query_text)
-        
+
         logger.trace(
             "FTS search",
             query_length=len(query_text),
@@ -564,7 +564,9 @@ class PeeweeVectorStore(BaseVectorStore):
         """
 
         # Собираем параметры: blob, where_params, sanitized_query, where_params, k, k, limit
-        params = [blob] + where_params + [sanitized_query] + where_params + [k, k, limit]
+        params = (
+            [blob] + where_params + [sanitized_query] + where_params + [k, k, limit]
+        )
 
         cursor = self.db.execute_sql(sql, params)
         results = []
@@ -599,7 +601,7 @@ class PeeweeVectorStore(BaseVectorStore):
             "Deleting document",
             doc_id=document_id,
         )
-        
+
         with self.db.atomic():
             doc_model = DocumentModel.get_by_id(document_id)
 
@@ -614,13 +616,13 @@ class PeeweeVectorStore(BaseVectorStore):
 
             # Удаляем документ (чанки удалятся каскадно)
             result = doc_model.delete_instance()
-            
+
             logger.info(
                 "Document deleted",
                 doc_id=document_id,
                 chunks_deleted=len(chunk_ids),
             )
-            
+
             return result
 
     def delete_by_metadata(self, filters: dict) -> int:
@@ -636,7 +638,7 @@ class PeeweeVectorStore(BaseVectorStore):
             "Deleting chunks by metadata",
             filters=filters,
         )
-        
+
         # Находим все чанки, которые соответствуют фильтрам
         query = ChunkModel.select()
 
@@ -708,7 +710,7 @@ class PeeweeVectorStore(BaseVectorStore):
             chunk_type_filter=chunk_type_filter,
             language_filter=language_filter,
         )
-        
+
         if mode == "vector":
             results = self._vector_search_chunks(
                 query_vector, filters, limit, chunk_type_filter, language_filter
@@ -725,7 +727,7 @@ class PeeweeVectorStore(BaseVectorStore):
         else:
             logger.error("Unknown search mode", mode=mode)
             raise ValueError(f"Неизвестный режим поиска: {mode}")
-        
+
         latency_ms = (time.perf_counter() - start_time) * 1000
         logger.info(
             "Chunk search completed",
@@ -733,7 +735,7 @@ class PeeweeVectorStore(BaseVectorStore):
             results_count=len(results),
             latency_ms=round(latency_ms, 2),
         )
-        
+
         return results
 
     def _vector_search_chunks(
