@@ -7,6 +7,8 @@ Usage:
     app = create_app()
 """
 
+from pathlib import Path
+
 from flask import Flask
 
 from app.config import get_flask_config, FlaskAppConfig
@@ -59,5 +61,11 @@ def create_app(config: dict | FlaskAppConfig | None = None) -> Flask:
     app.register_blueprint(ingest_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(settings_bp)
+
+    # Регистрация Jinja фильтров
+    @app.template_filter("basename")
+    def basename_filter(path: str) -> str:
+        """Извлечь имя файла из пути."""
+        return Path(path).name if path else ""
 
     return app
