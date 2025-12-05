@@ -37,6 +37,7 @@ class SearchResultItem:
         chunk_type: Тип чанка (text, code, image_ref, etc.).
         language: Язык программирования (для code).
         score: Релевантность (0.0-1.0).
+        score_percent: Релевантность в процентах (0-100).
         score_class: CSS класс для визуализации score.
         match_type: Тип совпадения (vector, fts, hybrid).
         parent_doc_id: ID родительского документа.
@@ -51,6 +52,7 @@ class SearchResultItem:
     chunk_type: str
     language: Optional[str]
     score: float
+    score_percent: int
     score_class: str
     match_type: str
     parent_doc_id: int
@@ -103,6 +105,7 @@ def _chunk_result_to_item(result: ChunkResult) -> SearchResultItem:
         chunk_type=result.chunk_type.value,
         language=result.language,
         score=result.score,
+        score_percent=int(result.score * 100),
         score_class=_score_to_class(result.score),
         match_type=result.match_type.value,
         parent_doc_id=result.parent_doc_id,
@@ -130,6 +133,7 @@ class SearchService:
         "code": "code",
         "image": "image_ref",
         "audio": "audio_ref",
+        "video": "video_ref",
     }
 
     def __init__(
@@ -222,4 +226,5 @@ class SearchService:
             {"id": "code", "label": "Код", "icon": "bi-code-square"},
             {"id": "image", "label": "Изображения", "icon": "bi-image"},
             {"id": "audio", "label": "Аудио", "icon": "bi-music-note-beamed"},
+            {"id": "video", "label": "Видео", "icon": "bi-camera-video"},
         ]
