@@ -14,10 +14,16 @@ class TestSemanticCoreAudioIngestion:
     @pytest.fixture
     def mock_audio_analyzer(self):
         """Mock для GeminiAudioAnalyzer."""
+        long_transcript = " ".join(
+            [
+                "This is a long audio transcript fragment that repeats to force splitting"
+                for _ in range(80)
+            ]
+        )
         analyzer = MagicMock()
         analyzer.analyze.return_value = MediaAnalysisResult(
             description="Test audio summary about document review.",
-            transcription="Hello, this is a test audio recording.",
+            transcription=long_transcript,
             participants=["Speaker 1"],
             action_items=["Review the document"],
             duration_seconds=30.0,
@@ -82,13 +88,25 @@ class TestSemanticCoreAudioIngestion:
         assert doc is not None
         assert doc.media_type == "audio"
 
-        # Чанк создан с типом audio_ref
+        # Есть summary + несколько чанков транскрипции
         chunks = list(
-            ChunkModel.select().where(ChunkModel.document_id == int(document_id))
+            ChunkModel.select()
+            .where(ChunkModel.document_id == int(document_id))
+            .order_by(ChunkModel.chunk_index)
         )
-        assert len(chunks) == 1
-        assert chunks[0].chunk_type == "audio_ref"
-        assert chunks[0].embedding_status == "READY"
+        assert len(chunks) >= 2
+
+        summary_chunk = chunks[0]
+        assert summary_chunk.chunk_type == "audio_ref"
+        assert summary_chunk.embedding_status == "READY"
+        assert summary_chunk.metadata.get("role") == "summary"
+
+        transcript_chunks = [
+            chunk for chunk in chunks if chunk.metadata.get("role") == "transcript"
+        ]
+        assert transcript_chunks
+        assert all(chunk.chunk_type == "text" for chunk in transcript_chunks)
+        assert all(chunk.embedding_status == "READY" for chunk in chunks)
 
     @patch("semantic_core.infrastructure.media.utils.files.get_file_mime_type", return_value="audio/mpeg")
     @patch("semantic_core.infrastructure.media.utils.audio.is_audio_supported", return_value=True)
@@ -136,10 +154,16 @@ class TestSemanticCoreVideoIngestion:
     @pytest.fixture
     def mock_video_analyzer(self):
         """Mock для GeminiVideoAnalyzer."""
+        long_transcript = " ".join(
+            [
+                "Video narration continues with detailed description of scenes and actions"
+                for _ in range(80)
+            ]
+        )
         analyzer = MagicMock()
         analyzer.analyze.return_value = MediaAnalysisResult(
             description="A video showing a person walking in the park.",
-            transcription="Welcome to the park tour.",
+            transcription=long_transcript,
             keywords=["park", "walking", "nature"],
             duration_seconds=120.0,
         )
@@ -203,13 +227,25 @@ class TestSemanticCoreVideoIngestion:
         assert doc is not None
         assert doc.media_type == "video"
 
-        # Чанк создан с типом video_ref
+        # Есть summary + транскрипция, разбитая на несколько чанков
         chunks = list(
-            ChunkModel.select().where(ChunkModel.document_id == int(document_id))
+            ChunkModel.select()
+            .where(ChunkModel.document_id == int(document_id))
+            .order_by(ChunkModel.chunk_index)
         )
-        assert len(chunks) == 1
-        assert chunks[0].chunk_type == "video_ref"
-        assert chunks[0].embedding_status == "READY"
+        assert len(chunks) >= 2
+
+        summary_chunk = chunks[0]
+        assert summary_chunk.chunk_type == "video_ref"
+        assert summary_chunk.metadata.get("role") == "summary"
+        assert summary_chunk.embedding_status == "READY"
+
+        transcript_chunks = [
+            chunk for chunk in chunks if chunk.metadata.get("role") == "transcript"
+        ]
+        assert transcript_chunks
+        assert all(chunk.chunk_type == "text" for chunk in transcript_chunks)
+        assert all(chunk.embedding_status == "READY" for chunk in chunks)
 
     @patch("semantic_core.infrastructure.media.utils.files.get_file_mime_type", return_value="video/mp4")
     @patch("semantic_core.infrastructure.media.utils.video.is_video_supported", return_value=True)
