@@ -252,14 +252,19 @@ class SemanticCore:
         # 2. Формируем контент и metadata
         content = str(media_path)
         metadata: dict = {"_original_path": str(media_path)}
+        analysis_result: Optional[dict] = None
 
         if enrich_media and mode == "sync":
             # Вызываем соответствующий анализатор
-            result = self._analyze_media_for_chunk(chunk_type, media_path, context_text="")
+            analysis_result = self._analyze_media_for_chunk(
+                chunk_type, media_path, context_text=""
+            )
 
-            if result is not None:
-                content = self._build_content_from_analysis(result)
-                metadata.update(self._build_metadata_from_analysis(result, media_path))
+            if analysis_result is not None:
+                content = self._build_content_from_analysis(analysis_result)
+                metadata.update(
+                    self._build_metadata_from_analysis(analysis_result, media_path)
+                )
                 logger.debug("Media enriched", content_preview=content[:100])
             else:
                 metadata["_media_error"] = "Analysis failed"
@@ -278,44 +283,58 @@ class SemanticCore:
                 logger.error(f"Failed to create media task: {e}")
                 metadata["_media_error"] = str(e)
 
-        # 3. Создаём единственный чанк
-        chunk = Chunk(
-            content=content,
-            chunk_index=0,
+        # 3. Собираем чанки (summary + transcript, если есть)
+        chunks = self._build_media_chunks(
+            document=document,
+            media_path=media_path,
             chunk_type=chunk_type,
-            metadata=metadata,
+            analysis=analysis_result,
+            fallback_metadata=metadata,
         )
+
+        # Обновляем метаданные документа (сохраняем _original_path и др.)
+        document.metadata.update(metadata)
+        document.content = content
 
         # 4. Векторизация
         if mode == "sync":
-            vector_text = self.context_strategy.form_vector_text(chunk, document)
-            embeddings = self.embedder.embed_documents([vector_text])
-            chunk.embedding = embeddings[0]
+            vector_texts = [
+                self.context_strategy.form_vector_text(chunk, document)
+                for chunk in chunks
+            ]
+            embeddings = self.embedder.embed_documents(vector_texts)
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk.embedding = embedding
         else:
-            chunk.metadata["_vector_source"] = content
-            chunk.metadata["_embedding_status"] = EmbeddingStatus.PENDING.value
-            chunk.embedding = None
+            for chunk in chunks:
+                chunk.metadata["_vector_source"] = chunk.content
+                chunk.metadata["_embedding_status"] = EmbeddingStatus.PENDING.value
+                chunk.embedding = None
 
         # 5. Сохраняем
-        saved_document = self.store.save(document, [chunk])
+        saved_document = self.store.save(document, chunks)
 
         logger.info(
             "Direct media ingested",
             doc_id=saved_document.id,
             chunk_type=chunk_type.value,
-            enriched=enrich_media and result is not None if enrich_media else False,
+            chunk_count=len(chunks),
+            enriched=enrich_media and analysis_result is not None if enrich_media else False,
         )
 
         return saved_document
 
     def _build_content_from_analysis(self, result: dict) -> str:
-        """Формирует текстовый контент из результата анализа медиа.
+        """Формирует текстовый контент для SUMMARY чанка из результата анализа медиа.
+
+        Для audio/video возвращает ТОЛЬКО description (без transcription),
+        т.к. transcription будет в отдельных чанках через _split_transcription_into_chunks().
 
         Args:
             result: Словарь с результатами от анализатора.
 
         Returns:
-            Текст для chunk.content.
+            Текст для summary chunk.content.
         """
         media_type = result.get("type", "unknown")
 
@@ -323,17 +342,12 @@ class SemanticCore:
             return result.get("description", "")
 
         elif media_type == "audio":
-            # Приоритет: транскрипция > описание
-            return result.get("transcription") or result.get("description", "")
+            # Только описание, transcription будет в отдельных чанках
+            return result.get("description", "")
 
         elif media_type == "video":
-            # Описание + транскрипция (если есть)
-            parts = []
-            if result.get("description"):
-                parts.append(result["description"])
-            if result.get("transcription"):
-                parts.append(f"\n\nTranscription:\n{result['transcription']}")
-            return "".join(parts)
+            # Только описание, transcription будет в отдельных чанках
+            return result.get("description", "")
 
         return ""
 
@@ -366,10 +380,7 @@ class SemanticCore:
 
         elif media_type == "video":
             metadata["_video_keywords"] = result.get("keywords", [])
-            if result.get("transcription"):
-                metadata["_video_transcription"] = result["transcription"]
-            if result.get("ocr_text"):
-                metadata["_video_ocr"] = result["ocr_text"]
+            # transcription и ocr_text теперь в отдельных чанках, не дублируем в metadata
             if result.get("duration_seconds"):
                 metadata["_video_duration"] = result["duration_seconds"]
 
@@ -776,45 +787,37 @@ class SemanticCore:
         )
 
         if mode == "sync":
-            # Анализируем аудио напрямую (не через queue)
-            from semantic_core.domain import MediaRequest, MediaResource
+            # Обрабатываем через MediaQueueProcessor (как для изображений)
+            self._ensure_media_queue()
+            success = self._media_queue.process_task(task_id)
 
-            resource = MediaResource(
-                path=Path(path),
-                media_type="audio",
-                mime_type=get_file_mime_type(path),
-            )
-            request = MediaRequest(
-                resource=resource,
-                user_prompt=user_prompt,
-                context_text=context_text,
-            )
-            result = self.audio_analyzer.analyze(request)
+            if not success:
+                task = MediaTaskModel.get_by_id(task_id)
+                raise RuntimeError(
+                    f"Failed to process audio: {task.error_message or 'Unknown error'}"
+                )
 
-            # Обновляем задачу
+            # Получаем результат анализа из задачи
             task = MediaTaskModel.get_by_id(task_id)
-            task.status = "completed"
-            task.result_transcription = result.transcription
-            if result.participants:
-                task.result_participants = json.dumps(result.participants)
-            if result.action_items:
-                task.result_action_items = json.dumps(result.action_items)
-            task.result_duration_seconds = result.duration_seconds
-            task.save()
 
-            # Формируем content
-            content_parts = []
-            if result.transcription:
-                content_parts.append(result.transcription)
-            if result.description:
-                content_parts.append(f"Description: {result.description}")
+            # Формируем analysis из результатов задачи
+            analysis = {
+                "type": "audio",
+                "description": task.result_description,
+                "transcription": task.result_transcription,
+                "keywords": json.loads(task.result_keywords) if task.result_keywords else None,
+                "participants": json.loads(task.result_participants) if task.result_participants else None,
+                "action_items": json.loads(task.result_action_items) if task.result_action_items else None,
+                "duration_seconds": task.result_duration_seconds,
+            }
 
-            content = "\n\n".join(content_parts) if content_parts else f"Audio: {Path(path).name}"
+            # Формируем content и метаданные документа
+            # Для Document.content используем только description (summary),
+            # т.к. transcription будет в отдельных чанках
+            content = task.result_description or f"Audio: {Path(path).name}"
 
-            # Формируем title из описания или имени файла
             title = Path(path).stem.replace("_", " ").replace("-", " ").title()
 
-            # Метаданные
             metadata = {
                 "title": title,
                 "source": path,
@@ -822,41 +825,50 @@ class SemanticCore:
                 "media_type": "audio",
                 "mime_type": get_file_mime_type(path),
                 "task_id": task_id,
-                "duration_seconds": result.duration_seconds,
+                "duration_seconds": task.result_duration_seconds,
             }
-            if result.participants:
-                metadata["participants"] = result.participants
+            if task.result_participants:
+                metadata["participants"] = json.loads(task.result_participants)
+            if task.result_keywords:
+                metadata["keywords"] = json.loads(task.result_keywords)
 
-            # Создаём Document и Chunk
             doc = Document(
                 content=content,
                 metadata=metadata,
                 media_type=MediaType.AUDIO,
             )
 
-            chunk = Chunk(
-                content=content,
-                chunk_index=0,
+            chunks = self._build_media_chunks(
+                document=doc,
+                media_path=Path(path),
                 chunk_type=ChunkType.AUDIO_REF,
-                metadata={
+                analysis=analysis,
+                fallback_metadata={
                     "source": path,
                     "filename": Path(path).name,
-                    "duration_seconds": result.duration_seconds,
+                    "_original_path": str(Path(path)),
                 },
             )
 
-            # Эмбеддинг и сохранение
-            vector_text = self.context_strategy.form_vector_text(chunk, doc)
-            embeddings = self.embedder.embed_documents([vector_text])
-            chunk.embedding = embeddings[0]
+            vector_texts = [
+                self.context_strategy.form_vector_text(chunk, doc)
+                for chunk in chunks
+            ]
+            embeddings = self.embedder.embed_documents(vector_texts)
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk.embedding = embedding
 
-            saved_doc = self.store.save(doc, [chunk])
+            saved_doc = self.store.save(doc, chunks)
 
-            # Обновляем chunk_id
+            # Обновляем chunk_id (summary chunk c chunk_index=0)
             from semantic_core.infrastructure.storage.peewee.models import ChunkModel
-            db_chunk = ChunkModel.select().where(
-                ChunkModel.document_id == saved_doc.id
-            ).first()
+
+            db_chunk = (
+                ChunkModel.select()
+                .where(ChunkModel.document_id == saved_doc.id)
+                .order_by(ChunkModel.chunk_index)
+                .first()
+            )
             if db_chunk:
                 task.result_chunk_id = db_chunk.id
                 task.save()
@@ -865,7 +877,7 @@ class SemanticCore:
                 "Audio indexed as document",
                 document_id=saved_doc.id,
                 path=path,
-                duration=result.duration_seconds,
+                duration=task.result_duration_seconds,
             )
             return str(saved_doc.id)
 
@@ -923,38 +935,33 @@ class SemanticCore:
         )
 
         if mode == "sync":
-            from semantic_core.domain import MediaRequest, MediaResource
+            # Обрабатываем через MediaQueueProcessor (как для изображений)
+            self._ensure_media_queue()
+            success = self._media_queue.process_task(task_id)
 
-            resource = MediaResource(
-                path=Path(path),
-                media_type="video",
-                mime_type=get_file_mime_type(path),
-            )
-            request = MediaRequest(
-                resource=resource,
-                user_prompt=user_prompt,
-                context_text=context_text,
-            )
-            result = self.video_analyzer.analyze(request)
+            if not success:
+                task = MediaTaskModel.get_by_id(task_id)
+                raise RuntimeError(
+                    f"Failed to process video: {task.error_message or 'Unknown error'}"
+                )
 
-            # Обновляем задачу
+            # Получаем результат анализа из задачи
             task = MediaTaskModel.get_by_id(task_id)
-            task.status = "completed"
-            task.result_description = result.description
-            task.result_transcription = result.transcription
-            if result.keywords:
-                task.result_keywords = json.dumps(result.keywords)
-            task.result_duration_seconds = result.duration_seconds
-            task.save()
+
+            # Формируем analysis из результатов задачи
+            analysis = {
+                "type": "video",
+                "description": task.result_description,
+                "transcription": task.result_transcription,
+                "keywords": json.loads(task.result_keywords) if task.result_keywords else None,
+                "ocr_text": task.result_ocr_text,
+                "duration_seconds": task.result_duration_seconds,
+            }
 
             # Формируем content
-            content_parts = []
-            if result.description:
-                content_parts.append(result.description)
-            if result.transcription:
-                content_parts.append(f"Transcription: {result.transcription}")
-
-            content = "\n\n".join(content_parts) if content_parts else f"Video: {Path(path).name}"
+            # Для Document.content используем только description (summary),
+            # т.к. transcription будет в отдельных чанках
+            content = task.result_description or f"Video: {Path(path).name}"
 
             # Формируем title из описания или имени файла
             title = Path(path).stem.replace("_", " ").replace("-", " ").title()
@@ -967,10 +974,10 @@ class SemanticCore:
                 "media_type": "video",
                 "mime_type": get_file_mime_type(path),
                 "task_id": task_id,
-                "duration_seconds": result.duration_seconds,
+                "duration_seconds": task.result_duration_seconds,
             }
-            if result.keywords:
-                metadata["keywords"] = result.keywords
+            if task.result_keywords:
+                metadata["keywords"] = json.loads(task.result_keywords)
 
             # Создаём Document и Chunk
             doc = Document(
@@ -979,30 +986,38 @@ class SemanticCore:
                 media_type=MediaType.VIDEO,
             )
 
-            chunk = Chunk(
-                content=content,
-                chunk_index=0,
+            chunks = self._build_media_chunks(
+                document=doc,
+                media_path=Path(path),
                 chunk_type=ChunkType.VIDEO_REF,
-                metadata={
+                analysis=analysis,
+                fallback_metadata={
                     "source": path,
                     "filename": Path(path).name,
-                    "duration_seconds": result.duration_seconds,
-                    "keywords": result.keywords or [],
+                    "_original_path": str(Path(path)),
+                    "duration_seconds": task.result_duration_seconds,
+                    "keywords": json.loads(task.result_keywords) if task.result_keywords else [],
                 },
             )
 
-            # Эмбеддинг и сохранение
-            vector_text = self.context_strategy.form_vector_text(chunk, doc)
-            embeddings = self.embedder.embed_documents([vector_text])
-            chunk.embedding = embeddings[0]
+            vector_texts = [
+                self.context_strategy.form_vector_text(chunk, doc)
+                for chunk in chunks
+            ]
+            embeddings = self.embedder.embed_documents(vector_texts)
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk.embedding = embedding
 
-            saved_doc = self.store.save(doc, [chunk])
+            saved_doc = self.store.save(doc, chunks)
 
             # Обновляем chunk_id
             from semantic_core.infrastructure.storage.peewee.models import ChunkModel
-            db_chunk = ChunkModel.select().where(
-                ChunkModel.document_id == saved_doc.id
-            ).first()
+            db_chunk = (
+                ChunkModel.select()
+                .where(ChunkModel.document_id == saved_doc.id)
+                .order_by(ChunkModel.chunk_index)
+                .first()
+            )
             if db_chunk:
                 task.result_chunk_id = db_chunk.id
                 task.save()
@@ -1011,7 +1026,7 @@ class SemanticCore:
                 "Video indexed as document",
                 document_id=saved_doc.id,
                 path=path,
-                duration=result.duration_seconds,
+                duration=task.result_duration_seconds,
             )
             return str(saved_doc.id)
 
@@ -1050,7 +1065,9 @@ class SemanticCore:
             from semantic_core.core.media_queue import MediaQueueProcessor
 
             self._media_queue = MediaQueueProcessor(
-                analyzer=self.image_analyzer,
+                image_analyzer=self.image_analyzer,
+                audio_analyzer=self.audio_analyzer,
+                video_analyzer=self.video_analyzer,
                 rate_limiter=self._rate_limiter,
                 embedder=self.embedder,
                 store=self.store,
@@ -1373,6 +1390,129 @@ class SemanticCore:
                 chunk.metadata["_video_duration"] = result["duration_seconds"]
 
         chunk.metadata["_enriched"] = True
+
+    def _build_media_chunks(
+        self,
+        document: Document,
+        media_path: Path,
+        chunk_type: ChunkType,
+        analysis: Optional[dict],
+        fallback_metadata: Optional[dict] = None,
+    ) -> list[Chunk]:
+        """Формирует список чанков для медиа: summary + transcript."""
+
+        base_metadata = dict(fallback_metadata or {})
+
+        if analysis is None:
+            return [
+                Chunk(
+                    content=str(media_path),
+                    chunk_index=0,
+                    chunk_type=chunk_type,
+                    metadata=base_metadata,
+                )
+            ]
+
+        summary_content = self._build_content_from_analysis(analysis)
+        summary_metadata = self._build_metadata_from_analysis(analysis, media_path)
+        summary_metadata.update(base_metadata)
+        summary_metadata["role"] = "summary"
+
+        chunks: list[Chunk] = [
+            Chunk(
+                content=summary_content,
+                chunk_index=0,
+                chunk_type=chunk_type,
+                metadata=summary_metadata,
+            )
+        ]
+
+        transcription = analysis.get("transcription")
+        if transcription:
+            transcript_chunks = self._split_transcription_into_chunks(
+                transcription=transcription,
+                base_index=len(chunks),
+                media_path=media_path,
+            )
+            chunks.extend(transcript_chunks)
+
+        # Для видео: разбиваем OCR текст на отдельные чанки
+        ocr_text = analysis.get("ocr_text")
+        if ocr_text:
+            ocr_chunks = self._split_ocr_into_chunks(
+                ocr_text=ocr_text,
+                base_index=len(chunks),
+                media_path=media_path,
+            )
+            chunks.extend(ocr_chunks)
+
+        return chunks
+
+    def _split_transcription_into_chunks(
+        self,
+        transcription: str,
+        base_index: int,
+        media_path: Path,
+    ) -> list[Chunk]:
+        """Режет транскрипцию на чанки через splitter."""
+
+        temp_doc = Document(
+            content=transcription,
+            metadata={"source": str(media_path)},
+            media_type=MediaType.TEXT,
+        )
+        split_chunks = self.splitter.split(temp_doc)
+
+        transcript_chunks: list[Chunk] = []
+        for idx, chunk in enumerate(split_chunks):
+            meta = dict(chunk.metadata or {})
+            meta.setdefault("_original_path", str(media_path))
+            meta["role"] = "transcript"
+            meta["parent_media_path"] = str(media_path)
+
+            chunk.chunk_index = base_index + idx
+            chunk.metadata = meta
+
+            transcript_chunks.append(chunk)
+
+        return transcript_chunks
+
+    def _split_ocr_into_chunks(
+        self,
+        ocr_text: str,
+        base_index: int,
+        media_path: Path,
+    ) -> list[Chunk]:
+        """Режет OCR текст на чанки через splitter.
+        
+        Args:
+            ocr_text: Текст, распознанный через OCR из видео.
+            base_index: Начальный индекс для нумерации чанков.
+            media_path: Путь к медиа-файлу.
+            
+        Returns:
+            Список чанков с role='ocr'.
+        """
+        temp_doc = Document(
+            content=ocr_text,
+            metadata={"source": str(media_path)},
+            media_type=MediaType.TEXT,
+        )
+        split_chunks = self.splitter.split(temp_doc)
+
+        ocr_chunks: list[Chunk] = []
+        for idx, chunk in enumerate(split_chunks):
+            meta = dict(chunk.metadata or {})
+            meta.setdefault("_original_path", str(media_path))
+            meta["role"] = "ocr"
+            meta["parent_media_path"] = str(media_path)
+
+            chunk.chunk_index = base_index + idx
+            chunk.metadata = meta
+
+            ocr_chunks.append(chunk)
+
+        return ocr_chunks
 
     def _get_mime_type(self, path: Path) -> str:
         """Определяет MIME-тип файла по расширению."""
