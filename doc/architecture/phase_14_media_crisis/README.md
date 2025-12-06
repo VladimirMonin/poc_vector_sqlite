@@ -225,6 +225,54 @@ Phase 14.1: Smart Steps + Advanced Features — ✅ COMPLETED
 
 ---
 
+### 80. E2E Testing & MediaPipeline Integration
+
+**Файл:** [80_e2e_testing_mediapipeline_integration.md](80_e2e_testing_mediapipeline_integration.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.1.4)
+
+Финальная интеграция MediaPipeline в SemanticCore + E2E валидация timecode parsing и user_instructions.
+
+**Ключевые изменения:**
+
+- **MediaPipeline Integration:** Замена legacy `_build_media_chunks()` на модульную архитектуру
+- **Удалён legacy код:** `_split_transcription_into_chunks()` и `_split_ocr_into_chunks()` (-82 LOC)
+- **Bugfix Path serialization:** `metadata["source"] = str(path)` вместо Path объектов
+- **E2E Test Suite:** 6 тестов для валидации полной интеграции
+
+**E2E Tests (6/6 PASSED):**
+
+1. `test_audio_with_timecodes` — проверка парсинга `[MM:SS]` → `start_seconds`
+2. `test_timecode_inheritance` — наследование таймкодов для чанков без меток
+3. `test_first_chunk_without_timecode_is_zero` — edge case (нет таймкода → 0)
+4. `test_user_prompt_injection_audio` — передача user_prompt в audio analyzer
+5. `test_user_prompt_injection_video` — передача user_prompt в video analyzer
+6. `test_timecode_validation_max_duration` — отбрасывание невалидных таймкодов
+
+**Архитектурные улучшения:**
+
+- ✅ **Модульность:** Шаги независимы, переиспользуются
+- ✅ **Тестируемость:** Изолированное тестирование компонентов
+- ✅ **Расширяемость:** `pipeline.register_step()` для новых шагов
+- ✅ **Code cleanup:** -82 LOC legacy кода
+
+**Commits:**
+
+- `6e66974` — Bugfix: Path objects JSON serialization
+- `42b0d30` — MediaPipeline Integration + E2E Tests
+
+**Итоги Phase 14.1 (FINAL):**
+
+```
+214 total tests (208 unit + 6 E2E)
+6 статей (75-80)
+7 commits
+-109 LOC (82 + 27)
+100% passing
+✅ Phase 14.1 — COMPLETED!
+```
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR
