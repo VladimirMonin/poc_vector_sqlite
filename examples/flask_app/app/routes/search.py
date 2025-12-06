@@ -83,6 +83,7 @@ def results():
     mode = request.args.get("mode", "hybrid")
     limit = request.args.get("limit", 20, type=int)
     result_type = request.args.get("result_type", "chunks")
+    min_score = request.args.get("min_score", 0, type=int)
 
     # Пустой запрос — пустые результаты
     if not query:
@@ -100,7 +101,7 @@ def results():
 
     logger.info(
         f"🔍 Search request: q='{query}', types={chunk_types}, "
-        f"mode={mode}, result_type={result_type}"
+        f"mode={mode}, result_type={result_type}, min_score={min_score}"
     )
 
     try:
@@ -110,6 +111,7 @@ def results():
                 query=query,
                 mode=mode,
                 limit=limit,
+                min_score=min_score,
             )
             return render_template(
                 "partials/search_documents.html",
@@ -123,14 +125,12 @@ def results():
                 chunk_types=chunk_types,
                 mode=mode,
                 limit=limit,
+                min_score=min_score,
             )
             return render_template(
                 "partials/search_results.html",
                 results=results,
                 query=query,
-                render_markdown=render_markdown,
-                render_code=render_code,
-                truncate_content=truncate_content,
             )
 
     except Exception as e:
