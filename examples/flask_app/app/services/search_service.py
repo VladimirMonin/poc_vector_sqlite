@@ -165,6 +165,9 @@ def _search_result_to_item(result: SearchResult) -> DocumentResultItem:
     if isinstance(tags, str):
         tags = [tags]
 
+    # Извлекаем source из metadata (Document не имеет атрибута source)
+    source = metadata.get("source", "")
+
     # Создаём описание из первых 200 символов content
     description = ""
     if doc.content:
@@ -174,8 +177,8 @@ def _search_result_to_item(result: SearchResult) -> DocumentResultItem:
 
     return DocumentResultItem(
         doc_id=doc.id or 0,
-        title=metadata.get("title", doc.source or "Untitled"),
-        source=doc.source,
+        title=metadata.get("title") or source or "Untitled",
+        source=source,
         score=result.score,
         score_percent=int(result.score * 100),
         score_class=_score_to_class(result.score),
