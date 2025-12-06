@@ -11,294 +11,97 @@
 
 ---
 
-## 📖 Оглавление
+## 🗺 Навигация по фазам проекта
 
-### 🎓 Основы
-
-1. [**Что такое эмбеддинги?**](01_embeddings_basics.md)  
-   Векторные представления текста и почему они работают
-
-2. [**Gemini API для эмбеддингов**](02_gemini_api.md)  
-   Модели, лимиты, task types и MRL
-
-3. [**SQLite-Vec: хранение векторов**](03_sqlite_vec.md)  
-   Как расширение sqlite-vec работает с BLOB
+Проект развивался итеративно через **14 фаз**. Каждая фаза решала конкретную архитектурную задачу и документирована отдельно.
 
 ---
 
-### 🔍 Поиск
+### 📚 Phase 0: Basics & Legacy
 
-4. [**Типы поиска**](04_search_types.md)  
-   Векторный, полнотекстовый и их отличия
+**[Phase 0: Basics](phase_0_basics/)** — Основы семантического поиска *(файлы не созданы)*  
+Эмбеддинги, SQLite-Vec, типы поиска, RRF
 
-5. [**Гибридный поиск (RRF)**](05_hybrid_search_rrf.md)  
-   Reciprocal Rank Fusion — лучшее из двух миров
-
----
-
-### 🏛️ [LEGACY] Старая архитектура (до SOLID рефакторинга)
-
-> ⚠️ **Устарело:** Эти документы описывают архитектуру до Phase 1-3.  
-> Актуальная архитектура — см. раздел "SOLID Рефакторинг" ниже.
-
-6. [**[LEGACY] Структура проекта**](06_LEGACY_project_architecture.md)  
-   Разделение на semantic_core и domain (прежняя архитектура)
-
-7. [**[LEGACY] Поток данных**](07_LEGACY_data_flow.md)  
-   Полный цикл: добавление → индексация → поиск (прежняя архитектура)
-
-8. [**[LEGACY] Стратегия нарезки**](08_LEGACY_chunking_strategy.md)  
-   Устаревший SimpleTextSplitter (замена — SmartSplitter)
-
-9. [**[LEGACY] Parent-Child Retrieval**](09_LEGACY_parent_child_retrieval.md)  
-   Концепция осталась, реализация изменилась
+**[Phase 0: LEGACY](phase_0_legacy/)** — Старая архитектура до SOLID  
+Monolithic design, SimpleTextSplitter, прежний data flow
 
 ---
 
-### 🏗️ SOLID Рефакторинг (новая архитектура)
+### 🏗️ Phase 1-3: SOLID Foundation
 
-10. [**SOLID Архитектура (Фаза 1)**](10_solid_refactoring.md)  
-    От прототипа к библиотеке: разделение на независимые слои
+**[Phase 1: SOLID Refactoring](phase_1_solid/)**  
+Превращение прототипа в библиотеку: интерфейсы, DI, чистая архитектура
 
-11. [**Storage Layer: Peewee + RRF + Фильтры (Фаза 2)**](11_storage_layer_phase2.md)  
-    Реализация хранилища с гибридным поиском и фильтрацией по метаданным
+**[Phase 2: Storage Layer](phase_2_storage/)**  
+PeeweeVectorStore с гибридным поиском, RRF и фильтрацией по метаданным
 
----
-
-### 🎩 Integration Layer: ORM + Семантика (Фаза 3)
-
-12. [**Descriptor Protocol: Магия атрибутов класса**](12_descriptor_protocol.md)  
-    Как `Article.search` превращается в объект с методами поиска
-
-13. [**Method Patching: Автоматическая индексация**](13_method_patching.md)  
-    Патчинг save() и delete_instance() для автоиндексации без SignalModel
-
-14. [**SearchProxy и DocumentBuilder: От ORM к семантике**](14_orm_to_semantic.md)  
-    Превращаем Article в Document, ищем, возвращаем обратно Article
+**[Phase 3: Integration Layer](phase_3_integration/)**  
+Descriptor magic для `Article.search`, автоиндексация через method patching
 
 ---
 
-### 🧠 Smart Parsing & Granular Search (Фаза 4)
+### 🧠 Phase 4: Smart Parsing
 
-15. [**Smart Parsing Architecture**](15_smart_parsing.md)  
-    AST-парсинг Markdown, ChunkType enum, иерархия заголовков и структурные метаданные
-
-16. [**Smart Splitting Strategy**](16_smart_splitting.md)  
-    Интеллектуальное разделение контента: изоляция кода, группировка текста, сохранение иерархии
-
-17. [**Hierarchical Context Strategy**](17_hierarchical_context.md)  
-    Обогащение эмбеддингов breadcrumbs: от плоских чанков к структурному контексту
-
-18. [**Granular Search & Storage Evolution**](18_granular_search.md)  
-    Поиск по индивидуальным чанкам, фильтрация по типу/языку, SQL оптимизация и ChunkResult API
+**[Phase 4: Smart Parsing & Granular Search](phase_4_smart_parsing/)**  
+AST-парсинг Markdown, изоляция кода, иерархический контекст, chunk-level поиск
 
 ---
 
-### 💰 Async Batching & Cost Optimization (Фаза 5)
+### 💰 Phase 5: Batching & Economics
 
-19. [**API Key Management: Разделение биллинга**](19_api_key_management.md)  
-    GoogleKeyring и изоляция затрат между синхронной и асинхронной векторизацией
-
-20. [**Async Processing: От блокировки к очереди**](20_async_processing.md)  
-    Режим mode='async', статусы чанков (PENDING/READY/FAILED) и неблокирующая загрузка
-
-21. [**Google Batch API: 50% экономия**](21_batch_api_economics.md)  
-    Почему batch processing дешевле в 2 раза, trade-offs и JSONL формат
-
-22. [**BatchManager: Локальная оркестрация**](22_batch_manager.md)  
-    SQLite как очередь задач, flush_queue/sync_status и жизненный цикл батч-заданий
-
-23. [**Schema Evolution: Миграция без downtime**](23_schema_evolution.md)  
-    Автоматическое добавление колонок через ALTER TABLE и backward compatibility
-
-24. [**Production Optimizations: От прототипа к масштабу**](24_production_optimizations.md)  
-    Partial failures handling, производительность bulk_update_vectors и готовность к миллионам чанков
+**[Phase 5: Async Batching & Cost Optimization](phase_5_batching/)**  
+Асинхронная векторизация, Google Batch API (50% экономия), production optimizations
 
 ---
 
-### 🖼️ Multimodal Processing (Фаза 6)
+### 🖼️ Phase 6: Multimodal
 
-25. [**Media Processing Architecture**](25_media_processing_architecture.md)  
-    Архитектура обработки изображений: sync/async режимы, DTO и интеграция в SemanticCore
-
-26. [**Gemini Vision Integration**](26_gemini_vision_integration.md)  
-    Анализ изображений через Gemini Vision API: structured JSON output и расчёт токенов
-
-27. [**Resilience Patterns**](27_resilience_patterns.md)  
-    Паттерны устойчивости: retry с backoff, классификация ошибок и graceful degradation
-
-28. [**Rate Limiting**](28_rate_limiting.md)  
-    Token Bucket алгоритм для контроля RPM и защиты от 429
-
-29. [**Media Queue Processor**](29_media_queue_processor.md)  
-    Персистентная очередь задач: MediaTaskModel, пакетная обработка и мониторинг
-
-30. [**Audio Analysis Architecture**](30_audio_analysis_architecture.md)  
-    GeminiAudioAnalyzer: транскрипция, 32kbps оптимизация, 83 минуты в одном запросе
-
-31. [**Video Multimodal Analysis**](31_video_multimodal_analysis.md)  
-    GeminiVideoAnalyzer: кадры + аудио в одном запросе, режимы извлечения кадров
-
-32. [**Media Optimization Strategies**](32_media_optimization_strategies.md)  
-    Утилиты audio.py/video.py: сжатие, пресеты качества, FFmpeg dependency
-
-33. [**Markdown-Media Integration**](33_markdown_media_integration.md)  
-    Обогащение IMAGE_REF чанков через Vision API: контекст из документа, резолв путей
-
-34. [**Audio & Video in Markdown**](34_audio_video_in_markdown.md)  
-    Детекция аудио/видео ссылок по расширению, AUDIO_REF и VIDEO_REF чанки
+**[Phase 6: Multimodal Processing](phase_6_multimodal/)**  
+Обработка изображений, аудио и видео через Gemini Vision/Audio API, resilience patterns
 
 ---
 
-### 📊 Observability Layer (Фаза 7)
+### 📊 Phase 7-8: Operations
 
-35. [**Semantic Logging Architecture**](35_semantic_logging.md)  
-    Dual-mode logging: Console (INFO+) для разработчика, File (TRACE) для AI-агентов
+**[Phase 7: Observability Layer](phase_7_observability/)**  
+Семантическое логирование с эмодзи, secret redaction, context propagation
 
-36. [**Visual Semantics in Logs**](36_visual_semantics_logs.md)  
-    EMOJI_MAP: мгновенная идентификация модуля и уровня через эмодзи
-
-37. [**Context Propagation with bind()**](37_context_propagation.md)  
-    Проброс batch_id, doc_id через весь pipeline без thread-local storage
-
-38. [**Secret Redaction in Logs**](38_secret_redaction.md)  
-    SensitiveDataFilter: автоматическое маскирование API-ключей
-
-39. [**Diagnostics & Debugging**](39_diagnostics_debugging.md)  
-    dump_debug_info(), check_config(), trace_ai() и error_with_context()
+**[Phase 8: CLI & Configuration](phase_8_cli/)**  
+Production-ready CLI (Typer + Rich), единая конфигурация через TOML + env
 
 ---
 
-### 🖥 CLI & Configuration (Фаза 8)
+### 🤖 Phase 9: RAG
 
-40. [**Unified Configuration**](40_unified_configuration.md)  
-    SemanticConfig: Pydantic Settings с TOML + env, единый источник правды
-
-41. [**CLI Architecture**](41_cli_architecture.md)  
-    Typer + Rich: быстрый --help, lazy initialization, красивый вывод
-
-42. [**CLI Commands**](42_cli_commands.md)  
-    ingest, search, docs — три основные команды для повседневной работы
-
-43. [**Queue & Worker Commands**](43_queue_worker_commands.md)  
-    queue status/flush/retry, worker run-once/start — операционные команды для async-обработки
+**[Phase 9: RAG Integration](phase_9_rag/)**  
+Retrieval-Augmented Generation, LLM provider abstraction, интерактивный чат с slash-командами
 
 ---
 
-### 🤖 RAG Integration (Фаза 9)
+### 🔄 Phase 10-11: Production Polish
 
-44. [**RAG Engine Architecture**](44_rag_engine_architecture.md)  
-    Оркестратор вопрос-ответа: поиск → контекст → LLM → ответ с источниками
+**[Phase 10: Batch API Integration](phase_10_batch_api/)**  
+Реальный Batch API клиент, миграция на text-embedding-004
 
-45. [**LLM Provider Abstraction**](45_llm_provider_abstraction.md)  
-    BaseLLMProvider интерфейс, GeminiLLMProvider и возможность подключить любую LLM
-
-46. [**RAG Chat CLI**](46_rag_chat_cli.md)  
-    Интерактивный REPL для вопросов к базе знаний из терминала
-
-47. [**Chat History Management**](47_chat_history_management.md)  
-    Управление историей чата: стратегии LastNMessages, TokenBudget и автотримминг
-
-48. [**Context Compression**](48_context_compression.md)  
-    Сжатие истории через LLM summarization: ContextCompressor и AdaptiveWithCompression
-
-49. [**Slash Commands**](49_slash_commands.md)  
-    Интерактивные команды чата: /search, /sources, /model и управление сессией
+**[Phase 11: Documentation](phase_11_documentation/)**  
+Кросс-платформенная совместимость (Windows), публичная документация, truthiness trap
 
 ---
 
-### 🔄 Batch API Integration (Фаза 10)
+### 🌐 Phase 12: Flask Web
 
-50. [**Batch API: От заглушки к реальности**](50_batch_api_implementation.md)  
-    Реализация GeminiBatchClient, новый SDK, формат JSONL и проблема совместимости моделей
-
-51. [**Миграция на gemini-embedding-001**](51_model_migration.md)  
-    Почему нельзя смешивать модели, MRL и план полной переиндексации
+**[Phase 12: Flask Web Application](phase_12_flask/)** *(в паузе, отдельная ветка)*  
+Веб-интерфейс для поиска, загрузки документов, RAG-чата с HTMX
 
 ---
 
-### 📚 Documentation (Фаза 11)
+### 🏁 Phase 13-14: Total Audit & Crisis Fix
 
-52. [**Documentation Architecture**](52_documentation_architecture.md)  
-    Две папки doc/ и docs/: разделение аудиторий, стилевые правила, структура публичной документации
+**[Phase 13: Total Visual Check](phase_13_audit/)**  
+E2E аудит всех систем, FTS refactoring, context window, embedding cache integration
 
-53. [**Cross-Platform Compatibility: Windows Support**](53_windows_compatibility.md)  
-    Python версии, CLI-парсинг, PowerShell vs Bash, пути и кодировки
-
-54. [**Python Truthiness Trap: Когда пустой объект — не None**](54_python_truthiness_trap.md)  
-    Коварный баг с `__len__()` и `if not obj:`, E2E тесты для слэш-команд
-
----
-
-### 🌐 Flask Web Application (Фаза 12)
-
-55. [**Flask Integration**](55_flask_integration.md)  
-    Интеграция SemanticCore в веб-приложение: Application Factory, DI через extensions, HTTP logging
-
-56. [**Query Cache Architecture**](56_query_cache.md)  
-    Кэширование эмбеддингов запросов: экономия API-вызовов, автокомплит, статистика
-
-57. [**Search Interface Architecture**](57_search_interface.md)  
-    HTMX + Flask: интеллектуальный поиск с фильтрами, Markdown рендеринг, Score визуализация
-
-58. [**Content Management Architecture**](58_content_management.md)  
-    Drag-n-Drop загрузка, UUID-именование, sync/async индексация, управление документами
-
-59. [**RAG Chat Web Architecture**](59_rag_chat_web.md)  
-    Интерактивный чат через HTMX, персистентные сессии, визуализация источников
-
-60. [**Settings & About Pages**](60_settings_about.md)  
-    Страницы конфигурации и информации о проекте, динамический sidebar
-
-61. [**Flask Integration Lessons: Анатомия проёба**](61_flask_integration_lessons.md)  
-    Честный разбор багов: кнопки в никуда, две БД, исчезающие изображения и chunk_type
-
----
-
-### 🏁 Total Visual Check (Фаза 13)
-
-62. [**Концептуальный обзор Phase 13: Total Visual Check**](62_phase_13_overview.md)  
-    Методология E2E аудита: зачем, как работает, 3 критических сценария (chunking, media, search)
-
-63. [**Детальные результаты аудита**](63_phase_13_results.md)  
-    Что работает отлично (chunking, media API, rate limiting), что требует внимания (hybrid scores, duplicates, FTS)
-
-64. [**Риски и ограничения**](64_phase_13_risks.md)  
-    Long video timeout, document-level search gap, FTS granularity mismatch, duplicate chunks waste
-
-65. [**FTS Refactoring: Chunk-Level Search**](65_fts_chunk_level_refactoring.md)  
-    Починка RRF: перевод FTS с документов на чанки, автомиграция и RRF boost
-
-66. [**Direct Media Ingestion**](66_direct_media_ingestion.md)  
-    Развилка на входе: медиа-файлы идут напрямую в Gemini API, минуя SmartSplitter
-
-67. [**Context Window: Гений или Дед с деменцией**](67_context_window.md)  
-    Расширение контекста соседними чанками: context_window, MatchType.CONTEXT и полный документ при большом window
-
-68. [**Embedding Cache Integration**](68_embedding_cache_integration.md)  
-    Замыкаем цепь: передача query_vector через слои, реальная экономия API-вызовов
-
-69. [**Result Type Abstraction**](69_result_type_abstraction.md)  
-    Чанки vs Документы: toggle в UI, два DTO, нормализация RRF score
-
-70. [**Search Score Normalization**](70_search_score_normalization.md)  
-    Математика релевантности: линейная формула, RRF адаптация и min_score фильтр
-
----
-
-### 🔥 Media Content Crisis (Фаза 14.0)
-
-71. [**Media Content Truncation Crisis**](71_media_content_truncation_crisis.md)  
-    Обнаружение катастрофы: 67-95% потеря данных в медиа-файлах, hardcoded лимиты 8k токенов
-
-72. [**Multi-Chunk Media Architecture**](72_multi_chunk_media_architecture.md)  
-    Решение кризиса: summary + transcript chunks, конфигурируемые лимиты, полное покрытие контента
-
-73. [**Multilingual Media Analysis**](73_multilingual_media_analysis.md)  
-    Настройка языка вывода через конфиг: template промпты, инъекция параметров, backward compatibility
-
-74. [**Media Smart Splitter Integration**](74_media_smart_splitter_integration.md)  
-    SmartSplitter для OCR-текста: изоляция кода в скринкастах, Markdown промпты, code_ratio мониторинг
+**[Phase 14: Media Content Crisis](phase_14_media_crisis/)** *(в разработке)*  
+Multi-chunk media architecture, multilingual analysis, SmartSplitter для OCR
 
 ---
 
@@ -312,8 +115,10 @@ poetry install
 cp .env.example .env
 # Добавь свой GEMINI_API_KEY
 
-# Запуск тестов
-poetry run python main.py
+# Основные команды CLI
+semantic ingest notes/           # Загрузить документы
+semantic search "SOLID principles"  # Поиск
+semantic chat                    # RAG-чат
 ```
 
 ---
@@ -346,11 +151,37 @@ graph LR
 
 ---
 
-## 🎯 Начни отсюда
+## 🎯 Рекомендуемый порядок изучения
 
-1. Сначала прочитай [**Что такое эмбеддинги**](01_embeddings_basics.md)
-2. Потом изучи [**Как работает Gemini API**](02_gemini_api.md)
-3. Дальше по порядку из оглавления ⬆️
+**Для новичков:**
+1. [Phase 0: Basics](phase_0_basics/) — базовые концепции *(если файлы будут созданы)*
+2. [Phase 1: SOLID](phase_1_solid/) — архитектурные принципы
+3. [Phase 2: Storage](phase_2_storage/) — как работает поиск
+4. [Phase 4: Smart Parsing](phase_4_smart_parsing/) — обработка контента
+
+**Для разработчиков:**
+1. [Phase 1-3](phase_1_solid/) — архитектурный фундамент
+2. [Phase 5](phase_5_batching/) — production оптимизации
+3. [Phase 7-8](phase_7_observability/) — operations и CLI
+4. [Phase 13](phase_13_audit/) — реальные проблемы и решения
+
+**Для пользователей медиа:**
+1. [Phase 6: Multimodal](phase_6_multimodal/) — обработка изображений, аудио, видео
+2. [Phase 14: Media Crisis](phase_14_media_crisis/) — multi-chunk архитектура
+3. [Phase 4: Smart Parsing](phase_4_smart_parsing/) — SmartSplitter для кода
+
+**Для RAG applications:**
+1. [Phase 9: RAG Integration](phase_9_rag/) — вопрос-ответ к базе знаний
+2. [Phase 12: Flask](phase_12_flask/) — веб-интерфейс для RAG
+3. [Phase 13: Embedding Cache](phase_13_audit/) — оптимизация запросов
+
+---
+
+## 📚 Другие ресурсы
+
+- **[Публичная документация](../../docs/README.md)** — гайды для пользователей библиотеки
+- **[Планы фаз](../ideas/)** — технические отчёты по каждой фазе разработки
+- **[Тесты](../../tests/README.md)** — 645+ unit/integration/e2e тестов
 
 ---
 
