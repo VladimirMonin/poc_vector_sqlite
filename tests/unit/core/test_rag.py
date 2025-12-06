@@ -308,6 +308,7 @@ class TestRAGEngine:
             query="What is the answer?",
             limit=5,
             mode="hybrid",
+            context_window=0,
         )
         mock_core.search.assert_not_called()
 
@@ -348,6 +349,7 @@ class TestRAGEngine:
             query="query",
             limit=5,
             mode="vector",
+            context_window=0,
         )
 
     def test_ask_fts_mode(self, rag_engine, mock_core):
@@ -358,6 +360,7 @@ class TestRAGEngine:
             query="query",
             limit=5,
             mode="fts",
+            context_window=0,
         )
 
     def test_ask_with_temperature(self, rag_engine, mock_llm):

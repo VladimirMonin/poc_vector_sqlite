@@ -343,3 +343,209 @@ class TestTranscriptionStepEdgeCases:
         assert chunk.content == "Video transcript"
         assert chunk.chunk_index == 10
         assert chunk.metadata["role"] == "transcript"
+
+
+class TestTranscriptionStepTimecodes:
+    """Тесты для интеграции TimecodeParser."""
+    
+    def test_timecodes_enabled_by_default(self):
+        """enable_timecodes=True по умолчанию."""
+        splitter = MagicMock()
+        step = TranscriptionStep(splitter=splitter)
+        
+        assert step.enable_timecodes is True
+    
+    def test_timecodes_can_be_disabled(self):
+        """enable_timecodes можно отключить."""
+        splitter = MagicMock()
+        step = TranscriptionStep(splitter=splitter, enable_timecodes=False)
+        
+        assert step.enable_timecodes is False
+    
+    def test_parses_timecode_from_content(self):
+        """Парсит таймкод [MM:SS] из контента чанка."""
+        mock_chunk = Chunk(
+            content="[05:30] Chapter 1 begins here",
+            chunk_index=0,
+            chunk_type=ChunkType.TEXT,
+            metadata={},
+        )
+        
+        mock_splitter = MagicMock()
+        mock_splitter.split.return_value = [mock_chunk]
+        
+        step = TranscriptionStep(splitter=mock_splitter, enable_timecodes=True)
+        
+        context = MediaContext(
+            media_path=Path("podcast.mp3"),
+            document=Document(
+                content="Test",
+                metadata={},
+                media_type=MediaType.AUDIO,
+            ),
+            analysis={
+                "transcription": "[05:30] Chapter 1",
+                "duration_seconds": 3600,
+            },
+            chunks=[],
+            base_index=1,
+        )
+        
+        new_context = step.process(context)
+        
+        chunk = new_context.chunks[0]
+        assert chunk.metadata["start_seconds"] == 330  # 5*60 + 30
+        assert chunk.metadata["timecode_original"] == "[05:30]"
+    
+    def test_inherits_timecode_when_missing(self):
+        """Наследует таймкод от предыдущего чанка."""
+        # 2 чанка: первый с таймкодом, второй без
+        chunk1 = Chunk(
+            content="[01:00] First chunk",
+            chunk_index=0,
+            chunk_type=ChunkType.TEXT,
+            metadata={},
+        )
+        chunk2 = Chunk(
+            content="Second chunk without timecode",
+            chunk_index=1,
+            chunk_type=ChunkType.TEXT,
+            metadata={},
+        )
+        
+        mock_splitter = MagicMock()
+        mock_splitter.split.return_value = [chunk1, chunk2]
+        
+        step = TranscriptionStep(splitter=mock_splitter, enable_timecodes=True)
+        
+        context = MediaContext(
+            media_path=Path("podcast.mp3"),
+            document=Document(
+                content="Test",
+                metadata={},
+                media_type=MediaType.AUDIO,
+            ),
+            analysis={
+                "transcription": "[01:00] First\nSecond",
+                "duration_seconds": 600,  # 10 минут
+            },
+            chunks=[],
+            base_index=1,
+        )
+        
+        new_context = step.process(context)
+        
+        # Первый чанк: явный таймкод
+        assert new_context.chunks[0].metadata["start_seconds"] == 60  # [01:00]
+        assert "timecode_original" in new_context.chunks[0].metadata
+        
+        # Второй чанк: наследует (60 + delta)
+        # delta = 600 / 2 = 300
+        assert new_context.chunks[1].metadata["start_seconds"] == 360  # 60 + 300
+        assert "timecode_original" not in new_context.chunks[1].metadata
+    
+    def test_first_chunk_without_timecode_is_zero(self):
+        """Первый чанк без таймкода начинается с 0."""
+        mock_chunk = Chunk(
+            content="No timecode at start",
+            chunk_index=0,
+            chunk_type=ChunkType.TEXT,
+            metadata={},
+        )
+        
+        mock_splitter = MagicMock()
+        mock_splitter.split.return_value = [mock_chunk]
+        
+        step = TranscriptionStep(splitter=mock_splitter, enable_timecodes=True)
+        
+        context = MediaContext(
+            media_path=Path("podcast.mp3"),
+            document=Document(
+                content="Test",
+                metadata={},
+                media_type=MediaType.AUDIO,
+            ),
+            analysis={
+                "transcription": "No timecode",
+                "duration_seconds": 1000,
+            },
+            chunks=[],
+            base_index=0,
+        )
+        
+        new_context = step.process(context)
+        
+        assert new_context.chunks[0].metadata["start_seconds"] == 0
+    
+    def test_timecodes_disabled_no_parsing(self):
+        """При enable_timecodes=False таймкоды не парсятся."""
+        mock_chunk = Chunk(
+            content="[05:30] Chapter 1",
+            chunk_index=0,
+            chunk_type=ChunkType.TEXT,
+            metadata={},
+        )
+        
+        mock_splitter = MagicMock()
+        mock_splitter.split.return_value = [mock_chunk]
+        
+        step = TranscriptionStep(splitter=mock_splitter, enable_timecodes=False)
+        
+        context = MediaContext(
+            media_path=Path("podcast.mp3"),
+            document=Document(
+                content="Test",
+                metadata={},
+                media_type=MediaType.AUDIO,
+            ),
+            analysis={
+                "transcription": "[05:30] Chapter 1",
+                "duration_seconds": 3600,
+            },
+            chunks=[],
+            base_index=0,
+        )
+        
+        new_context = step.process(context)
+        
+        chunk = new_context.chunks[0]
+        # Таймкоды не добавлены
+        assert "start_seconds" not in chunk.metadata
+        assert "timecode_original" not in chunk.metadata
+    
+    def test_timecode_validation_with_max_duration(self):
+        """Таймкод больше duration_seconds игнорируется."""
+        # Таймкод [20:00] при duration_seconds=600 (10 минут) недопустим
+        mock_chunk = Chunk(
+            content="[20:00] Invalid timecode",
+            chunk_index=0,
+            chunk_type=ChunkType.TEXT,
+            metadata={},
+        )
+        
+        mock_splitter = MagicMock()
+        mock_splitter.split.return_value = [mock_chunk]
+        
+        step = TranscriptionStep(splitter=mock_splitter, enable_timecodes=True)
+        
+        context = MediaContext(
+            media_path=Path("podcast.mp3"),
+            document=Document(
+                content="Test",
+                metadata={},
+                media_type=MediaType.AUDIO,
+            ),
+            analysis={
+                "transcription": "[20:00] Invalid",
+                "duration_seconds": 600,  # 10 минут
+            },
+            chunks=[],
+            base_index=0,
+        )
+        
+        new_context = step.process(context)
+        
+        chunk = new_context.chunks[0]
+        # Таймкод отклонён, наследован от position=0
+        assert chunk.metadata["start_seconds"] == 0
+        assert "timecode_original" not in chunk.metadata
