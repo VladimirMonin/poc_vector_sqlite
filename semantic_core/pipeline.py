@@ -381,7 +381,8 @@ class SemanticCore:
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
-        k: int = 60,
+        k: int = 1,
+        query_vector: Optional[list[float]] = None,
     ) -> list[SearchResult]:
         """Выполняет поиск документов.
 
@@ -390,7 +391,9 @@ class SemanticCore:
             filters: Фильтры по метаданным.
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
-            k: Константа для RRF алгоритма (по умолчанию 60).
+            k: Константа для RRF алгоритма (по умолчанию 1 для резкого ранжирования).
+            query_vector: Предварительно вычисленный вектор запроса (для кеширования).
+                Если передан, пропускает вызов embedder.embed_query().
 
         Returns:
             Список SearchResult с документами и скорами.
@@ -401,9 +404,8 @@ class SemanticCore:
         if not query or not query.strip():
             raise ValueError("Запрос не может быть пустым")
 
-        # Генерируем вектор для поиска (для vector/hybrid режимов)
-        query_vector = None
-        if mode in ("vector", "hybrid"):
+        # Используем переданный вектор или генерируем новый
+        if mode in ("vector", "hybrid") and query_vector is None:
             query_vector = self.embedder.embed_query(query)
 
         # Выполняем поиск
@@ -424,9 +426,10 @@ class SemanticCore:
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
-        k: int = 60,
+        k: int = 1,
         chunk_type_filter: Optional[str] = None,
         context_window: int = 0,
+        query_vector: Optional[list[float]] = None,
     ) -> list[ChunkResult]:
         """Выполняет гранулярный поиск по отдельным чанкам.
 
@@ -438,12 +441,14 @@ class SemanticCore:
             filters: Фильтры по метаданным документа.
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
-            k: Константа для RRF алгоритма (по умолчанию 60).
+            k: Константа для RRF алгоритма (по умолчанию 1 для резкого ранжирования).
             chunk_type_filter: Фильтр по типу чанка ('text', 'code', 'table', 'image_ref').
             context_window: Количество соседних чанков в каждую сторону.
                 0 = только найденные чанки (по умолчанию).
                 1 = найденный + по 1 соседу с каждой стороны.
                 N = если N >= количества чанков в документе, возвращается весь документ.
+            query_vector: Предварительно вычисленный вектор запроса (для кеширования).
+                Если передан, пропускает вызов embedder.embed_query().
 
         Returns:
             Список ChunkResult с чанками и их скорами.
@@ -454,9 +459,8 @@ class SemanticCore:
         if not query or not query.strip():
             raise ValueError("Запрос не может быть пустым")
 
-        # Генерируем вектор для поиска (для vector/hybrid режимов)
-        query_vector = None
-        if mode in ("vector", "hybrid"):
+        # Используем переданный вектор или генерируем новый
+        if mode in ("vector", "hybrid") and query_vector is None:
             query_vector = self.embedder.embed_query(query)
 
         # Выполняем гранулярный поиск
@@ -578,7 +582,7 @@ class SemanticCore:
         """Индексирует изображение.
 
         Создаёт задачу на анализ изображения. В sync режиме
-        обрабатывает сразу, в async — помещает в очередь.
+        обрабатывает сразу и создаёт searchable Document.
 
         Args:
             path: Путь к файлу изображения.
@@ -587,19 +591,22 @@ class SemanticCore:
             mode: Режим обработки ('sync' или 'async').
 
         Returns:
-            sync: chunk_id (ID созданного чанка).
+            sync: document_id (ID созданного документа).
             async: task_id (ID задачи в очереди).
 
         Raises:
             ValueError: Если файл не является поддерживаемым изображением.
             RuntimeError: Если image_analyzer не настроен.
         """
+        import json
+        from pathlib import Path
         from semantic_core.infrastructure.media.utils import (
             is_image_valid,
             get_media_type,
             get_file_mime_type,
         )
         from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+        from semantic_core.domain import Document, MediaType
 
         # Проверяем, что image_analyzer настроен
         if self.image_analyzer is None:
@@ -630,8 +637,383 @@ class SemanticCore:
                     f"Failed to process image: {task.error_message or 'Unknown error'}"
                 )
 
-            # Возвращаем task_id (chunk_id будет добавлен в Phase 6.1)
+            # Получаем результат анализа
+            task = MediaTaskModel.get_by_id(task_id)
+
+            # Формируем content из результатов анализа
+            content_parts = []
+            if task.result_description:
+                content_parts.append(task.result_description)
+            if task.result_alt_text:
+                content_parts.append(f"Alt: {task.result_alt_text}")
+            if task.result_ocr_text:
+                content_parts.append(f"OCR: {task.result_ocr_text}")
+
+            content = "\n\n".join(content_parts) if content_parts else f"Image: {Path(path).name}"
+
+            # Формируем title из alt_text или имени файла
+            title = (
+                task.result_alt_text
+                or Path(path).stem.replace("_", " ").replace("-", " ").title()
+            )
+
+            # Формируем метаданные
+            metadata = {
+                "title": title,
+                "source": path,
+                "filename": Path(path).name,
+                "media_type": "image",
+                "mime_type": task.mime_type,
+                "task_id": task_id,
+            }
+            keywords = []
+            if task.result_keywords:
+                try:
+                    keywords = json.loads(task.result_keywords)
+                    metadata["keywords"] = keywords
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            # Создаём Document
+            doc = Document(
+                content=content,
+                metadata=metadata,
+                media_type=MediaType.IMAGE,
+            )
+
+            # Создаём единственный чанк типа IMAGE_REF
+            from semantic_core.domain import Chunk, ChunkType
+
+            chunk = Chunk(
+                content=content,
+                chunk_index=0,
+                chunk_type=ChunkType.IMAGE_REF,
+                metadata={
+                    "source": path,
+                    "filename": Path(path).name,
+                    "alt_text": task.result_alt_text or "",
+                    "keywords": keywords,
+                },
+            )
+
+            # Формируем текст для векторизации с контекстом
+            vector_text = self.context_strategy.form_vector_text(chunk, doc)
+
+            # Генерируем эмбеддинг
+            embeddings = self.embedder.embed_documents([vector_text])
+            chunk.embedding = embeddings[0]
+
+            # Сохраняем напрямую (минуя splitter)
+            saved_doc = self.store.save(doc, [chunk])
+
+            # Обновляем chunk_id в задаче
+            from semantic_core.infrastructure.storage.peewee.models import ChunkModel
+            db_chunk = ChunkModel.select().where(
+                ChunkModel.document_id == saved_doc.id
+            ).first()
+            if db_chunk:
+                task.result_chunk_id = db_chunk.id
+                task.save()
+
+            logger.info(
+                "Image indexed as document",
+                document_id=saved_doc.id,
+                path=path,
+            )
+            return str(saved_doc.id)
+
+        else:  # async
             return task_id
+
+    def ingest_audio(
+        self,
+        path: str,
+        user_prompt: Optional[str] = None,
+        context_text: Optional[str] = None,
+        mode: IngestionMode = "sync",
+    ) -> str:
+        """Индексирует аудиофайл.
+
+        Транскрибирует аудио и создаёт searchable Document с AUDIO_REF чанком.
+
+        Args:
+            path: Путь к аудиофайлу.
+            user_prompt: Пользовательский промпт для анализа.
+            context_text: Контекст из метаданных.
+            mode: Режим обработки ('sync' или 'async').
+
+        Returns:
+            sync: document_id (ID созданного документа).
+            async: task_id (ID задачи в очереди).
+
+        Raises:
+            ValueError: Если файл не является аудио.
+            RuntimeError: Если audio_analyzer не настроен.
+        """
+        import json
+        from pathlib import Path
+        from semantic_core.infrastructure.media.utils import (
+            is_audio_supported,
+            get_file_mime_type,
+        )
+        from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+        from semantic_core.domain import Document, MediaType, Chunk, ChunkType
+
+        if self.audio_analyzer is None:
+            raise RuntimeError(
+                "audio_analyzer not configured. "
+                "Pass GeminiAudioAnalyzer to SemanticCore constructor."
+            )
+
+        mime_type = get_file_mime_type(path)
+        if not is_audio_supported(mime_type):
+            raise ValueError(f"Unsupported audio format: {path} (mime: {mime_type})")
+
+        task_id = self._create_media_task(
+            path=path,
+            user_prompt=user_prompt,
+            context_text=context_text,
+        )
+
+        if mode == "sync":
+            # Анализируем аудио напрямую (не через queue)
+            from semantic_core.domain import MediaRequest, MediaResource
+
+            resource = MediaResource(
+                path=Path(path),
+                media_type="audio",
+                mime_type=get_file_mime_type(path),
+            )
+            request = MediaRequest(
+                resource=resource,
+                user_prompt=user_prompt,
+                context_text=context_text,
+            )
+            result = self.audio_analyzer.analyze(request)
+
+            # Обновляем задачу
+            task = MediaTaskModel.get_by_id(task_id)
+            task.status = "completed"
+            task.result_transcription = result.transcription
+            if result.participants:
+                task.result_participants = json.dumps(result.participants)
+            if result.action_items:
+                task.result_action_items = json.dumps(result.action_items)
+            task.result_duration_seconds = result.duration_seconds
+            task.save()
+
+            # Формируем content
+            content_parts = []
+            if result.transcription:
+                content_parts.append(result.transcription)
+            if result.description:
+                content_parts.append(f"Description: {result.description}")
+
+            content = "\n\n".join(content_parts) if content_parts else f"Audio: {Path(path).name}"
+
+            # Формируем title из описания или имени файла
+            title = Path(path).stem.replace("_", " ").replace("-", " ").title()
+
+            # Метаданные
+            metadata = {
+                "title": title,
+                "source": path,
+                "filename": Path(path).name,
+                "media_type": "audio",
+                "mime_type": get_file_mime_type(path),
+                "task_id": task_id,
+                "duration_seconds": result.duration_seconds,
+            }
+            if result.participants:
+                metadata["participants"] = result.participants
+
+            # Создаём Document и Chunk
+            doc = Document(
+                content=content,
+                metadata=metadata,
+                media_type=MediaType.AUDIO,
+            )
+
+            chunk = Chunk(
+                content=content,
+                chunk_index=0,
+                chunk_type=ChunkType.AUDIO_REF,
+                metadata={
+                    "source": path,
+                    "filename": Path(path).name,
+                    "duration_seconds": result.duration_seconds,
+                },
+            )
+
+            # Эмбеддинг и сохранение
+            vector_text = self.context_strategy.form_vector_text(chunk, doc)
+            embeddings = self.embedder.embed_documents([vector_text])
+            chunk.embedding = embeddings[0]
+
+            saved_doc = self.store.save(doc, [chunk])
+
+            # Обновляем chunk_id
+            from semantic_core.infrastructure.storage.peewee.models import ChunkModel
+            db_chunk = ChunkModel.select().where(
+                ChunkModel.document_id == saved_doc.id
+            ).first()
+            if db_chunk:
+                task.result_chunk_id = db_chunk.id
+                task.save()
+
+            logger.info(
+                "Audio indexed as document",
+                document_id=saved_doc.id,
+                path=path,
+                duration=result.duration_seconds,
+            )
+            return str(saved_doc.id)
+
+        else:  # async
+            return task_id
+
+    def ingest_video(
+        self,
+        path: str,
+        user_prompt: Optional[str] = None,
+        context_text: Optional[str] = None,
+        mode: IngestionMode = "sync",
+    ) -> str:
+        """Индексирует видеофайл.
+
+        Анализирует видео (кадры + аудио) и создаёт searchable Document с VIDEO_REF чанком.
+
+        Args:
+            path: Путь к видеофайлу.
+            user_prompt: Пользовательский промпт для анализа.
+            context_text: Контекст из метаданных.
+            mode: Режим обработки ('sync' или 'async').
+
+        Returns:
+            sync: document_id (ID созданного документа).
+            async: task_id (ID задачи в очереди).
+
+        Raises:
+            ValueError: Если файл не является видео.
+            RuntimeError: Если video_analyzer не настроен.
+        """
+        import json
+        from pathlib import Path
+        from semantic_core.infrastructure.media.utils import (
+            is_video_supported,
+            get_file_mime_type,
+        )
+        from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+        from semantic_core.domain import Document, MediaType, Chunk, ChunkType
+
+        if self.video_analyzer is None:
+            raise RuntimeError(
+                "video_analyzer not configured. "
+                "Pass GeminiVideoAnalyzer to SemanticCore constructor."
+            )
+
+        mime_type = get_file_mime_type(path)
+        if not is_video_supported(mime_type):
+            raise ValueError(f"Unsupported video format: {path} (mime: {mime_type})")
+
+        task_id = self._create_media_task(
+            path=path,
+            user_prompt=user_prompt,
+            context_text=context_text,
+        )
+
+        if mode == "sync":
+            from semantic_core.domain import MediaRequest, MediaResource
+
+            resource = MediaResource(
+                path=Path(path),
+                media_type="video",
+                mime_type=get_file_mime_type(path),
+            )
+            request = MediaRequest(
+                resource=resource,
+                user_prompt=user_prompt,
+                context_text=context_text,
+            )
+            result = self.video_analyzer.analyze(request)
+
+            # Обновляем задачу
+            task = MediaTaskModel.get_by_id(task_id)
+            task.status = "completed"
+            task.result_description = result.description
+            task.result_transcription = result.transcription
+            if result.keywords:
+                task.result_keywords = json.dumps(result.keywords)
+            task.result_duration_seconds = result.duration_seconds
+            task.save()
+
+            # Формируем content
+            content_parts = []
+            if result.description:
+                content_parts.append(result.description)
+            if result.transcription:
+                content_parts.append(f"Transcription: {result.transcription}")
+
+            content = "\n\n".join(content_parts) if content_parts else f"Video: {Path(path).name}"
+
+            # Формируем title из описания или имени файла
+            title = Path(path).stem.replace("_", " ").replace("-", " ").title()
+
+            # Метаданные
+            metadata = {
+                "title": title,
+                "source": path,
+                "filename": Path(path).name,
+                "media_type": "video",
+                "mime_type": get_file_mime_type(path),
+                "task_id": task_id,
+                "duration_seconds": result.duration_seconds,
+            }
+            if result.keywords:
+                metadata["keywords"] = result.keywords
+
+            # Создаём Document и Chunk
+            doc = Document(
+                content=content,
+                metadata=metadata,
+                media_type=MediaType.VIDEO,
+            )
+
+            chunk = Chunk(
+                content=content,
+                chunk_index=0,
+                chunk_type=ChunkType.VIDEO_REF,
+                metadata={
+                    "source": path,
+                    "filename": Path(path).name,
+                    "duration_seconds": result.duration_seconds,
+                    "keywords": result.keywords or [],
+                },
+            )
+
+            # Эмбеддинг и сохранение
+            vector_text = self.context_strategy.form_vector_text(chunk, doc)
+            embeddings = self.embedder.embed_documents([vector_text])
+            chunk.embedding = embeddings[0]
+
+            saved_doc = self.store.save(doc, [chunk])
+
+            # Обновляем chunk_id
+            from semantic_core.infrastructure.storage.peewee.models import ChunkModel
+            db_chunk = ChunkModel.select().where(
+                ChunkModel.document_id == saved_doc.id
+            ).first()
+            if db_chunk:
+                task.result_chunk_id = db_chunk.id
+                task.save()
+
+            logger.info(
+                "Video indexed as document",
+                document_id=saved_doc.id,
+                path=path,
+                duration=result.duration_seconds,
+            )
+            return str(saved_doc.id)
 
         else:  # async
             return task_id

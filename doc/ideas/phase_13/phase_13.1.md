@@ -21,6 +21,7 @@
 **Файл:** `semantic_core/infrastructure/storage/peewee/adapter.py`
 
 **Vector Search (строка 314-390):**
+
 ```python
 def _vector_search(...):
     sql = """
@@ -32,9 +33,11 @@ def _vector_search(...):
     """
     # Возвращает: SearchResult(chunk_id=42, document=..., score=0.75)
 ```
+
 ### 1. Обновление Схемы БД (`infrastructure/storage/peewee/models.py`)
 
 **Текущее состояние:**
+
 - Файл содержит `DocumentModel`, `ChunkModel`, `BatchJobModel`, `MediaTaskModel`
 - Нет FTS моделей (они создаются через raw SQL в `adapter.py`)
 
@@ -61,8 +64,10 @@ cursor.execute("""
 ```
 
 **Изменение:**
+
 1. **Удалить** создание `documents_fts` и все триггеры (строки 137-176).
 2. **Добавить** создание `chunks_fts`:
+
 ```python
 cursor.execute("""
     CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts
@@ -74,7 +79,9 @@ cursor.execute("""
     )
 """)
 ```
+
 3. **Добавить триггеры** для автосинхронизации `chunks` ↔ `chunks_fts`:
+
 ```python
 # INSERT trigger
 CREATE TRIGGER IF NOT EXISTS chunks_fts_insert
@@ -106,6 +113,7 @@ END;
         table_name = "chunks_fts"
         # FTS5 создаётся через SQL в adapter.py
         # Здесь только декларация для ORM
+
 ```
 
 **Примечание:** Peewee не поддерживает FTS5 напрямую через ORM. Фактическое создание таблицы будет через `CREATE VIRTUAL TABLE` в `adapter.py:ensure_schema_compatibility()`.
@@ -114,6 +122,7 @@ END;
 ```
 
 **Hybrid Search (строка 465-580):**
+
 ```python
 def _hybrid_search(...):
     sql = """
@@ -177,6 +186,7 @@ def _hybrid_search(self, query_vector, query_text, filters, limit, k=60):
 ```
 
 **Изменение:**
+
 ```python
 def _hybrid_search(self, query_vector, query_text, filters, limit, k=60):
     sanitized_query = _sanitize_fts_query(query_text)
@@ -247,23 +257,25 @@ def _hybrid_search(self, query_vector, query_text, filters, limit, k=60):
 ```
 
 **Ключевые изменения:**
+
 1. Vector CTE: `cv.id as chunk_id` (было: `c.document_id as doc_id`)
 2. FTS CTE: `FROM chunks_fts` (было: `FROM documents_fts`)
 3. RRF JOIN: `ON v.chunk_id = f.chunk_id` (было: `ON v.doc_id = f.doc_id`)
 4. **Теперь RRF видит пересечения!** Если оба метода нашли `chunk_42`, score будет `1/(60+rank_vec) + 1/(60+rank_fts)`
     """
-    
+
     for row in cursor.fetchall():
         doc_id, rank = row
         doc_model = DocumentModel.get_by_id(doc_id)
         document = self._model_to_document(doc_model)
-        
+
         results.append(SearchResult(
             document=document,
             score=abs(rank),
             match_type=MatchType.FTS,
         ))
     return results
+
 ```
 
 **Изменение:**
@@ -317,20 +329,27 @@ def _fts_search(self, query_text: str, filters: Optional[dict], limit: int):
 ```
 
 **Ключевые изменения:**
+
 1. `FROM chunks_fts` вместо `documents_fts`
 2. `JOIN chunks c ON c.id = fts.rowid` (связь через rowid)
 3. Возвращаем `ChunkResult` вместо `SearchResult`
-    # ⚠️ ПРОБЛЕМА: Схлопывает 10 релевантных чанков в 1 doc_id
-    # ⚠️ FTS видит весь документ (1000 слов), а вектор — абзац (50 слов)
-    # ⚠️ RRF не видит пересечений на уровне чанков!
+
+   # ⚠️ ПРОБЛЕМА: Схлопывает 10 релевантных чанков в 1 doc_id
+
+   # ⚠️ FTS видит весь документ (1000 слов), а вектор — абзац (50 слов)
+
+   # ⚠️ RRF не видит пересечений на уровне чанков
+
 ```
 
 **Результат тестирования (Phase 13):**
 ```
+
 Query: "гибридный поиск RRF"
 Vector Score: 0.75 (нашёл chunk_42)
 FTS Score: 0.20 (нашёл весь document_5, содержащий 50 чанков)
 Hybrid Score: 0.016 ← ПРОВАЛ!
+
 ```
 
 **Причина:** Vector возвращает `chunk_id=42`, FTS возвращает `doc_id=5`. RRF не может сопоставить — это разные сущности.
@@ -345,10 +364,12 @@ Hybrid Score: 0.016 ← ПРОВАЛ!
 
 **Ожидаемый результат после фикса:**
 ```
+
 Query: "гибридный поиск RRF"
 Vector Score: 0.75 (chunk_42)
 FTS Score: 0.85 (chunk_42) ← ТОТ ЖЕ ЧАНК!
 Hybrid Score: 0.85+ ← БУСТ от RRF!
+
 ```
 
 ---
@@ -476,6 +497,7 @@ semantic search "Reciprocal Rank Fusion" --mode hybrid --limit 5
 ```
 
 **Python API:**
+
 ```python
 from semantic_core import SemanticCore
 
@@ -494,9 +516,13 @@ vector_score = vector_results[0].score
 assert hybrid_score > vector_score, "Hybrid должен бустить найденные оба методами чанки"
 print(f"✅ Буст работает: {hybrid_score:.2f} > {vector_score:.2f}")
 ```
+
 # Vector: chunk_42 (score=0.75)
-# FTS: chunk_42 (score=0.85) ← ТОТ ЖЕ ЧАНК!
+
+# FTS: chunk_42 (score=0.85) ← ТОТ ЖЕ ЧАНК
+
 # Hybrid: chunk_42 (score=0.92+) ← БУСТ от RRF: 1/(60+1) + 1/(60+1)
+
 ```
 
 **Критерий успеха:** `hybrid_score > vector_score`
@@ -526,11 +552,13 @@ assert results[0].score > results[1].score  # Буст от RRF
 **Метрика:** Время выполнения гибридного поиска.
 
 **До фикса:**
+
 ```
 Hybrid search (100 chunks): ~45ms
 ```
 
 **После фикса:**
+
 ```
 Hybrid search (100 chunks): ~40ms
 # Может быть БЫСТРЕЕ, т.к. FTS теперь ищет по меньшим текстам (чанки, а не документы)
@@ -543,6 +571,7 @@ Hybrid search (100 chunks): ~40ms
 ### Тест 4: Корректность структуры результатов
 
 **Проверка типов:**
+
 ```python
 results = core.search("test", mode="fts", limit=5)
 
@@ -588,6 +617,7 @@ def test_hybrid_search_chunk_level_boost(semantic_core):
     # Проверка: Hybrid нашёл тот же чанк
     assert hybrid_results[0].chunk.id == vector_results[0].chunk.id
 ```
+
     """Проверяет наличие chunks_fts таблицы."""
     cursor = db.execute_sql("SELECT name FROM sqlite_master WHERE type='table' AND name='chunks_fts'")
     if not cursor.fetchone():
@@ -606,6 +636,7 @@ def test_hybrid_search_chunk_level_boost(semantic_core):
     
     console.print(f"[green]✅ FTS индекс синхронизирован ({fts_count} чанков)[/green]")
     return True
+
 ```
 
 ### Вариант В: Автоматическая миграция в `ensure_schema_compatibility()`
@@ -647,7 +678,7 @@ if chunks_count > 0 and fts_count == 0:
 1. Запрос: `"[FTS] RRF гибридный поиск"` (или специфичный термин).
 2. **Vector Score:** ~0.75 (как было).
 3. **Hybrid Score:** Должен стать **ВЫШЕ**, чем Vector Score (например, 0.8+), или хотя бы не 0.016.
-    * *Почему:* Потому что FTS теперь тоже найдет этот чанк, и `1/k + 1/k` даст буст.
+    - *Почему:* Потому что FTS теперь тоже найдет этот чанк, и `1/k + 1/k` даст буст.
 
 ---
 

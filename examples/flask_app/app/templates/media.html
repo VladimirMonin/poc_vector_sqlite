@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Медиа-галерея — Semantic Knowledge Base{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">
+        <i class="bi bi-images me-2"></i>
+        Медиа-галерея
+        <span class="badge bg-secondary ms-2">{{ total_count }}</span>
+    </h4>
+    
+    <!-- Фильтр по типу -->
+    <div class="btn-group" role="group" aria-label="Фильтр по типу медиа">
+        <a href="{{ url_for('ingest.media_gallery', type='all') }}" 
+           class="btn btn-outline-secondary {% if filter_type == 'all' %}active{% endif %}">
+            <i class="bi bi-grid-3x3-gap me-1"></i> Все
+        </a>
+        <a href="{{ url_for('ingest.media_gallery', type='image') }}" 
+           class="btn btn-outline-info {% if filter_type == 'image' %}active{% endif %}">
+            <i class="bi bi-image me-1"></i> Изображения
+        </a>
+        <a href="{{ url_for('ingest.media_gallery', type='audio') }}" 
+           class="btn btn-outline-success {% if filter_type == 'audio' %}active{% endif %}">
+            <i class="bi bi-music-note me-1"></i> Аудио
+        </a>
+        <a href="{{ url_for('ingest.media_gallery', type='video') }}" 
+           class="btn btn-outline-danger {% if filter_type == 'video' %}active{% endif %}">
+            <i class="bi bi-camera-video me-1"></i> Видео
+        </a>
+    </div>
+</div>
+
+{% if media_items %}
+<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-3">
+    {% for item in media_items %}
+    <div class="col">
+        <a href="{{ url_for('ingest.document_detail', doc_id=item.id) }}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm media-card">
+                <!-- Превью -->
+                {% if item.media_type == 'image' %}
+                    <!-- Изображение: пытаемся показать превью -->
+                    {% if item.source %}
+                    <div class="card-img-top media-preview" 
+                         style="background-image: url('{{ url_for('ingest.serve_media', doc_id=item.id) }}');">
+                    </div>
+                    {% else %}
+                    <div class="card-img-top media-preview media-placeholder bg-info text-white">
+                        <i class="bi bi-image display-4"></i>
+                    </div>
+                    {% endif %}
+                {% elif item.media_type == 'audio' %}
+                    <div class="card-img-top media-preview media-placeholder bg-success text-white">
+                        <i class="bi bi-music-note-beamed display-4"></i>
+                    </div>
+                {% elif item.media_type == 'video' %}
+                    <div class="card-img-top media-preview media-placeholder bg-danger text-white">
+                        <i class="bi bi-play-circle display-4"></i>
+                    </div>
+                {% else %}
+                    <div class="card-img-top media-preview media-placeholder bg-secondary text-white">
+                        <i class="bi bi-file-earmark display-4"></i>
+                    </div>
+                {% endif %}
+                
+                <div class="card-body py-2 px-3">
+                    <h6 class="card-title text-truncate mb-1" title="{{ item.title }}">
+                        {{ item.title }}
+                    </h6>
+                    {% if item.description %}
+                    <p class="card-text small text-muted text-truncate mb-1">
+                        {{ item.description }}
+                    </p>
+                    {% endif %}
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            {{ item.created_at.strftime('%d.%m.%Y') if item.created_at else 'N/A' }}
+                        </small>
+                        <span class="badge {% if item.media_type == 'image' %}bg-info{% elif item.media_type == 'audio' %}bg-success{% elif item.media_type == 'video' %}bg-danger{% else %}bg-secondary{% endif %}">
+                            {% if item.media_type == 'image' %}
+                                <i class="bi bi-image"></i>
+                            {% elif item.media_type == 'audio' %}
+                                <i class="bi bi-music-note"></i>
+                            {% elif item.media_type == 'video' %}
+                                <i class="bi bi-camera-video"></i>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-images display-1 text-muted mb-3"></i>
+        <h5 class="text-muted">Нет медиа-файлов</h5>
+        <p class="text-muted">
+            {% if filter_type != 'all' %}
+            Нет файлов типа "{{ filter_type }}". 
+            <a href="{{ url_for('ingest.media_gallery', type='all') }}">Показать все</a>
+            {% else %}
+            Загрузите изображения, аудио или видео через страницу 
+            <a href="{{ url_for('ingest.upload_page') }}">Загрузка</a>
+            {% endif %}
+        </p>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.media-card {
+    transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    cursor: pointer;
+}
+
+.media-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.media-preview {
+    height: 140px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: 0.375rem 0.375rem 0 0;
+}
+
+.media-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}

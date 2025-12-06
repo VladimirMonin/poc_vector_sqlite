@@ -20,3 +20,5 @@ tests/asests/*.ogg
 tests/asests/*.mov
 tests/asests/*.avi
 tests/asests/*.webm
+semantic.db-wal
+semantic.db-shm

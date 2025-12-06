@@ -40,19 +40,31 @@ class TestSemanticCoreImageIngestion:
         return core
 
     def test_ingest_image_sync_success(self, core_with_image_analyzer, red_square_path):
-        """Sync mode: успешная индексация изображения."""
+        """Sync mode: успешная индексация изображения создаёт searchable документ."""
+        from semantic_core.infrastructure.storage.peewee.models import (
+            DocumentModel,
+            ChunkModel,
+        )
+
         with patch("time.sleep"):
-            task_id = core_with_image_analyzer.ingest_image(
+            document_id = core_with_image_analyzer.ingest_image(
                 path=str(red_square_path),
                 mode="sync",
             )
 
-        assert task_id is not None
-        assert isinstance(task_id, str)
+        assert document_id is not None
+        assert isinstance(document_id, str)
 
-        # Задача в БД со статусом completed
-        task = MediaTaskModel.get_by_id(task_id)
-        assert task.status == "completed"
+        # Документ создан в БД с media_type=image
+        doc = DocumentModel.get_by_id(int(document_id))
+        assert doc is not None
+        assert doc.media_type == "image"
+
+        # Чанк создан с типом image_ref и вектором
+        chunks = list(ChunkModel.select().where(ChunkModel.document_id == int(document_id)))
+        assert len(chunks) == 1
+        assert chunks[0].chunk_type == "image_ref"
+        assert chunks[0].embedding_status == "READY"
 
     def test_ingest_image_async_returns_task_id(
         self, core_with_image_analyzer, red_square_path

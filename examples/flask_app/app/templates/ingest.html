@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Загрузка — Semantic Knowledge Base{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-cloud-upload me-2"></i>
+                    Загрузка документов
+                </h5>
+                <a href="{{ url_for('ingest.documents_page') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-list-ul me-1"></i> Все документы
+                </a>
+            </div>
+            <div class="card-body">
+                {% if not core_available %}
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>SemanticCore недоступен.</strong>
+                    Загрузка невозможна без API ключа.
+                </div>
+                {% else %}
+                
+                <form 
+                    action="{{ url_for('ingest.upload_files') }}" 
+                    method="POST" 
+                    enctype="multipart/form-data"
+                    id="upload-form"
+                >
+                    <!-- Drag-n-Drop зона -->
+                    <div 
+                        id="drop-zone" 
+                        class="border border-2 border-dashed rounded-3 p-5 text-center mb-4"
+                        style="border-color: var(--bs-border-color); cursor: pointer;"
+                    >
+                        <i class="bi bi-cloud-arrow-up display-1 text-muted mb-3"></i>
+                        <h5 class="text-muted">Перетащите файлы сюда</h5>
+                        <p class="text-muted small mb-3">или нажмите для выбора</p>
+                        
+                        <input 
+                            type="file" 
+                            name="files" 
+                            id="file-input"
+                            class="d-none" 
+                            multiple
+                            accept=".md,.markdown,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp3,.wav,.mp4,.webm"
+                        >
+                        
+                        <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('file-input').click()">
+                            <i class="bi bi-folder2-open me-1"></i> Выбрать файлы
+                        </button>
+                    </div>
+                    
+                    <!-- Список выбранных файлов -->
+                    <div id="file-list" class="mb-4" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-muted mb-0">
+                                <i class="bi bi-files me-1"></i>
+                                Выбранные файлы: <span id="file-count" class="badge bg-primary">0</span>
+                            </h6>
+                            <button type="button" class="btn btn-outline-danger btn-sm" id="clear-files">
+                                <i class="bi bi-x-circle me-1"></i>Очистить
+                            </button>
+                        </div>
+                        <ul class="list-group" id="selected-files"></ul>
+                    </div>
+                    
+                    <!-- Кнопка загрузки -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" id="upload-btn" disabled>
+                            <span class="upload-text">
+                                <i class="bi bi-upload me-2"></i>
+                                Загрузить и проиндексировать
+                            </span>
+                            <span class="upload-spinner d-none">
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                Загрузка...
+                            </span>
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Подсказки -->
+                <div class="mt-4">
+                    <h6 class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Поддерживаемые форматы:
+                    </h6>
+                    <div class="row text-muted small">
+                        <div class="col-md-3">
+                            <strong>Документы:</strong><br>
+                            .md, .markdown, .txt
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Изображения:</strong><br>
+                            .png, .jpg, .gif, .webp
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Аудио:</strong><br>
+                            .mp3, .wav, .ogg
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Видео:</strong><br>
+                            .mp4, .webm
+                        </div>
+                    </div>
+                    <p class="text-muted small mt-2">
+                        💡 <strong>Совет:</strong> Загружайте Markdown-файлы вместе с изображениями — 
+                        пути автоматически обновятся.
+                    </p>
+                </div>
+                
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const fileList = document.getElementById('file-list');
+const selectedFiles = document.getElementById('selected-files');
+const uploadBtn = document.getElementById('upload-btn');
+const uploadForm = document.getElementById('upload-form');
+
+// DataTransfer для хранения файлов (поддержка Drag-n-Drop + click)
+let dataTransfer = new DataTransfer();
+
+// Drag & Drop
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('bg-primary', 'bg-opacity-10');
+    dropZone.style.borderColor = 'var(--bs-primary)';
+});
+
+dropZone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('bg-primary', 'bg-opacity-10');
+    dropZone.style.borderColor = 'var(--bs-border-color)';
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('bg-primary', 'bg-opacity-10');
+    dropZone.style.borderColor = 'var(--bs-border-color)';
+    
+    const files = e.dataTransfer.files;
+    // Добавляем файлы через DataTransfer API
+    for (const file of files) {
+        dataTransfer.items.add(file);
+    }
+    fileInput.files = dataTransfer.files;
+    updateFileList(dataTransfer.files);
+});
+
+dropZone.addEventListener('click', (e) => {
+    // Не открывать выбор файлов если кликнули по кнопке
+    if (e.target.tagName === 'BUTTON') return;
+    fileInput.click();
+});
+
+fileInput.addEventListener('change', (e) => {
+    // Обновляем DataTransfer при выборе через input
+    dataTransfer = new DataTransfer();
+    for (const file of e.target.files) {
+        dataTransfer.items.add(file);
+    }
+    updateFileList(dataTransfer.files);
+});
+
+// Очистка списка файлов
+document.getElementById('clear-files').addEventListener('click', () => {
+    dataTransfer = new DataTransfer();
+    fileInput.files = dataTransfer.files;
+    updateFileList(dataTransfer.files);
+});
+
+// Показываем спиннер при отправке формы
+uploadForm.addEventListener('submit', () => {
+    uploadBtn.disabled = true;
+    uploadBtn.querySelector('.upload-text').classList.add('d-none');
+    uploadBtn.querySelector('.upload-spinner').classList.remove('d-none');
+});
+
+function removeFile(index) {
+    const newDataTransfer = new DataTransfer();
+    const files = Array.from(dataTransfer.files);
+    files.splice(index, 1);
+    files.forEach(f => newDataTransfer.items.add(f));
+    dataTransfer = newDataTransfer;
+    fileInput.files = dataTransfer.files;
+    updateFileList(dataTransfer.files);
+}
+
+function updateFileList(files) {
+    const fileCount = document.getElementById('file-count');
+    
+    if (files.length === 0) {
+        fileList.style.display = 'none';
+        uploadBtn.disabled = true;
+        return;
+    }
+    
+    fileList.style.display = 'block';
+    uploadBtn.disabled = false;
+    selectedFiles.innerHTML = '';
+    fileCount.textContent = files.length;
+    
+    const mdCount = Array.from(files).filter(f => 
+        f.name.endsWith('.md') || f.name.endsWith('.markdown')
+    ).length;
+    
+    Array.from(files).forEach((file, index) => {
+        const icon = getFileIcon(file.name);
+        const size = formatSize(file.size);
+        
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.innerHTML = `
+            <span>
+                <i class="bi ${icon} me-2"></i>
+                ${file.name}
+            </span>
+            <div>
+                <span class="badge bg-secondary me-2">${size}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFile(${index})" title="Удалить">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        `;
+        selectedFiles.appendChild(li);
+    });
+    
+    // Обновляем текст кнопки
+    const btnText = uploadBtn.querySelector('.upload-text');
+    if (mdCount >= 5) {
+        btnText.innerHTML = '<i class="bi bi-upload me-2"></i>Загрузить (async режим)';
+    } else {
+        btnText.innerHTML = '<i class="bi bi-upload me-2"></i>Загрузить и проиндексировать';
+    }
+}
+
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const icons = {
+        'md': 'bi-markdown',
+        'markdown': 'bi-markdown',
+        'txt': 'bi-file-text',
+        'png': 'bi-image',
+        'jpg': 'bi-image',
+        'jpeg': 'bi-image',
+        'gif': 'bi-image',
+        'webp': 'bi-image',
+        'mp3': 'bi-music-note',
+        'wav': 'bi-music-note',
+        'mp4': 'bi-camera-video',
+        'webm': 'bi-camera-video',
+    };
+    return icons[ext] || 'bi-file-earmark';
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+</script>
+{% endblock %}

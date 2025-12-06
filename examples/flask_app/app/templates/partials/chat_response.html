@@ -1,0 +1,72 @@
+<!-- Chat response partial (HTMX target) -->
+<!-- Вставляется в #chat-messages после каждого ответа -->
+
+<div class="message message-assistant" 
+     data-session-id="{{ response.session_id }}"
+     data-message-id="{{ response.message_id }}"
+     id="message-{{ response.message_id }}">
+    <button class="btn btn-sm btn-outline-danger message-delete-btn"
+            hx-delete="{{ url_for('chat.delete_message', message_id=response.message_id) }}"
+            hx-target="#message-{{ response.message_id }}"
+            hx-swap="outerHTML"
+            hx-confirm="Удалить это сообщение?"
+            title="Удалить сообщение">
+        <i class="bi bi-x"></i>
+    </button>
+    
+    <div class="message-content">
+        {{ render_markdown(response.answer) | safe }}
+    </div>
+    
+    {% if response.sources %}
+    <div class="message-sources">
+        <small class="text-muted d-block mb-2">
+            <i class="bi bi-bookmark me-1"></i>
+            Источники ({{ response.sources | length }}):
+        </small>
+        
+        <div class="d-flex flex-wrap gap-1">
+            {% for source in response.sources %}
+            <a href="{{ url_for('ingest.document_detail', doc_id=source.doc_id) }}" 
+               target="_blank"
+               class="source-badge text-decoration-none" 
+               data-bs-toggle="tooltip" 
+               data-bs-placement="top"
+               title="{{ source.content_preview }}">
+                <span class="source-index">{{ source.index }}</span>
+                <span class="source-title text-truncate" style="max-width: 150px;">
+                    {{ source.title }}
+                </span>
+                <span class="badge bg-secondary">{{ source.chunk_type }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if response.tokens_used %}
+    <div class="mt-2">
+        <small class="text-muted">
+            <i class="bi bi-lightning me-1"></i>
+            {{ response.tokens_used }} токенов
+        </small>
+    </div>
+    {% endif %}
+</div>
+
+<!-- OOB update для счётчика токенов -->
+<div id="tokens-counter" hx-swap-oob="true">
+    {% if response.total_tokens > 0 %}
+    <small class="text-muted">
+        <i class="bi bi-lightning-charge me-1"></i>
+        Всего: {{ "{:,}".format(response.total_tokens) }} токенов
+    </small>
+    {% endif %}
+</div>
+
+<script>
+// Initialize tooltips for new sources
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+    new bootstrap.Tooltip(el);
+});
+</script>
