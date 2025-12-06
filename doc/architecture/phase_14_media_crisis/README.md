@@ -183,6 +183,48 @@ language = "Russian"  # Gemini ответит на русском!
 
 ---
 
+### 79. Analyzer Migration — response.parsed вместо json.loads()
+
+**Файл:** [79_analyzer_migration_response_parsed.md](79_analyzer_migration_response_parsed.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.1.3)
+
+Рефакторинг audio/video/image analyzers: миграция с `json.loads()` на `response.parsed` (Pydantic).
+
+**Ключевые изменения:**
+
+- **Удалён json.loads():** Из всех 3 analyzers (audio, video, image)
+- **response.parsed:** Автоматический парсинг в Pydantic объекты
+- **Type-safe доступ:** `data.field` вместо `data.get("field", default)`
+- **Убран error handling:** try/except json.JSONDecodeError (Gemini SDK гарантирует валидность)
+- **Удалён импорт json:** Из всех analyzers
+
+**Выгоды:**
+
+- ✅ -27 lines code (774 → 747 lines)
+- ✅ Type safety: dict → Pydantic objects
+- ✅ IDE autocomplete для полей схем
+- ✅ Меньше boilerplate (no .get() с defaults)
+
+**Тестирование:**
+
+- ✅ 202/202 тестов passing (no regressions)
+- ✅ Backward compatibility сохранена
+
+**Commit:**
+
+- `1e0dc44` — Миграция analyzers на response.parsed (Pydantic)
+
+**Итоги Phase 14.1.3:**
+
+```
+202 unit-теста (100% passing)
+-27 lines code
++Type safety
+Phase 14.1: Smart Steps + Advanced Features — ✅ COMPLETED
+```
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR
