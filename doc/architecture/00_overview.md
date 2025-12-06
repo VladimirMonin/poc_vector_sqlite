@@ -294,6 +294,9 @@
 72. [**Multi-Chunk Media Architecture**](72_multi_chunk_media_architecture.md)  
     Решение кризиса: summary + transcript chunks, конфигурируемые лимиты, полное покрытие контента
 
+73. [**Multilingual Media Analysis**](73_multilingual_media_analysis.md)  
+    Настройка языка вывода через конфиг: template промпты, инъекция параметров, backward compatibility
+
 ---
 
 ## 🚀 Быстрый старт
