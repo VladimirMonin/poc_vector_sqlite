@@ -43,6 +43,10 @@ from semantic_core.domain.media import (
     MediaAnalysisResult,
     VideoAnalysisConfig,
 )
+from semantic_core.domain.media_dto import (
+    TimelineItem,
+    MediaDetails,
+)
 
 __all__ = [
     "Document",
@@ -60,4 +64,6 @@ __all__ = [
     "MediaRequest",
     "MediaAnalysisResult",
     "VideoAnalysisConfig",
+    "TimelineItem",
+    "MediaDetails",
 ]
