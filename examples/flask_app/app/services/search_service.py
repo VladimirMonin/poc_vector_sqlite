@@ -273,7 +273,8 @@ class SearchService:
         if self.cache and mode in ("vector", "hybrid"):
             cache_result = self.cache.get_or_embed(query)
             query_vector = cache_result.embedding
-            logger.info(f"💾 Cache {'HIT ✅' if cache_result.from_cache else 'MISS ❌'}")
+            cache_status = "HIT ✅" if cache_result.from_cache else "MISS ❌"
+            logger.info(f"💾 Cache {cache_status}")
 
         results: list[SearchResultItem] = []
 
