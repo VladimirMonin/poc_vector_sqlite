@@ -65,6 +65,7 @@ def results():
         types: Типы контента (text,code,image,audio)
         mode: Режим поиска (hybrid, vector, fts)
         limit: Максимум результатов
+        result_type: Тип результатов (chunks, documents)
 
     Returns:
         HTML partial с карточками результатов.
@@ -81,34 +82,56 @@ def results():
     types_param = request.args.get("types", "")
     mode = request.args.get("mode", "hybrid")
     limit = request.args.get("limit", 20, type=int)
+    result_type = request.args.get("result_type", "chunks")
 
     # Пустой запрос — пустые результаты
     if not query:
-        return render_template("partials/search_results.html", results=[], query="")
+        template = (
+            "partials/search_documents.html"
+            if result_type == "documents"
+            else "partials/search_results.html"
+        )
+        return render_template(template, results=[], query="")
 
     # Парсим типы контента
     chunk_types = None
     if types_param:
         chunk_types = [t.strip() for t in types_param.split(",") if t.strip()]
 
-    logger.info(f"🔍 Search request: q='{query}', types={chunk_types}, mode={mode}")
+    logger.info(
+        f"🔍 Search request: q='{query}', types={chunk_types}, "
+        f"mode={mode}, result_type={result_type}"
+    )
 
     try:
-        results = service.search(
-            query=query,
-            chunk_types=chunk_types,
-            mode=mode,
-            limit=limit,
-        )
-
-        return render_template(
-            "partials/search_results.html",
-            results=results,
-            query=query,
-            render_markdown=render_markdown,
-            render_code=render_code,
-            truncate_content=truncate_content,
-        )
+        if result_type == "documents":
+            # Поиск по документам
+            results = service.search_documents(
+                query=query,
+                mode=mode,
+                limit=limit,
+            )
+            return render_template(
+                "partials/search_documents.html",
+                results=results,
+                query=query,
+            )
+        else:
+            # Поиск по чанкам (default)
+            results = service.search(
+                query=query,
+                chunk_types=chunk_types,
+                mode=mode,
+                limit=limit,
+            )
+            return render_template(
+                "partials/search_results.html",
+                results=results,
+                query=query,
+                render_markdown=render_markdown,
+                render_code=render_code,
+                truncate_content=truncate_content,
+            )
 
     except Exception as e:
         import traceback
