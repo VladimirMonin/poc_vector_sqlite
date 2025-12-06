@@ -5,7 +5,8 @@
 
 Classes:
     SearchService: Фасад для поиска с кэшем и фильтрацией.
-    SearchResultItem: UI-friendly представление результата.
+    SearchResultItem: UI-friendly представление результата (чанк).
+    DocumentResultItem: UI-friendly представление результата (документ).
 
 Usage:
     service = SearchService(core, cache)
@@ -15,7 +16,7 @@ Usage:
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 
-from semantic_core.domain import ChunkResult, ChunkType, MatchType
+from semantic_core.domain import ChunkResult, ChunkType, MatchType, SearchResult
 from semantic_core.utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -60,6 +61,37 @@ class SearchResultItem:
     highlight: Optional[str] = None
     context: str = ""
     tags: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DocumentResultItem:
+    """UI-friendly представление результата поиска (документ).
+
+    Используется в режиме результатов 'documents'.
+
+    Attributes:
+        doc_id: ID документа.
+        title: Заголовок документа.
+        source: Путь к исходному файлу.
+        score: Релевантность (0.0-1.0).
+        score_percent: Релевантность в процентах (0-100).
+        score_class: CSS класс для визуализации score.
+        match_type: Тип совпадения (vector, fts, hybrid).
+        chunk_count: Количество чанков в документе.
+        tags: Теги из метаданных.
+        description: Краткое описание (из первых N символов).
+    """
+
+    doc_id: int
+    title: str
+    source: Optional[str]
+    score: float
+    score_percent: int
+    score_class: str
+    match_type: str
+    chunk_count: int = 0
+    tags: list[str] = field(default_factory=list)
+    description: str = ""
 
 
 def _score_to_class(score: float) -> str:
@@ -113,6 +145,44 @@ def _chunk_result_to_item(result: ChunkResult) -> SearchResultItem:
         highlight=result.highlight,
         context=context,
         tags=tags,
+    )
+
+
+def _search_result_to_item(result: SearchResult) -> DocumentResultItem:
+    """Преобразовать SearchResult в DocumentResultItem.
+
+    Args:
+        result: Результат поиска из SemanticCore.search().
+
+    Returns:
+        DocumentResultItem для UI.
+    """
+    doc = result.document
+    metadata = doc.metadata or {}
+
+    # Извлекаем теги
+    tags = metadata.get("tags", [])
+    if isinstance(tags, str):
+        tags = [tags]
+
+    # Создаём описание из первых 200 символов content
+    description = ""
+    if doc.content:
+        description = doc.content[:200].strip()
+        if len(doc.content) > 200:
+            description += "..."
+
+    return DocumentResultItem(
+        doc_id=doc.id or 0,
+        title=metadata.get("title", doc.source or "Untitled"),
+        source=doc.source,
+        score=result.score,
+        score_percent=int(result.score * 100),
+        score_class=_score_to_class(result.score),
+        match_type=result.match_type.value,
+        chunk_count=metadata.get("chunk_count", 0),
+        tags=tags,
+        description=description,
     )
 
 
@@ -177,10 +247,11 @@ class SearchService:
         limit = int(limit) if limit else 20
         logger.info(f"🔍 Поиск: '{query[:50]}...' mode={mode}, types={chunk_types}")
 
-        # Если есть кэш — используем кэшированный вектор
-        # (но для search_chunks всё равно нужен core)
-        if self.cache:
+        # Получаем закешированный вектор (или генерируем новый)
+        query_vector: Optional[list[float]] = None
+        if self.cache and mode in ("vector", "hybrid"):
             cache_result = self.cache.get_or_embed(query)
+            query_vector = cache_result.embedding
             logger.debug(f"💾 Cache {'HIT' if cache_result.from_cache else 'MISS'}")
 
         results: list[SearchResultItem] = []
@@ -197,6 +268,7 @@ class SearchService:
                     mode=mode,
                     limit=limit,
                     chunk_type_filter=chunk_type_filter,
+                    query_vector=query_vector,
                 )
                 results.extend(_chunk_result_to_item(r) for r in type_results)
         else:
@@ -205,6 +277,7 @@ class SearchService:
                 query=query,
                 mode=mode,
                 limit=limit,
+                query_vector=query_vector,
             )
             results = [_chunk_result_to_item(r) for r in chunk_results]
 
@@ -213,6 +286,49 @@ class SearchService:
         results = results[:limit]
 
         logger.info(f"✅ Найдено {len(results)} результатов")
+        return results
+
+    def search_documents(
+        self,
+        query: str,
+        mode: str = "hybrid",
+        limit: int = 20,
+    ) -> list[DocumentResultItem]:
+        """Выполнить поиск по документам (агрегация по документам).
+
+        Args:
+            query: Текст поискового запроса.
+            mode: Режим поиска (vector, fts, hybrid).
+            limit: Максимальное количество результатов.
+
+        Returns:
+            Список DocumentResultItem для отображения в UI.
+        """
+        if not query or not query.strip():
+            return []
+
+        query = query.strip()
+        limit = int(limit) if limit else 20
+        logger.info(f"📄 Поиск документов: '{query[:50]}...' mode={mode}")
+
+        # Получаем закешированный вектор
+        query_vector: Optional[list[float]] = None
+        if self.cache and mode in ("vector", "hybrid"):
+            cache_result = self.cache.get_or_embed(query)
+            query_vector = cache_result.embedding
+            logger.debug(f"💾 Cache {'HIT' if cache_result.from_cache else 'MISS'}")
+
+        # Используем core.search() для поиска по документам
+        search_results = self.core.search(
+            query=query,
+            mode=mode,
+            limit=limit,
+            query_vector=query_vector,
+        )
+
+        results = [_search_result_to_item(r) for r in search_results]
+
+        logger.info(f"✅ Найдено {len(results)} документов")
         return results
 
     def get_available_types(self) -> list[dict]:
