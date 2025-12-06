@@ -87,6 +87,35 @@ language = "Russian"  # Gemini ответит на русском!
 
 ---
 
+### 76. Smart Steps: Summary & Transcription
+
+**Файл:** [76_smart_steps_summary_transcription.md](76_smart_steps_summary_transcription.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.1.1 — частично)
+
+Реализация `SummaryStep` и `TranscriptionStep` — конкретных шагов обработки медиа-контента.
+
+**SummaryStep:**
+
+- Извлечение description из analysis
+- Поддержка image/audio/video с правильными ChunkType
+- Флаг `include_keywords` для управления metadata
+- 14 unit-тестов (всё покрыто)
+
+**TranscriptionStep:**
+
+- Разбивка транскрипции через BaseSplitter (Constructor Injection)
+- `should_run()`: проверка наличия transcription
+- Обогащение metadata: `role='transcript'`, `parent_media_path`
+- 11 unit-тестов (включая edge cases)
+
+**Тестирование:**
+
+- ✅ 14 тестов SummaryStep (0.08s)
+- ✅ 11 тестов TranscriptionStep (0.09s)
+- ✅ 100% passing
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR
