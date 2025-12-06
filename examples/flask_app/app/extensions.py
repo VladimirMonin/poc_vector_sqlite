@@ -104,12 +104,14 @@ def init_semantic_core(app: Flask) -> None:
         image_analyzer = GeminiImageAnalyzer(
             api_key=api_key,
             max_output_tokens=config.max_output_tokens,
+            output_language=config.output_language,
         )
         logger.info("🖼️ ImageAnalyzer инициализирован")
 
         audio_analyzer = GeminiAudioAnalyzer(
             api_key=api_key,
             max_output_tokens=config.max_output_tokens,
+            output_language=config.output_language,
         )
         logger.info("🎵 AudioAnalyzer инициализирован")
 
@@ -117,6 +119,7 @@ def init_semantic_core(app: Flask) -> None:
             api_key=api_key,
             audio_analyzer=audio_analyzer,
             max_output_tokens=config.max_output_tokens,
+            output_language=config.output_language,
         )
         logger.info("🎬 VideoAnalyzer инициализирован")
 

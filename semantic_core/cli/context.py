@@ -181,14 +181,17 @@ class CLIContext:
                 image_analyzer = GeminiImageAnalyzer(
                     api_key=api_key,
                     max_output_tokens=config.max_output_tokens,
+                    output_language=config.output_language,
                 )
                 audio_analyzer = GeminiAudioAnalyzer(
                     api_key=api_key,
                     max_output_tokens=config.max_output_tokens,
+                    output_language=config.output_language,
                 )
                 video_analyzer = GeminiVideoAnalyzer(
                     api_key=api_key,
                     max_output_tokens=config.max_output_tokens,
+                    output_language=config.output_language,
                 )
             except ImportError:
                 # Media dependencies not installed
