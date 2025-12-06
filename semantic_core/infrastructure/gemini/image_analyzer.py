@@ -5,7 +5,6 @@
         Анализирует изображения для семантического поиска.
 """
 
-import json
 import time
 from typing import Optional
 
@@ -203,16 +202,8 @@ class GeminiImageAnalyzer:
             operation="image_analysis",
         )
 
-        try:
-            data = json.loads(response.text)
-        except json.JSONDecodeError as e:
-            logger.error(
-                "Failed to parse Gemini response as JSON",
-                path=image_path,
-                error=str(e),
-                response_preview=response.text[:500],
-            )
-            raise ValueError(f"Invalid JSON in Gemini response: {e}")
+        # response.parsed возвращает ImageAnalysisSchema (Pydantic)
+        data = response.parsed
 
         # Извлекаем usage_metadata (это Pydantic модель, не словарь)
         tokens_used = None
@@ -224,14 +215,14 @@ class GeminiImageAnalyzer:
             "Image analyzed",
             latency_ms=round(latency_ms, 2),
             tokens_used=tokens_used,
-            keywords_count=len(data.get("keywords", [])),
-            has_ocr=bool(data.get("ocr_text")),
+            keywords_count=len(data.keywords),
+            has_ocr=bool(data.ocr_text),
         )
 
         return MediaAnalysisResult(
-            description=data["description"],
-            alt_text=data.get("alt_text"),
-            keywords=data.get("keywords", []),
-            ocr_text=data.get("ocr_text"),
+            description=data.description,
+            alt_text=data.alt_text,
+            keywords=data.keywords,
+            ocr_text=data.ocr_text,
             tokens_used=tokens_used,
         )

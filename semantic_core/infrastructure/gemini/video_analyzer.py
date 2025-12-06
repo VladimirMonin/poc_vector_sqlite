@@ -5,7 +5,6 @@
         Анализирует видео: кадры + аудио в одном запросе.
 """
 
-import json
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -340,16 +339,8 @@ class GeminiVideoAnalyzer:
             operation="video_analysis",
         )
 
-        try:
-            data = json.loads(response.text)
-        except json.JSONDecodeError as e:
-            logger.error(
-                "Failed to parse Gemini response as JSON",
-                path=str(video_path),
-                error=str(e),
-                response_preview=response.text[:500],
-            )
-            raise ValueError(f"Invalid JSON in Gemini response: {e}")
+        # response.parsed возвращает VideoAnalysisSchema (Pydantic)
+        data = response.parsed
 
         # Извлекаем usage_metadata (это Pydantic модель, не словарь)
         tokens_used = None
@@ -364,17 +355,17 @@ class GeminiVideoAnalyzer:
             frames_count=len(frames),
             has_audio=audio_bytes is not None,
             tokens_used=tokens_used,
-            keywords_count=len(data.get("keywords", [])),
+            keywords_count=len(data.keywords),
         )
 
         return MediaAnalysisResult(
-            description=data["description"],
+            description=data.description,
             alt_text=None,  # Видео не имеют alt-text
-            keywords=data.get("keywords", []),
-            ocr_text=data.get("ocr_text"),
-            transcription=data.get("transcription"),
-            participants=data.get("participants", []),
-            action_items=data.get("action_items", []),
+            keywords=data.keywords,
+            ocr_text=data.ocr_text,
+            transcription=data.transcription,
+            participants=data.participants,
+            action_items=data.action_items,
             duration_seconds=duration,
             tokens_used=tokens_used,
         )

@@ -5,7 +5,6 @@
         Анализирует аудио для транскрипции и семантического поиска.
 """
 
-import json
 import time
 from typing import Optional
 
@@ -251,16 +250,8 @@ class GeminiAudioAnalyzer:
             operation="audio_analysis",
         )
 
-        try:
-            data = json.loads(response.text)
-        except json.JSONDecodeError as e:
-            logger.error(
-                "Failed to parse Gemini response as JSON",
-                path=audio_path,
-                error=str(e),
-                response_preview=response.text[:500],
-            )
-            raise ValueError(f"Invalid JSON in Gemini response: {e}")
+        # response.parsed возвращает AudioAnalysisSchema (Pydantic)
+        data = response.parsed
 
         # Извлекаем usage_metadata (это Pydantic модель, не словарь)
         tokens_used = None
@@ -268,7 +259,7 @@ class GeminiAudioAnalyzer:
             tokens_used = getattr(response.usage_metadata, "total_token_count", None)
 
         latency_ms = (time.perf_counter() - start_time) * 1000
-        transcription = data.get("transcription", "")
+        transcription = data.transcription
 
         logger.info(
             "Audio analyzed",
@@ -276,15 +267,15 @@ class GeminiAudioAnalyzer:
             duration_sec=round(duration, 2),
             tokens_used=tokens_used,
             transcription_length=len(transcription),
-            participants_count=len(data.get("participants", [])),
+            participants_count=len(data.participants),
         )
 
         return MediaAnalysisResult(
-            description=data["description"],
+            description=data.description,
             transcription=transcription,
-            keywords=data.get("keywords", []),
-            participants=data.get("participants", []),
-            action_items=data.get("action_items", []),
+            keywords=data.keywords,
+            participants=data.participants,
+            action_items=data.action_items,
             duration_seconds=duration,
             tokens_used=tokens_used,
         )
