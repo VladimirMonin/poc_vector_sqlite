@@ -29,6 +29,15 @@ from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
 from semantic_core.utils.logger import get_logger, setup_logging, LoggingConfig
 
+# Phase 14.1 imports: Media Pipeline Architecture
+from semantic_core.core.media_context import MediaContext
+from semantic_core.core.media_pipeline import MediaPipeline
+from semantic_core.processing.steps import (
+    SummaryStep,
+    TranscriptionStep,
+    OCRStep,
+)
+
 if TYPE_CHECKING:
     from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
     from semantic_core.infrastructure.gemini.audio_analyzer import GeminiAudioAnalyzer
@@ -1417,10 +1426,29 @@ class SemanticCore:
         analysis: Optional[dict],
         fallback_metadata: Optional[dict] = None,
     ) -> list[Chunk]:
-        """Формирует список чанков для медиа: summary + transcript."""
-
+        """Формирует список чанков для медиа через MediaPipeline.
+        
+        Phase 14.1.4: Интеграция MediaPipeline для модульной обработки медиа.
+        Заменяет legacy методы _split_transcription_into_chunks и _split_ocr_into_chunks.
+        
+        Pipeline steps:
+        - SummaryStep: Создаёт summary chunk (всегда)
+        - TranscriptionStep: Парсит транскрипцию с таймкодами (если есть)
+        - OCRStep: Парсит OCR текст с таймкодами (если есть, видео)
+        
+        Args:
+            document: Document объект для контекста
+            media_path: Путь к медиа-файлу
+            chunk_type: Тип чанка (IMAGE_REF/AUDIO_REF/VIDEO_REF)
+            analysis: Результат анализа от Gemini (словарь)
+            fallback_metadata: Дополнительные метаданные для чанков
+        
+        Returns:
+            Список чанков: [summary_chunk, *transcript_chunks, *ocr_chunks]
+        """
         base_metadata = dict(fallback_metadata or {})
 
+        # Если анализа нет — создаём fallback chunk
         if analysis is None:
             return [
                 Chunk(
@@ -1431,119 +1459,33 @@ class SemanticCore:
                 )
             ]
 
-        summary_content = self._build_content_from_analysis(analysis)
-        summary_metadata = self._build_metadata_from_analysis(analysis, media_path)
-        summary_metadata.update(base_metadata)
-        summary_metadata["role"] = "summary"
-
-        chunks: list[Chunk] = [
-            Chunk(
-                content=summary_content,
-                chunk_index=0,
-                chunk_type=chunk_type,
-                metadata=summary_metadata,
-            )
-        ]
-
-        transcription = analysis.get("transcription")
-        if transcription:
-            transcript_chunks = self._split_transcription_into_chunks(
-                transcription=transcription,
-                base_index=len(chunks),
-                media_path=media_path,
-            )
-            chunks.extend(transcript_chunks)
-
-        # Для видео: разбиваем OCR текст на отдельные чанки
-        ocr_text = analysis.get("ocr_text")
-        if ocr_text:
-            ocr_chunks = self._split_ocr_into_chunks(
-                ocr_text=ocr_text,
-                base_index=len(chunks),
-                media_path=media_path,
-            )
-            chunks.extend(ocr_chunks)
-
-        return chunks
-
-    def _split_transcription_into_chunks(
-        self,
-        transcription: str,
-        base_index: int,
-        media_path: Path,
-    ) -> list[Chunk]:
-        """Режет транскрипцию на чанки через splitter."""
-
-        temp_doc = Document(
-            content=transcription,
-            metadata={"source": str(media_path)},
-            media_type=MediaType.TEXT,
+        # Создаём MediaContext с нужными сервисами
+        # chunk_type и fallback_metadata передаём через services
+        context = MediaContext(
+            media_path=media_path,
+            document=document,
+            analysis=analysis,
+            chunks=[],
+            base_index=0,
+            services={
+                "chunk_type": chunk_type,  # Для SummaryStep
+                "fallback_metadata": base_metadata,  # Для всех шагов
+            },
         )
-        split_chunks = self.splitter.split(temp_doc)
-
-        transcript_chunks: list[Chunk] = []
-        for idx, chunk in enumerate(split_chunks):
-            meta = dict(chunk.metadata or {})
-            meta.setdefault("_original_path", str(media_path))
-            meta["role"] = "transcript"
-            meta["parent_media_path"] = str(media_path)
-
-            chunk.chunk_index = base_index + idx
-            chunk.metadata = meta
-
-            transcript_chunks.append(chunk)
-
-        return transcript_chunks
-
-    def _split_ocr_into_chunks(
-        self,
-        ocr_text: str,
-        base_index: int,
-        media_path: Path,
-    ) -> list[Chunk]:
-        """Режет OCR текст на чанки через splitter.
-
-        Args:
-            ocr_text: Текст, распознанный через OCR из видео.
-            base_index: Начальный индекс для нумерации чанков.
-            media_path: Путь к медиа-файлу.
-
-        Returns:
-            Список чанков с role='ocr'.
-        """
-        temp_doc = Document(
-            content=ocr_text,
-            metadata={"source": str(media_path)},
-            media_type=MediaType.TEXT,  # Parser already set in SmartSplitter (MarkdownNodeParser)
+        
+        # Создаём pipeline со всеми шагами
+        pipeline = MediaPipeline(
+            steps=[
+                SummaryStep(),  # Всегда создаёт summary chunk
+                TranscriptionStep(splitter=self.splitter),  # Если есть transcription
+                OCRStep(splitter=self.splitter),  # Если есть ocr_text (видео)
+            ]
         )
-        split_chunks = self.splitter.split(temp_doc)
-
-        ocr_chunks: list[Chunk] = []
-        for idx, chunk in enumerate(split_chunks):
-            meta = dict(chunk.metadata or {})
-            meta.setdefault("_original_path", str(media_path))
-            meta["role"] = "ocr"
-            meta["parent_media_path"] = str(media_path)
-
-            chunk.chunk_index = base_index + idx
-            chunk.metadata = meta
-
-            ocr_chunks.append(chunk)
-
-        # Monitor code detection rate for false positives
-        code_chunks = [c for c in ocr_chunks if c.chunk_type == ChunkType.CODE]
-        code_ratio = len(code_chunks) / len(ocr_chunks) if ocr_chunks else 0
-
-        if code_ratio > 0.5:
-            logger.warning(
-                "High code ratio in OCR — possible UI text false positives",
-                code_ratio=f"{code_ratio:.2%}",
-                media_path=str(media_path),
-                code_chunks=len(code_chunks),
-                total_ocr_chunks=len(ocr_chunks),
-            )
-
-        return ocr_chunks
+        
+        # Выполняем pipeline
+        final_context = pipeline.build_chunks(context)
+        
+        return final_context.chunks
 
     def _get_mime_type(self, path: Path) -> str:
         """Определяет MIME-тип файла по расширению."""
