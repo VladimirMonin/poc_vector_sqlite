@@ -71,14 +71,14 @@
 - Остальное **молча игнорируется**
 - Semantic search находит только начало документа
 
-### Проблема #4: `chunk_size` не в конфигурации
+### ~~Проблема #4: `chunk_size` не в конфигурации~~ ✅ ИСПРАВЛЕНО
 
 | Параметр | Где задан | Можно менять? |
 |----------|-----------|---------------|
-| `chunk_size=1000` | `SmartSplitter.__init__()` | ❌ Только в коде |
-| `code_chunk_size=2000` | `SmartSplitter.__init__()` | ❌ Только в коде |
+| `chunk_size=1800` | `SemanticConfig` → `SmartSplitter` | ✅ Через `semantic.toml` |
+| `code_chunk_size=2000` | `SemanticConfig` → `SmartSplitter` | ✅ Через `semantic.toml` |
 
-**Суть:** `SemanticConfig` (`semantic.toml`) **не содержит** параметров размера чанков.
+**UPDATE (2025-12-06):** Проблема исправлена в рамках рефакторинга Phase 2-3. Параметры **уже** доступны в конфигурации!
 
 ---
 

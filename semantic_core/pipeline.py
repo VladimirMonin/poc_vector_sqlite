@@ -1496,7 +1496,7 @@ class SemanticCore:
         temp_doc = Document(
             content=ocr_text,
             metadata={"source": str(media_path)},
-            media_type=MediaType.TEXT,
+            media_type=MediaType.TEXT,  # Parser already set in SmartSplitter (MarkdownNodeParser)
         )
         split_chunks = self.splitter.split(temp_doc)
 
@@ -1511,6 +1511,19 @@ class SemanticCore:
             chunk.metadata = meta
 
             ocr_chunks.append(chunk)
+        
+        # Monitor code detection rate for false positives
+        code_chunks = [c for c in ocr_chunks if c.chunk_type == ChunkType.CODE]
+        code_ratio = len(code_chunks) / len(ocr_chunks) if ocr_chunks else 0
+        
+        if code_ratio > 0.5:
+            logger.warning(
+                "High code ratio in OCR — possible UI text false positives",
+                code_ratio=f"{code_ratio:.2%}",
+                media_path=str(media_path),
+                code_chunks=len(code_chunks),
+                total_ocr_chunks=len(ocr_chunks),
+            )
 
         return ocr_chunks
 

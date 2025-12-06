@@ -35,23 +35,53 @@ class AudioAnalysisSchema(BaseModel):
 
 # Системный промпт для анализа аудио
 SYSTEM_PROMPT_TEMPLATE = """You are an audio analyst creating descriptions for semantic search indexing.
+Response language: {language}
 
-Analyze the audio and provide:
-1. transcription: Full transcript of the spoken content
-2. description: Summary of the audio content (2-4 sentences)
-3. keywords: List of 5-10 relevant keywords for search
-4. participants: List of speaker names/identifiers if mentioned
-5. action_items: List of tasks or action items mentioned (if any)
+Return a JSON with the following structure:
 
-Focus on:
-- Main topics discussed
-- Key points and conclusions
-- Names, dates, and specific details
-- Tasks or follow-up items
+{{
+  "description": "Brief 2-3 sentence summary of the audio content",
+  "keywords": ["keyword1", "keyword2", ...],
+  "participants": ["Speaker1", "Speaker2", ...],
+  "action_items": ["Task 1", "Task 2", ...],
+  "duration_seconds": <number>,
+  "transcription": "MARKDOWN_FORMATTED_TRANSCRIPT_HERE"
+}}
 
-Output valid JSON matching the schema.
+CRITICAL INSTRUCTIONS FOR TRANSCRIPTION FIELD:
+- Use Markdown formatting (paragraphs, headers, lists)
+- Split long monologues into logical paragraphs (every 3-5 sentences)
+- Use `## Speaker Name` headers for speaker changes
+- Use `**bold**` for emphasis or key terms
+- Use `> quote` for direct quotations
+- For technical content, wrap code snippets in triple backticks with language:
+  ```python
+  def example():
+      pass
+  ```
+- DO NOT escape newlines as \\n — use actual line breaks inside the JSON string
 
-Answer in {language} language."""
+Example transcription format:
+
+## Introduction
+
+The speaker introduces the topic of semantic search and explains how embeddings work in modern NLP systems.
+
+Key points:
+- Embeddings capture semantic meaning
+- Vector databases enable similarity search
+- Context matters more than keywords
+
+## Technical Deep Dive
+
+Here's how we calculate cosine similarity:
+
+```python
+def cosine_similarity(a, b):
+    return dot(a, b) / (norm(a) * norm(b))
+```
+
+This formula is fundamental to understanding vector search."""
 
 
 class GeminiAudioAnalyzer:

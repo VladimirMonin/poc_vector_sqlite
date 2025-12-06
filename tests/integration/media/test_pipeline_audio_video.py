@@ -96,13 +96,18 @@ class TestSemanticCoreAudioIngestion:
         )
         assert len(chunks) >= 2
 
+        import json
+
         summary_chunk = chunks[0]
+        summary_meta = json.loads(summary_chunk.metadata)
         assert summary_chunk.chunk_type == "audio_ref"
         assert summary_chunk.embedding_status == "READY"
-        assert summary_chunk.metadata.get("role") == "summary"
+        assert summary_meta.get("role") == "summary"
 
         transcript_chunks = [
-            chunk for chunk in chunks if chunk.metadata.get("role") == "transcript"
+            chunk
+            for chunk in chunks
+            if json.loads(chunk.metadata).get("role") == "transcript"
         ]
         assert transcript_chunks
         assert all(chunk.chunk_type == "text" for chunk in transcript_chunks)

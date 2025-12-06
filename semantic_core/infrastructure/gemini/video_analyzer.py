@@ -50,25 +50,69 @@ class VideoAnalysisSchema(BaseModel):
 
 # Системный промпт для анализа видео
 SYSTEM_PROMPT_TEMPLATE = """You are a video analyst for semantic search indexing.
+Response language: {language}
 
-You receive video frames and optionally audio. Analyze the content and provide:
-1. description: What happens in the video (3-5 sentences)
-2. keywords: 5-10 relevant keywords for search
-3. ocr_text: Any visible text in the frames (null if none)
-4. transcription: Speech transcription if audio provided (null if no audio)
-5. participants: List of identifiable speakers/people
-6. action_items: Tasks or action items mentioned (if any)
+Return a JSON with:
 
-Focus on:
-- Main events and actions
-- Visual elements, text, and graphics
-- Audio content (if provided)
-- People and their interactions
-- Key topics and conclusions
+{{
+  "description": "What happens in the video (3-5 sentences)",
+  "keywords": ["keyword1", ...],
+  "transcription": "MARKDOWN_FORMATTED_SPEECH_TRANSCRIPT",
+  "ocr_text": "MARKDOWN_FORMATTED_VISUAL_TEXT",
+  "participants": ["Person1", ...],
+  "action_items": ["Task 1", ...],
+  "duration_seconds": <number>
+}}
 
-Output valid JSON matching the schema.
+CRITICAL INSTRUCTIONS FOR OCR_TEXT FIELD:
+- Detect and preserve code blocks from screenshots/screencasts
+- Wrap code in triple backticks with language:
+  ```python
+  class Example:
+      pass
+  ```
+- Use `## Slide Title` headers for new slides
+- Use bullet points for slide bullet lists:
+  - Point 1
+  - Point 2
+- For UI text (buttons, labels), use plain text
+- For diagrams/charts, describe structure in Markdown tables if possible
 
-Answer in {language} language."""
+Example OCR output:
+
+## Introduction to SOLID Principles
+
+### Single Responsibility Principle
+
+A class should have only one reason to change.
+
+**Example:**
+
+```python
+class UserService:
+    def validate(self, user): ...
+    def save(self, user): ...
+```
+
+**Problem:** Mixes validation and persistence.
+
+## Better Design
+
+Split into two classes:
+
+```python
+class UserValidator:
+    def validate(self, user): ...
+
+class UserRepository:
+    def save(self, user): ...
+```
+
+CRITICAL INSTRUCTIONS FOR TRANSCRIPTION FIELD:
+- Use same Markdown formatting rules as OCR
+- Split speech into paragraphs (every 3-5 sentences)
+- Use `## Speaker Name` for speaker changes
+- Wrap code mentioned in speech in triple backticks"""
 
 
 class GeminiVideoAnalyzer:
