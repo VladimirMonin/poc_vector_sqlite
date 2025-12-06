@@ -381,7 +381,7 @@ class SemanticCore:
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
-        k: int = 60,
+        k: int = 1,
         query_vector: Optional[list[float]] = None,
     ) -> list[SearchResult]:
         """Выполняет поиск документов.
@@ -391,7 +391,7 @@ class SemanticCore:
             filters: Фильтры по метаданным.
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
-            k: Константа для RRF алгоритма (по умолчанию 60).
+            k: Константа для RRF алгоритма (по умолчанию 1 для резкого ранжирования).
             query_vector: Предварительно вычисленный вектор запроса (для кеширования).
                 Если передан, пропускает вызов embedder.embed_query().
 
@@ -426,7 +426,7 @@ class SemanticCore:
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
-        k: int = 60,
+        k: int = 1,
         chunk_type_filter: Optional[str] = None,
         context_window: int = 0,
         query_vector: Optional[list[float]] = None,
@@ -441,7 +441,7 @@ class SemanticCore:
             filters: Фильтры по метаданным документа.
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
-            k: Константа для RRF алгоритма (по умолчанию 60).
+            k: Константа для RRF алгоритма (по умолчанию 1 для резкого ранжирования).
             chunk_type_filter: Фильтр по типу чанка ('text', 'code', 'table', 'image_ref').
             context_window: Количество соседних чанков в каждую сторону.
                 0 = только найденные чанки (по умолчанию).

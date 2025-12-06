@@ -533,7 +533,7 @@ class PeeweeVectorStore(BaseVectorStore):
         query_text: Optional[str],
         filters: Optional[dict],
         limit: int,
-        k: int = 60,
+        k: int = 1,
     ) -> list[SearchResult]:
         """Гибридный поиск с RRF (Reciprocal Rank Fusion).
 
@@ -548,7 +548,7 @@ class PeeweeVectorStore(BaseVectorStore):
             query_text: Текст запроса.
             filters: Фильтры по метаданным.
             limit: Итоговое количество результатов.
-            k: Константа RRF (обычно 60).
+            k: Константа RRF (default=1 для максимального контраста).
 
         Returns:
             Список SearchResult, отсортированный по RRF score.
@@ -752,7 +752,7 @@ class PeeweeVectorStore(BaseVectorStore):
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
-        k: int = 60,
+        k: int = 1,
         chunk_type_filter: Optional[str] = None,
         language_filter: Optional[str] = None,
     ) -> list[ChunkResult]:
@@ -764,7 +764,7 @@ class PeeweeVectorStore(BaseVectorStore):
             filters: Словарь фильтров по метаданным документа.
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
-            k: Константа для RRF алгоритма.
+            k: Константа для RRF алгоритма (default=1).
             chunk_type_filter: Фильтр по типу чанка.
             language_filter: Фильтр по языку программирования.
 
@@ -789,9 +789,14 @@ class PeeweeVectorStore(BaseVectorStore):
             logger.debug("FTS chunk search not implemented")
             results = []
         elif mode == "hybrid":
-            # Для гибридного используем только векторный поиск чанков
-            results = self._vector_search_chunks(
-                query_vector, filters, limit, chunk_type_filter, language_filter
+            results = self._hybrid_search_chunks(
+                query_vector,
+                query_text,
+                filters,
+                limit,
+                k,
+                chunk_type_filter,
+                language_filter,
             )
         else:
             logger.error("Unknown search mode", mode=mode)
@@ -932,7 +937,8 @@ class PeeweeVectorStore(BaseVectorStore):
             doc_title = doc_meta.get("title")
 
             # Конвертируем расстояние в скор (0.0 - 1.0)
-            score = 1.0 / (1.0 + distance)
+            # Используем линейную формулу: 1.0 - distance
+            score = max(0.0, 1.0 - distance)
 
             results.append(
                 ChunkResult(
@@ -1123,3 +1129,176 @@ class PeeweeVectorStore(BaseVectorStore):
             parent_doc_id=model.document_id,
             created_at=model.created_at,
         )
+
+    def _hybrid_search_chunks(
+        self,
+        query_vector: Optional[np.ndarray],
+        query_text: Optional[str],
+        filters: Optional[dict],
+        limit: int,
+        k: int = 1,
+        chunk_type_filter: Optional[str] = None,
+        language_filter: Optional[str] = None,
+    ) -> list[ChunkResult]:
+        """Гибридный поиск чанков (RRF).
+
+        Args:
+            query_vector: Вектор запроса.
+            query_text: Текст запроса.
+            filters: Фильтры по метаданным документа.
+            limit: Количество результатов.
+            k: Константа RRF.
+            chunk_type_filter: Фильтр по типу чанка.
+            language_filter: Фильтр по языку программирования.
+
+        Returns:
+            Список ChunkResult.
+        """
+        if query_vector is None and query_text is None:
+            return []
+
+        # Если только один метод, используем его напрямую
+        if query_vector is None:
+            # TODO: Реализовать _fts_search_chunks
+            return []
+        if query_text is None:
+            return self._vector_search_chunks(
+                query_vector, filters, limit, chunk_type_filter, language_filter
+            )
+
+        # Экранируем специальные символы FTS5 для query_text
+        sanitized_query = _sanitize_fts_query(query_text)
+
+        # Формируем WHERE условия для фильтров
+        where_conditions = []
+        where_params = []
+        
+        # Фильтры по метаданным документа
+        if filters:
+            for key, value in filters.items():
+                where_conditions.append(f"json_extract(d.metadata, '$.{key}') = ?")
+                where_params.append(value)
+
+        # Фильтр по типу чанка
+        if chunk_type_filter:
+            where_conditions.append("c.chunk_type = ?")
+            chunk_type_value = (
+                chunk_type_filter.value
+                if hasattr(chunk_type_filter, "value")
+                else chunk_type_filter
+            )
+            where_params.append(chunk_type_value)
+
+        # Фильтр по языку
+        if language_filter:
+            where_conditions.append("c.language = ?")
+            where_params.append(language_filter)
+
+        where_clause = (
+            f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
+        )
+
+        blob = query_vector.tobytes()
+
+        # SQL запрос с RRF через CTE
+        sql = f"""
+            WITH vector_results AS (
+                SELECT 
+                    cv.id as chunk_id,
+                    ROW_NUMBER() OVER (
+                        ORDER BY vec_distance_cosine(cv.embedding, ?)
+                    ) as rank
+                FROM chunks_vec cv
+                JOIN chunks c ON c.id = cv.id
+                JOIN documents d ON d.id = c.document_id
+                {where_clause}
+                LIMIT 100
+            ),
+            fts_results AS (
+                SELECT 
+                    fts.rowid as chunk_id,
+                    ROW_NUMBER() OVER (ORDER BY fts.rank) as rank
+                FROM chunks_fts fts
+                JOIN chunks c ON c.id = fts.rowid
+                JOIN documents d ON d.id = c.document_id
+                WHERE chunks_fts MATCH ?
+                {f"AND {' AND '.join(where_conditions)}" if where_conditions else ""}
+                LIMIT 100
+            ),
+            rrf_scores AS (
+                SELECT 
+                    COALESCE(v.chunk_id, f.chunk_id) as chunk_id,
+                    (
+                        COALESCE(1.0 / (? + v.rank), 0.0) + 
+                        COALESCE(1.0 / (? + f.rank), 0.0)
+                    ) as rrf_score
+                FROM vector_results v
+                FULL OUTER JOIN fts_results f ON v.chunk_id = f.chunk_id
+            )
+            SELECT 
+                r.chunk_id, 
+                r.rrf_score,
+                c.chunk_index,
+                c.content,
+                c.chunk_type,
+                c.language,
+                c.metadata as chunk_metadata,
+                c.created_at,
+                d.id as doc_id,
+                d.metadata as doc_metadata
+            FROM rrf_scores r
+            JOIN chunks c ON c.id = r.chunk_id
+            JOIN documents d ON d.id = c.document_id
+            ORDER BY r.rrf_score DESC
+            LIMIT ?
+        """
+
+        # Параметры: blob, where_params, sanitized_query, where_params, k, k, limit
+        params = (
+            [blob] + where_params + [sanitized_query] + where_params + [k, k, limit]
+        )
+
+        cursor = self.db.execute_sql(sql, params)
+        results = []
+
+        for row in cursor.fetchall():
+            (
+                chunk_id,
+                rrf_score,
+                chunk_index,
+                content,
+                chunk_type,
+                language,
+                chunk_metadata,
+                chunk_created_at,
+                doc_id,
+                doc_metadata,
+            ) = row
+
+            # Создаём Chunk DTO
+            chunk = Chunk(
+                id=chunk_id,
+                content=content,
+                chunk_index=chunk_index,
+                chunk_type=ChunkType(chunk_type),
+                language=language,
+                parent_doc_id=doc_id,
+                metadata=json.loads(chunk_metadata),
+                created_at=chunk_created_at,
+            )
+
+            doc_meta = json.loads(doc_metadata)
+            doc_title = doc_meta.get("title")
+
+            results.append(
+                ChunkResult(
+                    chunk=chunk,
+                    score=rrf_score,
+                    match_type=MatchType.HYBRID,
+                    parent_doc_id=doc_id,
+                    parent_doc_title=doc_title,
+                    parent_metadata=doc_meta,
+                )
+            )
+
+        return results
