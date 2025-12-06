@@ -286,6 +286,16 @@
 
 ---
 
+### 🔥 Media Content Crisis (Фаза 14.0)
+
+71. [**Media Content Truncation Crisis**](71_media_content_truncation_crisis.md)  
+    Обнаружение катастрофы: 67-95% потеря данных в медиа-файлах, hardcoded лимиты 8k токенов
+
+72. [**Multi-Chunk Media Architecture**](72_multi_chunk_media_architecture.md)  
+    Решение кризиса: summary + transcript chunks, конфигурируемые лимиты, полное покрытие контента
+
+---
+
 ## 🚀 Быстрый старт
 
 ```bash
