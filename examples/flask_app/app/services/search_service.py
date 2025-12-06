@@ -273,7 +273,7 @@ class SearchService:
         if self.cache and mode in ("vector", "hybrid"):
             cache_result = self.cache.get_or_embed(query)
             query_vector = cache_result.embedding
-            logger.debug(f"💾 Cache {'HIT' if cache_result.from_cache else 'MISS'}")
+            logger.info(f"💾 Cache {'HIT ✅' if cache_result.from_cache else 'MISS ❌'}")
 
         results: list[SearchResultItem] = []
 
@@ -337,7 +337,7 @@ class SearchService:
         if self.cache and mode in ("vector", "hybrid"):
             cache_result = self.cache.get_or_embed(query)
             query_vector = cache_result.embedding
-            logger.debug(f"💾 Cache {'HIT' if cache_result.from_cache else 'MISS'}")
+            logger.info(f"💾 Cache {'HIT ✅' if cache_result.from_cache else 'MISS ❌'}")
 
         # Используем core.search() для поиска по документам
         search_results = self.core.search(

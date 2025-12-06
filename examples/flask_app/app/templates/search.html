@@ -74,7 +74,7 @@
                             autocomplete="off"
                             list="search-suggestions"
                             hx-get="{{ url_for('search.results') }}"
-                            hx-trigger="keyup changed delay:500ms, search"
+                            hx-trigger="keyup[key=='Enter'], search"
                             hx-target="#search-results"
                             hx-indicator="#search-indicator"
                             hx-include="#type-filters, #search-mode"
