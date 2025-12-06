@@ -90,7 +90,7 @@ language = "Russian"  # Gemini ответит на русском!
 ### 76. Smart Steps: Summary & Transcription
 
 **Файл:** [76_smart_steps_summary_transcription.md](76_smart_steps_summary_transcription.md)  
-**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.1.1 — частично)
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.1.1)
 
 Реализация `SummaryStep` и `TranscriptionStep` — конкретных шагов обработки медиа-контента.
 
@@ -116,6 +116,36 @@ language = "Russian"  # Gemini ответит на русском!
 
 ---
 
+### 77. OCR Step — Smart Parsing для распознанного текста
+
+**Файл:** [77_smart_step_ocr.md](77_smart_step_ocr.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.1.1)
+
+Реализация `OCRStep` с Markdown-парсингом для изоляции code blocks в видео-скринкастах.
+
+**Ключевые фичи:**
+
+- **parser_mode:** `"markdown"` (code detection) | `"plain"` (simple text)
+- **Code Ratio Monitoring:** WARNING при > 50% CODE chunks (false positives)
+- **MediaType.TEXT Bug Fix:** исправлен несуществующий `MediaType.MARKDOWN`
+- **Constructor Injection:** `splitter: BaseSplitter`
+
+**Тестирование:**
+
+- ✅ 15 тестов OCRStep (0.09s)
+- ✅ Покрытие: should_run, parser_mode, code_ratio, metadata enrichment
+- ✅ 100% passing
+
+**Итоги Phase 14.1.1:**
+
+```
+40 unit-тестов steps + 25 unit-тестов core = 65 тестов
+0.26s execution
+100% passing
+```
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR
@@ -124,11 +154,11 @@ language = "Russian"  # Gemini ответит на русском!
 
 ---
 
-## 🚀 Phase 14.1.1 Preview
+## 🚀 Phase 14.1.2 Preview
 
-**Следующий шаг:** Smart Steps Implementation
+**Следующий шаг:** Advanced Features
 
-Реализация конкретных шагов: `SummaryStep`, `TranscriptionStep`, `OCRStep` с использованием новой архитектуры.
+Реализация FrameDescriptionStep, TimecodeParser, user_instructions для расширения функциональности pipeline.
 
 ---
 
