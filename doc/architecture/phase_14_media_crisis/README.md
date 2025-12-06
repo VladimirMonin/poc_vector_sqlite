@@ -129,69 +129,7 @@ MediaConfig models (4 Pydantic classes) + Template Injection pattern для ка
 **Файл:** [82_configuration_template_injection.md](82_configuration_template_injection.md)  
 **Статус:** ✅ ЗАВЕРШЕНО (Phase 14.3.1)
 
-MediaConfig models + Template Injection pattern для гибкой кастомизации промптов и chunk sizes.
-
-**Проблема:**
-
-Система негибкая после Phase 14.1-14.2:
-- ❌ Промпты захардкожены — нельзя кастомизировать под домен
-- ❌ Chunk size единый — transcript и OCR используют одинаковый размер
-- ❌ Parser mode статичен — OCR всегда Markdown
-
-**Решение: MediaConfig + Template Injection**
-
-**Архитектурное решение:**
-
-```python
-# 4 Pydantic models
-MediaPromptsConfig          # Промпты с кастомизацией
-MediaChunkSizesConfig       # Per-role chunk sizes
-MediaProcessingConfig       # OCR mode, timecodes
-MediaConfig                 # Агрегатор
-
-# Template Injection pattern (безопасно!)
-DEFAULT_SYSTEM_PROMPT = """
-Response language: {language}
-
-{custom_instructions}
-
-Return JSON...
-"""
-```
-
-**Что получили:**
-
-- ✅ TOML config: `[media.prompts]`, `[media.chunk_sizes]`, `[media.processing]`
-- ✅ Template placeholders: `{language}`, `{custom_instructions}` вместо конкатенации
-- ✅ Валидация: `ge=500, le=8000` для chunk_sizes, `pattern="^(markdown|plain)$"` для ocr_parser_mode
-- ✅ 38 unit-тестов (19 config + 19 template injection)
-
-**Примеры TOML:**
-
-```toml
-[media.prompts]
-audio_custom_instructions = "Extract medical terms and dosages"
-video_custom_instructions = "Focus on code blocks and syntax highlighting"
-
-[media.chunk_sizes]
-transcript_chunk_size = 2000
-ocr_text_chunk_size = 1800
-
-[media.processing]
-ocr_parser_mode = "markdown"
-enable_timecodes = true
-```
-
-**Commit:** `d270238`
-
-**Статистика Phase 14.3.1:**
-
-```
-38 new tests (19 config + 19 template injection)
-1062 total tests
-4 Pydantic models
-✅ Phase 14.3.1 — COMPLETED!
-```
+MediaConfig models (4 Pydantic classes) + Template Injection pattern для кастомизации промптов и chunk sizes через `semantic.toml`. **38 unit-тестов, commit `d270238`.**
 
 ---
 
@@ -201,6 +139,15 @@ enable_timecodes = true
 **Статус:** ✅ ЗАВЕРШЕНО (Phase 14.3.3)
 
 Повторный анализ медиа-файлов с новыми custom_instructions через SRP-compliant архитектуру. Single Source of Truth: `Document.metadata["source"]`. **9 unit-тестов, commit `65f060b`.**
+
+---
+
+### 84. CLI Integration — `semantic reanalyze`
+
+**Файл:** [84_cli_reanalyze_command.md](84_cli_reanalyze_command.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.3.4)
+
+CLI команда для повторного анализа медиа-файлов. Флаги: `--prompt`, `--show-details`, `--force`. Интерактивное подтверждение, Rich UI, полное error handling. **11 unit-тестов, commit `8acfc89`.**
 
 ---
 
