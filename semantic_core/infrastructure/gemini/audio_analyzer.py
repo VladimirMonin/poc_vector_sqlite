@@ -32,9 +32,11 @@ class AudioAnalysisSchema(BaseModel):
     action_items: list[str] = []
 
 
-# Системный промпт для анализа аудио
-SYSTEM_PROMPT_TEMPLATE = """You are an audio analyst creating descriptions for semantic search indexing.
+# Системный промпт для анализа аудио (с placeholders для injection)
+DEFAULT_SYSTEM_PROMPT = """You are an audio analyst creating descriptions for semantic search indexing.
 Response language: {language}
+
+{custom_instructions}
 
 Return a JSON with the following structure:
 
@@ -109,6 +111,7 @@ class GeminiAudioAnalyzer:
         model: str = DEFAULT_MODEL,
         max_output_tokens: int = 65_536,
         output_language: str = "Russian",
+        custom_instructions: Optional[str] = None,
     ):
         """Инициализация анализатора.
 
@@ -117,16 +120,34 @@ class GeminiAudioAnalyzer:
             model: Модель для Audio API (по умолчанию flash-lite).
             max_output_tokens: Лимит токенов на вывод модели.
             output_language: Язык для ответов модели.
+            custom_instructions: Кастомные инструкции для промпта (опционально).
         """
         self.api_key = api_key
         self.model = model
         self.max_output_tokens = max_output_tokens
         self.output_language = output_language
-        self.system_prompt = SYSTEM_PROMPT_TEMPLATE.format(language=output_language)
+        self.custom_instructions = custom_instructions
+        self.system_prompt = self._build_system_prompt()
         self._client = None
         logger.debug(
             "Audio analyzer initialized",
             model=model,
+            has_custom_instructions=custom_instructions is not None,
+        )
+
+    def _build_system_prompt(self) -> str:
+        """Собирает system prompt с template injection.
+
+        Returns:
+            Готовый system prompt с инжектированными кастомными инструкциями.
+        """
+        instructions = ""
+        if self.custom_instructions:
+            instructions = f"CUSTOM INSTRUCTIONS:\n{self.custom_instructions}\n"
+
+        return DEFAULT_SYSTEM_PROMPT.format(
+            language=self.output_language,
+            custom_instructions=instructions,
         )
 
     @property

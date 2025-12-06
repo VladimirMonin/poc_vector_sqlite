@@ -30,7 +30,7 @@ Example:
 from pathlib import Path
 from typing import Literal, Optional, Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from semantic_core.utils.logger import get_logger
@@ -68,6 +68,124 @@ def find_config_file(start_dir: Optional[Path] = None) -> Optional[Path]:
         current = parent
 
     return None
+
+
+# === Media Configuration Models ===
+
+
+class MediaPromptsConfig(BaseModel):
+    """Кастомизация промптов для медиа-анализаторов.
+
+    Attributes:
+        audio_instructions: Дополнительные инструкции для аудио анализа.
+        image_instructions: Дополнительные инструкции для анализа изображений.
+        video_instructions: Дополнительные инструкции для видео анализа.
+    """
+
+    audio_instructions: Optional[str] = Field(
+        default=None,
+        description="Custom instructions for audio analysis (e.g., focus on specific topics).",
+    )
+
+    image_instructions: Optional[str] = Field(
+        default=None,
+        description="Custom instructions for image analysis (e.g., detailed object detection).",
+    )
+
+    video_instructions: Optional[str] = Field(
+        default=None,
+        description="Custom instructions for video analysis (e.g., focus on speaker activity).",
+    )
+
+
+class MediaChunkSizesConfig(BaseModel):
+    """Конфигурация размеров чанков для различных типов медиа-контента.
+
+    Attributes:
+        summary_chunk_size: Размер чанка для summary.
+        transcript_chunk_size: Размер чанка для транскрипции.
+        ocr_text_chunk_size: Размер чанка для OCR текста.
+        ocr_code_chunk_size: Размер чанка для кода из OCR.
+    """
+
+    summary_chunk_size: int = Field(
+        default=1500,
+        ge=500,
+        le=5000,
+        description="Chunk size for media summary/description.",
+    )
+
+    transcript_chunk_size: int = Field(
+        default=2000,
+        ge=500,
+        le=8000,
+        description="Chunk size for audio/video transcription.",
+    )
+
+    ocr_text_chunk_size: int = Field(
+        default=1800,
+        ge=500,
+        le=5000,
+        description="Chunk size for regular OCR text from images/video.",
+    )
+
+    ocr_code_chunk_size: int = Field(
+        default=2000,
+        ge=500,
+        le=5000,
+        description="Chunk size for code blocks extracted from OCR.",
+    )
+
+
+class MediaProcessingConfig(BaseModel):
+    """Конфигурация обработки медиа.
+
+    Attributes:
+        ocr_parser_mode: Режим парсинга OCR текста (markdown/plain).
+        enable_timecodes: Включить извлечение таймкодов.
+        strict_timecode_ordering: Проверять порядок таймкодов.
+        max_timeline_items: Максимум элементов timeline.
+    """
+
+    ocr_parser_mode: str = Field(
+        default="markdown",
+        pattern="^(markdown|plain)$",
+        description="Parser mode for OCR text: 'markdown' (detects code blocks) or 'plain'.",
+    )
+
+    enable_timecodes: bool = Field(
+        default=True,
+        description="Enable timecode extraction from Gemini responses ([MM:SS] format).",
+    )
+
+    strict_timecode_ordering: bool = Field(
+        default=False,
+        description="Enforce ascending order for timecodes (warn if violated).",
+    )
+
+    max_timeline_items: int = Field(
+        default=100,
+        ge=10,
+        le=500,
+        description="Maximum number of timeline items to generate.",
+    )
+
+
+class MediaConfig(BaseModel):
+    """Полная конфигурация медиа-обработки.
+
+    Attributes:
+        prompts: Настройки промптов для анализаторов.
+        chunk_sizes: Размеры чанков по типам контента.
+        processing: Настройки обработки медиа.
+    """
+
+    prompts: MediaPromptsConfig = Field(default_factory=MediaPromptsConfig)
+    chunk_sizes: MediaChunkSizesConfig = Field(default_factory=MediaChunkSizesConfig)
+    processing: MediaProcessingConfig = Field(default_factory=MediaProcessingConfig)
+
+
+# === Main Configuration ===
 
 
 class SemanticConfig(BaseSettings):
@@ -184,6 +302,12 @@ class SemanticConfig(BaseSettings):
     output_language: str = Field(
         default="Russian",
         description="Язык для ответов Gemini анализаторов (description, transcription, keywords)",
+    )
+
+    # === Media Configuration (nested) ===
+    media: MediaConfig = Field(
+        default_factory=MediaConfig,
+        description="Конфигурация медиа-обработки (промпты, размеры чанков, настройки)",
     )
 
     # === Search ===
@@ -334,6 +458,40 @@ class SemanticConfig(BaseSettings):
             if section in raw and key in raw[section]:
                 flat[field_name] = raw[section][key]
 
+        # Поддержка nested media config (media.prompts.*, media.chunk_sizes.*, media.processing.*)
+        if "media" in raw and isinstance(raw["media"], dict):
+            media_dict = {}
+            
+            # media.prompts
+            if "prompts" in raw["media"] and isinstance(raw["media"]["prompts"], dict):
+                prompts = {}
+                for key in ["audio_instructions", "image_instructions", "video_instructions"]:
+                    if key in raw["media"]["prompts"]:
+                        prompts[key] = raw["media"]["prompts"][key]
+                if prompts:
+                    media_dict["prompts"] = prompts
+            
+            # media.chunk_sizes
+            if "chunk_sizes" in raw["media"] and isinstance(raw["media"]["chunk_sizes"], dict):
+                chunk_sizes = {}
+                for key in ["summary_chunk_size", "transcript_chunk_size", "ocr_text_chunk_size", "ocr_code_chunk_size"]:
+                    if key in raw["media"]["chunk_sizes"]:
+                        chunk_sizes[key] = raw["media"]["chunk_sizes"][key]
+                if chunk_sizes:
+                    media_dict["chunk_sizes"] = chunk_sizes
+            
+            # media.processing
+            if "processing" in raw["media"] and isinstance(raw["media"]["processing"], dict):
+                processing = {}
+                for key in ["ocr_parser_mode", "enable_timecodes", "strict_timecode_ordering", "max_timeline_items"]:
+                    if key in raw["media"]["processing"]:
+                        processing[key] = raw["media"]["processing"][key]
+                if processing:
+                    media_dict["processing"] = processing
+            
+            if media_dict:
+                flat["media"] = media_dict
+
         # Также поддерживаем плоские ключи (для простоты)
         for key in [
             "db_path",
@@ -415,6 +573,28 @@ class SemanticConfig(BaseSettings):
                 "enabled": self.media_enabled,
                 "rpm_limit": self.media_rpm_limit,
                 "output_language": self.output_language,
+                # Nested media config
+                "prompts": {
+                    k: v
+                    for k, v in {
+                        "audio_instructions": self.media.prompts.audio_instructions,
+                        "image_instructions": self.media.prompts.image_instructions,
+                        "video_instructions": self.media.prompts.video_instructions,
+                    }.items()
+                    if v is not None
+                },
+                "chunk_sizes": {
+                    "summary_chunk_size": self.media.chunk_sizes.summary_chunk_size,
+                    "transcript_chunk_size": self.media.chunk_sizes.transcript_chunk_size,
+                    "ocr_text_chunk_size": self.media.chunk_sizes.ocr_text_chunk_size,
+                    "ocr_code_chunk_size": self.media.chunk_sizes.ocr_code_chunk_size,
+                },
+                "processing": {
+                    "ocr_parser_mode": self.media.processing.ocr_parser_mode,
+                    "enable_timecodes": self.media.processing.enable_timecodes,
+                    "strict_timecode_ordering": self.media.processing.strict_timecode_ordering,
+                    "max_timeline_items": self.media.processing.max_timeline_items,
+                },
             },
             "search": {
                 "limit": self.search_limit,
@@ -463,10 +643,17 @@ def reset_config() -> None:
 
 
 __all__ = [
+    # Main config
     "SemanticConfig",
     "get_config",
     "reset_config",
     "find_config_file",
+    # Media config models
+    "MediaConfig",
+    "MediaPromptsConfig",
+    "MediaChunkSizesConfig",
+    "MediaProcessingConfig",
+    # Type aliases
     "LogLevel",
     "SplitterType",
     "ContextStrategyType",
