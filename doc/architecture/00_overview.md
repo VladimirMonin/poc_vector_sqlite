@@ -297,6 +297,9 @@
 73. [**Multilingual Media Analysis**](73_multilingual_media_analysis.md)  
     Настройка языка вывода через конфиг: template промпты, инъекция параметров, backward compatibility
 
+74. [**Media Smart Splitter Integration**](74_media_smart_splitter_integration.md)  
+    SmartSplitter для OCR-текста: изоляция кода в скринкастах, Markdown промпты, code_ratio мониторинг
+
 ---
 
 ## 🚀 Быстрый старт
