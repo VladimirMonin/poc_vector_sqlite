@@ -65,6 +65,28 @@ language = "Russian"  # Gemini ответит на русском!
 
 ---
 
+### 75. Processing Steps Architecture
+
+**Файл:** [75_processing_steps_architecture.md](75_processing_steps_architecture.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.1.0)
+
+Модульная step-based архитектура для media processing: `MediaContext`, `BaseProcessingStep`, `MediaPipeline`.
+
+**Компоненты:**
+
+- **MediaContext** (frozen dataclass): immutable контейнер данных
+- **BaseProcessingStep** (ABC): абстракция для шагов обработки
+- **MediaPipeline**: executor для координации шагов
+- **Service Locator**: зависимости через `context.services`
+
+**Тестирование:**
+
+- ✅ 13 unit-тестов MediaContext (immutability, with_chunks, service locator)
+- ✅ 12 unit-тестов MediaPipeline (execution, error handling, logging)
+- ✅ 100% passing
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR
@@ -73,11 +95,11 @@ language = "Russian"  # Gemini ответит на русском!
 
 ---
 
-## 🚧 Phase 14.1 Preview
+## 🚀 Phase 14.1.1 Preview
 
-**Следующий шаг:** ProcessingStep Abstraction
+**Следующий шаг:** Smart Steps Implementation
 
-Рефакторинг `_build_media_chunks()` → `SummaryStep`, `TranscriptionStep`, `OCRStep` для гибкости и тестируемости.
+Реализация конкретных шагов: `SummaryStep`, `TranscriptionStep`, `OCRStep` с использованием новой архитектуры.
 
 ---
 
