@@ -181,6 +181,11 @@ class SemanticConfig(BaseSettings):
         description="Максимальное количество токенов в ответе Gemini (image/audio/video analysis)",
     )
 
+    output_language: str = Field(
+        default="Russian",
+        description="Язык для ответов Gemini анализаторов (description, transcription, keywords)",
+    )
+
     # === Search ===
     search_limit: int = Field(
         default=10,
@@ -316,6 +321,7 @@ class SemanticConfig(BaseSettings):
             ("processing", "context_strategy"): "context_strategy",
             ("media", "enabled"): "media_enabled",
             ("media", "rpm_limit"): "media_rpm_limit",
+            ("media", "output_language"): "output_language",
             ("search", "limit"): "search_limit",
             ("search", "type"): "search_type",
             ("logging", "level"): "log_level",
@@ -408,6 +414,7 @@ class SemanticConfig(BaseSettings):
             "media": {
                 "enabled": self.media_enabled,
                 "rpm_limit": self.media_rpm_limit,
+                "output_language": self.output_language,
             },
             "search": {
                 "limit": self.search_limit,
