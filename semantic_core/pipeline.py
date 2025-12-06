@@ -677,7 +677,7 @@ class SemanticCore:
             # Формируем метаданные
             metadata = {
                 "title": title,
-                "source": path,
+                "source": str(path),
                 "filename": Path(path).name,
                 "media_type": "image",
                 "mime_type": task.mime_type,
@@ -835,7 +835,7 @@ class SemanticCore:
 
             metadata = {
                 "title": title,
-                "source": path,
+                "source": str(path),
                 "filename": Path(path).name,
                 "media_type": "audio",
                 "mime_type": get_file_mime_type(path),
@@ -859,7 +859,7 @@ class SemanticCore:
                 chunk_type=ChunkType.AUDIO_REF,
                 analysis=analysis,
                 fallback_metadata={
-                    "source": path,
+                    "source": str(path),
                     "filename": Path(path).name,
                     "_original_path": str(Path(path)),
                 },
@@ -985,7 +985,7 @@ class SemanticCore:
             # Метаданные
             metadata = {
                 "title": title,
-                "source": path,
+                "source": str(path),
                 "filename": Path(path).name,
                 "media_type": "video",
                 "mime_type": get_file_mime_type(path),
@@ -1008,7 +1008,7 @@ class SemanticCore:
                 chunk_type=ChunkType.VIDEO_REF,
                 analysis=analysis,
                 fallback_metadata={
-                    "source": path,
+                    "source": str(path),
                     "filename": Path(path).name,
                     "_original_path": str(Path(path)),
                     "duration_seconds": task.result_duration_seconds,
