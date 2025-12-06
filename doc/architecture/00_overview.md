@@ -281,6 +281,9 @@
 69. [**Result Type Abstraction**](69_result_type_abstraction.md)  
     Чанки vs Документы: toggle в UI, два DTO, нормализация RRF score
 
+70. [**Search Score Normalization**](70_search_score_normalization.md)  
+    Математика релевантности: линейная формула, RRF адаптация и min_score фильтр
+
 ---
 
 ## 🚀 Быстрый старт
