@@ -94,38 +94,52 @@ class DocumentResultItem:
     description: str = ""
 
 
-def _score_to_class(score: float) -> str:
-    """Преобразовать score в CSS класс.
+def _score_to_class(score: float, match_type: MatchType) -> str:
+    """Преобразовать score в CSS класс с учётом режима.
 
     Args:
         score: Значение релевантности.
+        match_type: Режим поиска.
 
     Returns:
         CSS класс: 'score-high', 'score-medium', или 'score-low'.
     """
-    if score >= 0.02:
-        return "score-high"
-    elif score >= 0.01:
-        return "score-medium"
-    return "score-low"
+    if match_type == MatchType.HYBRID:
+        # RRF пороги
+        if score >= 0.02:
+            return "score-high"
+        elif score >= 0.01:
+            return "score-medium"
+        return "score-low"
+    else:
+        # Vector/FTS пороги (0.0-1.0)
+        if score >= 0.7:
+            return "score-high"
+        elif score >= 0.4:
+            return "score-medium"
+        return "score-low"
 
 
-def _normalize_rrf_score(score: float, max_score: float = 0.033) -> int:
-    """Нормализовать RRF score в проценты (0-100).
-
-    RRF score обычно в диапазоне 0.01-0.033 (для k=60).
-    Максимум = 1/(k+1) = 1/61 ≈ 0.0164 для одного источника,
-    или ~0.033 для hybrid (два источника).
+def _normalize_score(score: float, match_type: MatchType) -> int:
+    """Нормализовать score в проценты с учётом режима поиска.
 
     Args:
-        score: RRF score (обычно 0.01-0.033).
-        max_score: Максимальный ожидаемый score.
+        score: Raw score из ядра.
+        match_type: Режим поиска (HYBRID, VECTOR, FTS).
 
     Returns:
         Нормализованный процент (0-100).
     """
-    normalized = min(score / max_score, 1.0)
-    return int(normalized * 100)
+    if match_type == MatchType.HYBRID:
+        # RRF score с k=1:
+        # Max score (Rank 1 in both) = 1/(1+1) + 1/(1+1) = 0.5 + 0.5 = 1.0
+        # Min score (Rank 100 in one) = 1/(1+100) = 0.0099
+        # Так как max = 1.0, то просто умножаем на 100
+        return int(min(score, 1.0) * 100)
+    else:
+        # Vector/FTS score: 0.0-1.0 → 0-100%
+        return int(min(max(score, 0.0), 1.0) * 100)
+
 
 
 def _chunk_result_to_item(result: ChunkResult) -> SearchResultItem:
@@ -155,8 +169,8 @@ def _chunk_result_to_item(result: ChunkResult) -> SearchResultItem:
         chunk_type=result.chunk_type.value,
         language=result.language,
         score=result.score,
-        score_percent=_normalize_rrf_score(result.score),
-        score_class=_score_to_class(result.score),
+        score_percent=_normalize_score(result.score, result.match_type),
+        score_class=_score_to_class(result.score, result.match_type),
         match_type=result.match_type.value,
         parent_doc_id=result.parent_doc_id,
         parent_doc_title=result.parent_doc_title,
@@ -198,8 +212,8 @@ def _search_result_to_item(result: SearchResult) -> DocumentResultItem:
         title=metadata.get("title") or source or "Untitled",
         source=source,
         score=result.score,
-        score_percent=_normalize_rrf_score(result.score),
-        score_class=_score_to_class(result.score),
+        score_percent=_normalize_score(result.score, result.match_type),
+        score_class=_score_to_class(result.score, result.match_type),
         match_type=result.match_type.value,
         chunk_count=metadata.get("chunk_count", 0),
         tags=tags,
@@ -220,11 +234,11 @@ class SearchService:
 
     # Маппинг фильтра UI → ChunkType
     CHUNK_TYPE_FILTER_MAP = {
-        "text": "text",
-        "code": "code",
-        "image": "image_ref",
-        "audio": "audio_ref",
-        "video": "video_ref",
+        "text": ["text"],
+        "code": ["code"],
+        "image": ["image_ref"],
+        "audio": ["audio_ref"],
+        "video": ["video_ref"],
     }
 
     def __init__(
@@ -247,6 +261,7 @@ class SearchService:
         chunk_types: Optional[list[str]] = None,
         mode: str = "hybrid",
         limit: int = 20,
+        min_score: int = 0,
     ) -> list[SearchResultItem]:
         """Выполнить поиск по базе знаний.
 
@@ -256,6 +271,7 @@ class SearchService:
                          (text, code, image, audio). None = все.
             mode: Режим поиска (vector, fts, hybrid).
             limit: Максимальное количество результатов.
+            min_score: Минимальный порог релевантности (0-100%).
 
         Returns:
             Список SearchResultItem для отображения в UI.
@@ -278,33 +294,40 @@ class SearchService:
 
         results: list[SearchResultItem] = []
 
-        # Если выбраны типы чанков — ищем по каждому типу
+        # ВСЕГДА делаем ОДИН общий поиск (без фильтра по типу)
+        # Это гарантирует корректный RRF ranking
+        chunk_results = self.core.search_chunks(
+            query=query,
+            mode=mode,
+            limit=limit * 4 if chunk_types else limit,  # Берём больше если есть фильтр
+            k=1,
+            query_vector=query_vector,
+        )
+        
+        # Конвертируем в SearchResultItem
+        all_results = [_chunk_result_to_item(r) for r in chunk_results]
+        
+        # Фильтруем по типам ПОСЛЕ поиска (если нужно)
         if chunk_types:
+            # Собираем ChunkType фильтры
+            allowed_types: set[str] = set()
             for chunk_type_ui in chunk_types:
-                chunk_type_filter = self.CHUNK_TYPE_FILTER_MAP.get(chunk_type_ui)
-                if not chunk_type_filter:
-                    continue
-
-                type_results = self.core.search_chunks(
-                    query=query,
-                    mode=mode,
-                    limit=limit,
-                    chunk_type_filter=chunk_type_filter,
-                    query_vector=query_vector,
-                )
-                results.extend(_chunk_result_to_item(r) for r in type_results)
+                chunk_filters = self.CHUNK_TYPE_FILTER_MAP.get(chunk_type_ui)
+                if chunk_filters:
+                    allowed_types.update(chunk_filters)
+            
+            # Фильтруем результаты
+            results = [r for r in all_results if r.chunk_type in allowed_types]
         else:
-            # Поиск без фильтра по типу
-            chunk_results = self.core.search_chunks(
-                query=query,
-                mode=mode,
-                limit=limit,
-                query_vector=query_vector,
-            )
-            results = [_chunk_result_to_item(r) for r in chunk_results]
+            results = all_results
+        
+        # Обрезаем до limit (уже отсортировано по score из core)
+        results = results[:limit]
 
-        # Сортируем по score и обрезаем до limit
-        results.sort(key=lambda x: x.score, reverse=True)
+        # Фильтрация по минимальному score (в процентах)
+        if min_score > 0:
+            results = [r for r in results if r.score_percent >= min_score]
+
         results = results[:limit]
 
         logger.info(f"✅ Найдено {len(results)} результатов")
@@ -315,6 +338,7 @@ class SearchService:
         query: str,
         mode: str = "hybrid",
         limit: int = 20,
+        min_score: int = 0,
     ) -> list[DocumentResultItem]:
         """Выполнить поиск по документам (агрегация по документам).
 
@@ -322,6 +346,7 @@ class SearchService:
             query: Текст поискового запроса.
             mode: Режим поиска (vector, fts, hybrid).
             limit: Максимальное количество результатов.
+            min_score: Минимальный порог релевантности (0-100%).
 
         Returns:
             Список DocumentResultItem для отображения в UI.
@@ -345,10 +370,15 @@ class SearchService:
             query=query,
             mode=mode,
             limit=limit,
+            k=1,
             query_vector=query_vector,
         )
 
         results = [_search_result_to_item(r) for r in search_results]
+
+        # Фильтрация по минимальному score (в процентах)
+        if min_score > 0:
+            results = [r for r in results if r.score_percent >= min_score]
 
         logger.info(f"✅ Найдено {len(results)} документов")
         return results
