@@ -273,6 +273,53 @@ Phase 14.1: Smart Steps + Advanced Features — ✅ COMPLETED
 
 ---
 
+### 81. MediaService & Aggregation Layer
+
+**Файл:** [81_mediaservice_aggregation_layer.md](81_mediaservice_aggregation_layer.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.2)
+
+Сервисный слой для агрегации разрозненных медиа-чанков в структурированные DTO.
+
+**Проблема:**
+
+После Phase 14.1 медиа разбивается на множество чанков (summary, transcript, OCR).
+UI/CLI приходится вручную собирать данные → дублирование логики.
+
+**Решение: MediaService**
+
+Единая точка агрегации с тремя методами:
+- `get_media_details(doc_id)` → `MediaDetails` (полная информация)
+- `get_timeline(doc_id)` → `list[TimelineItem]` (навигация по таймкодам)
+- `get_chunks_by_role(doc_id, role)` → `list[Chunk]` (фильтрация)
+
+**DTO Models:**
+- **TimelineItem:** chunk_id, start_seconds, content_preview, formatted_time
+- **MediaDetails:** summary, full_transcript, full_ocr_text, timeline, keywords, +properties
+
+**Ключевые фичи:**
+- ✅ Автоматическое склеивание transcript/OCR в единый текст
+- ✅ Timeline сортируется по start_seconds
+- ✅ Properties: has_timeline, has_transcript, has_ocr, total_chunks
+- ✅ Форматирование времени: 65 → "01:05", 3665 → "1:01:05"
+
+**Тестирование:**
+- ✅ 9 unit-тестов (100% passing)
+- ✅ Fixture-based mocking (Peewee ORM)
+- ✅ Обработка исключений через `peewee.DoesNotExist`
+
+**Commit:** `a7045fd`
+
+**Итоги Phase 14.2:**
+
+```
+9 unit-тестов MediaService
+1024 total tests в проекте
+Сокращение кода: 30+ строк → 4 строки (Flask routes)
+✅ Phase 14.2 — COMPLETED!
+```
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR
