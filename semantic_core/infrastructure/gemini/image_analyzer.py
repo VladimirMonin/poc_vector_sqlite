@@ -33,7 +33,7 @@ SYSTEM_PROMPT = """You are an image analyst creating descriptions for semantic s
 
 Analyze the image and provide:
 1. alt_text: A concise accessibility description (1 sentence)
-2. description: Detailed description of the image content (2-4 sentences)
+2. description: Comprehensive detailed description of all visible elements, text, diagrams, relationships, and context. Be thorough and complete - describe everything you see in as much detail as needed for full understanding.
 3. keywords: List of 5-10 relevant keywords for search
 4. ocr_text: Any visible text in the image (null if none)
 
@@ -42,6 +42,8 @@ Focus on:
 - Colors, mood, and style
 - Text/OCR if present
 - Context clues
+- Diagrams, charts, relationships between elements
+- All visible details that would help someone understand the image content
 
 Output valid JSON matching the schema."""
 
@@ -67,15 +69,18 @@ class GeminiImageAnalyzer:
         self,
         api_key: str,
         model: str = "gemini-2.5-flash-lite",
+        max_output_tokens: int = 65_536,
     ):
         """Инициализация анализатора.
 
         Args:
             api_key: API ключ Google Gemini.
             model: Модель для Vision API.
+            max_output_tokens: Лимит токенов на вывод модели.
         """
         self.api_key = api_key
         self.model = model
+        self.max_output_tokens = max_output_tokens
         self._client = None
         logger.debug(
             "Image analyzer initialized",
@@ -145,7 +150,7 @@ class GeminiImageAnalyzer:
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             temperature=0.4,
-            max_output_tokens=1024,
+            max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",
             response_schema=ImageAnalysisSchema,
             safety_settings=[

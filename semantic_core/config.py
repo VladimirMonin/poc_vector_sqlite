@@ -142,6 +142,20 @@ class SemanticConfig(BaseSettings):
         description="Тип сплиттера документов",
     )
 
+    chunk_size: int = Field(
+        default=1800,
+        ge=500,
+        le=8000,
+        description="Размер текстового чанка в символах (рекомендуется 1800 для Gemini Embedding 2048 токенов)",
+    )
+
+    code_chunk_size: int = Field(
+        default=2000,
+        ge=500,
+        le=10000,
+        description="Размер чанка кода в символах",
+    )
+
     context_strategy: ContextStrategyType = Field(
         default="hierarchical",
         description="Стратегия формирования контекста",
@@ -158,6 +172,13 @@ class SemanticConfig(BaseSettings):
         ge=1,
         le=100,
         description="Rate limit для Vision/Audio API (запросов/мин)",
+    )
+
+    max_output_tokens: int = Field(
+        default=65_536,
+        ge=1024,
+        le=65_536,
+        description="Максимальное количество токенов в ответе Gemini (image/audio/video analysis)",
     )
 
     # === Search ===

@@ -37,7 +37,7 @@ class SmartSplitter(BaseSplitter):
     def __init__(
         self,
         parser: DocumentParser,
-        chunk_size: int = 1000,
+        chunk_size: int = 1800,
         code_chunk_size: int = 2000,
         preserve_code: bool = True,
     ):

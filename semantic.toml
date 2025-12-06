@@ -17,10 +17,13 @@ embedding_dimension = 768
 [processing]
 splitter = "smart"           # simple | smart
 context_strategy = "hierarchical"  # basic | hierarchical
+chunk_size = 1800            # Размер текстового чанка (500-8000 символов)
+code_chunk_size = 2000       # Размер чанка кода (500-10000 символов)
 
 [media]
 enabled = true
 rpm_limit = 15  # Запросов в минуту для Vision/Audio API
+max_output_tokens = 65536  # Лимит токенов для Gemini (image/audio/video), макс 65536
 
 [search]
 limit = 10      # Результатов по умолчанию

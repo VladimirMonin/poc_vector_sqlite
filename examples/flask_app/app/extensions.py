@@ -101,15 +101,22 @@ def init_semantic_core(app: Flask) -> None:
         logger.info(f"🤖 Embedder: {config.embedding_model}")
 
         # === Media Analyzers ===
-        image_analyzer = GeminiImageAnalyzer(api_key=api_key)
+        image_analyzer = GeminiImageAnalyzer(
+            api_key=api_key,
+            max_output_tokens=config.max_output_tokens,
+        )
         logger.info("🖼️ ImageAnalyzer инициализирован")
 
-        audio_analyzer = GeminiAudioAnalyzer(api_key=api_key)
+        audio_analyzer = GeminiAudioAnalyzer(
+            api_key=api_key,
+            max_output_tokens=config.max_output_tokens,
+        )
         logger.info("🎵 AudioAnalyzer инициализирован")
 
         video_analyzer = GeminiVideoAnalyzer(
             api_key=api_key,
             audio_analyzer=audio_analyzer,
+            max_output_tokens=config.max_output_tokens,
         )
         logger.info("🎬 VideoAnalyzer инициализирован")
 
@@ -121,7 +128,11 @@ def init_semantic_core(app: Flask) -> None:
 
     # Splitter
     parser = MarkdownNodeParser()
-    splitter = SmartSplitter(parser=parser)
+    splitter = SmartSplitter(
+        parser=parser,
+        chunk_size=config.chunk_size,
+        code_chunk_size=config.code_chunk_size,
+    )
 
     # Context Strategy
     context_strategy = HierarchicalContextStrategy()

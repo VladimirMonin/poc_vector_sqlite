@@ -188,7 +188,7 @@
                             </div>
                             <small class="text-muted">{{ chunk.content|length }} символов</small>
                         </div>
-                        <pre class="mb-0 small bg-body-secondary p-2 rounded" style="white-space: pre-wrap; max-height: 150px; overflow-y: auto;">{{ chunk.content[:500] }}{% if chunk.content|length > 500 %}...{% endif %}</pre>
+                        <pre class="mb-0 small bg-body-secondary p-2 rounded" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{{ chunk.content }}</pre>
                     </div>
                     {% endfor %}
                 </div>

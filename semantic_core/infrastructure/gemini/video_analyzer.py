@@ -94,6 +94,7 @@ class GeminiVideoAnalyzer:
         api_key: str,
         model: str = DEFAULT_MODEL,
         audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
+        max_output_tokens: int = 65_536,
     ):
         """Инициализация анализатора.
 
@@ -101,10 +102,12 @@ class GeminiVideoAnalyzer:
             api_key: API ключ Google Gemini.
             model: Модель для Vision API (pro для видео).
             audio_analyzer: Опциональный анализатор для отдельной аудио-транскрипции.
+            max_output_tokens: Лимит токенов на вывод модели.
         """
         self.api_key = api_key
         self.model = model
         self.audio_analyzer = audio_analyzer
+        self.max_output_tokens = max_output_tokens
         self._client = None
         logger.debug(
             "Video analyzer initialized",
@@ -241,7 +244,7 @@ class GeminiVideoAnalyzer:
         api_config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             temperature=0.4,
-            max_output_tokens=8192,
+            max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",
             response_schema=VideoAnalysisSchema,
             safety_settings=[

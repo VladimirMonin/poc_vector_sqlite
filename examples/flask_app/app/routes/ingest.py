@@ -12,6 +12,7 @@ Endpoints:
     POST /documents/<id>/reindex — Переиндексация
 """
 
+import json
 from pathlib import Path
 
 from flask import (
@@ -28,7 +29,7 @@ from flask import (
 )
 
 from app.services.upload_service import UploadService
-from semantic_core.domain import Document
+from semantic_core.domain import Document, MediaType
 from semantic_core.infrastructure.storage.peewee.models import (
     DocumentModel,
     ChunkModel,
@@ -428,29 +429,68 @@ def reindex_document(doc_id: int):
             flash("Документ не найден", "warning")
             return redirect(url_for("ingest.documents_page"))
 
+        # Получаем метаданные (могут быть строкой JSON)
+        meta_raw = doc_model.metadata or "{}"
+        try:
+            metadata = meta_raw if isinstance(meta_raw, dict) else json.loads(meta_raw)
+        except json.JSONDecodeError:
+            metadata = {}
+
         # Получаем путь к файлу
-        source = doc_model.metadata.get("source") if doc_model.metadata else None
+        source = metadata.get("source")
         if not source or not Path(source).exists():
             flash("Исходный файл не найден", "warning")
             return redirect(url_for("ingest.documents_page"))
 
-        # Читаем содержимое
-        content = Path(source).read_text(encoding="utf-8")
+        media_type_str = doc_model.media_type or "text"
+        media_type = MediaType(media_type_str)
 
-        # Удаляем старый документ
-        core.delete(doc_id)
-
-        # Создаём новый
-        doc = Document(
-            content=content,
-            metadata=doc_model.metadata or {},
-        )
-        core.ingest(doc)
-
-        flash("Документ переиндексирован", "success")
+        try:
+            # Для медиа используем специальные методы, для текста — обычный ingest
+            if media_type == MediaType.IMAGE:
+                core.ingest_image(source, mode="sync")
+            elif media_type == MediaType.AUDIO:
+                core.ingest_audio(source, mode="sync")
+            elif media_type == MediaType.VIDEO:
+                core.ingest_video(source, mode="sync")
+            else:
+                # Текстовые документы — читаем содержимое
+                source_path = Path(source)
+                try:
+                    content = source_path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    try:
+                        content = source_path.read_text(encoding="cp1251")
+                    except UnicodeDecodeError:
+                        content = source_path.read_text(encoding="utf-8", errors="replace")
+                
+                doc = Document(
+                    content=content,
+                    metadata=metadata,
+                    media_type=media_type,
+                )
+                core.ingest(doc)
+        except Exception as ingest_error:
+            logger.error(f" Ошибка переиндексации {doc_id}: {ingest_error}")
+            flash(f"Ошибка переиндексации: {ingest_error}", "danger")
+        else:
+            # Только после успешного ingest удаляем старый документ
+            try:
+                core.delete(doc_id)
+            except Exception as delete_error:
+                logger.error(
+                    f" Не удалось удалить старый документ {doc_id} после переиндексации: {delete_error}"
+                )
+                flash(
+                    "Новый документ создан, но старый не удалён: "
+                    f"{delete_error}",
+                    "warning",
+                )
+            else:
+                flash("Документ переиндексирован", "success")
 
     except Exception as e:
-        logger.error(f"🔥 Ошибка переиндексации {doc_id}: {e}")
+        logger.error(f" Ошибка переиндексации {doc_id}: {e}")
         flash(f"Ошибка: {e}", "danger")
 
     return redirect(url_for("ingest.documents_page"))

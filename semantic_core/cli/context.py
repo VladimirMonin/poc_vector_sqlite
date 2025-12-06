@@ -156,7 +156,11 @@ class CLIContext:
 
         # Parser and Splitter
         parser = MarkdownNodeParser()
-        splitter = SmartSplitter(parser=parser)
+        splitter = SmartSplitter(
+            parser=parser,
+            chunk_size=config.chunk_size,
+            code_chunk_size=config.code_chunk_size,
+        )
 
         # Context Strategy
         context_strategy = HierarchicalContextStrategy()
@@ -174,9 +178,18 @@ class CLIContext:
                     GeminiVideoAnalyzer,
                 )
 
-                image_analyzer = GeminiImageAnalyzer(api_key=api_key)
-                audio_analyzer = GeminiAudioAnalyzer(api_key=api_key)
-                video_analyzer = GeminiVideoAnalyzer(api_key=api_key)
+                image_analyzer = GeminiImageAnalyzer(
+                    api_key=api_key,
+                    max_output_tokens=config.max_output_tokens,
+                )
+                audio_analyzer = GeminiAudioAnalyzer(
+                    api_key=api_key,
+                    max_output_tokens=config.max_output_tokens,
+                )
+                video_analyzer = GeminiVideoAnalyzer(
+                    api_key=api_key,
+                    max_output_tokens=config.max_output_tokens,
+                )
             except ImportError:
                 # Media dependencies not installed
                 pass

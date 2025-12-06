@@ -76,15 +76,18 @@ class GeminiAudioAnalyzer:
         self,
         api_key: str,
         model: str = DEFAULT_MODEL,
+        max_output_tokens: int = 65_536,
     ):
         """Инициализация анализатора.
 
         Args:
             api_key: API ключ Google Gemini.
             model: Модель для Audio API (по умолчанию flash-lite).
+            max_output_tokens: Лимит токенов на вывод модели.
         """
         self.api_key = api_key
         self.model = model
+        self.max_output_tokens = max_output_tokens
         self._client = None
         logger.debug(
             "Audio analyzer initialized",
@@ -165,7 +168,7 @@ class GeminiAudioAnalyzer:
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             temperature=0.3,
-            max_output_tokens=8192,  # Для длинных транскрипций
+            max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",
             response_schema=AudioAnalysisSchema,
             safety_settings=[
