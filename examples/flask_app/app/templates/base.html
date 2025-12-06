@@ -180,16 +180,15 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('ingest') %}active{% endif %}" href="{{ url_for('ingest.documents_page') }}">
+                    <a class="nav-link {% if request.endpoint and request.endpoint.startswith('ingest') and request.endpoint != 'ingest.media_gallery' %}active{% endif %}" href="{{ url_for('ingest.documents_page') }}">
                         <i class="bi bi-file-text"></i>
                         Документы
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link disabled text-muted" href="#" aria-disabled="true">
-                        <i class="bi bi-image"></i>
+                    <a class="nav-link {% if request.endpoint == 'ingest.media_gallery' %}active{% endif %}" href="{{ url_for('ingest.media_gallery') }}">
+                        <i class="bi bi-images"></i>
                         Медиа
-                        <span class="badge bg-secondary ms-1">Soon</span>
                     </a>
                 </li>
             </ul>

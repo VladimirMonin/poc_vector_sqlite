@@ -7,6 +7,7 @@ Endpoints:
     GET /ingest — Страница загрузки
     POST /ingest/upload — Загрузка файлов
     GET /documents — Список документов
+    GET /media — Галерея медиа-файлов
     POST /documents/<id>/delete — Удаление документа
     POST /documents/<id>/reindex — Переиндексация
 """
@@ -502,4 +503,97 @@ def serve_media(doc_id: int):
         file_path,
         mimetype=mime_type,
         as_attachment=False,
+    )
+
+
+# ==============================================================================
+# Media Gallery
+# ==============================================================================
+
+
+@ingest_bp.route("/media")
+def media_gallery():
+    """Галерея медиа-файлов (изображения, аудио, видео).
+    
+    Фильтрация по типу через query param ?type=image|audio|video|all.
+    """
+    import json
+    
+    filter_type = request.args.get("type", "all")  # image, audio, video, all
+    
+    # Маппинг chunk_type → media_type
+    CHUNK_TYPE_TO_MEDIA = {
+        "image_ref": "image",
+        "audio_ref": "audio",
+        "video_ref": "video",
+    }
+    
+    # Типы чанков для фильтрации
+    if filter_type == "all":
+        media_chunk_types = ["image_ref", "audio_ref", "video_ref"]
+    elif filter_type == "image":
+        media_chunk_types = ["image_ref"]
+    elif filter_type == "audio":
+        media_chunk_types = ["audio_ref"]
+    elif filter_type == "video":
+        media_chunk_types = ["video_ref"]
+    else:
+        media_chunk_types = ["image_ref", "audio_ref", "video_ref"]
+    
+    # Находим документы, у которых первый чанк — медиа-типа
+    # (документ целиком = медиа-файл)
+    media_items = []
+    
+    # Получаем уникальные document_id для медиа-чанков
+    media_chunks = (
+        ChunkModel.select(ChunkModel.document_id, ChunkModel.chunk_type)
+        .where(ChunkModel.chunk_type.in_(media_chunk_types))
+        .where(ChunkModel.chunk_index == 0)  # Только первый чанк
+        .distinct()
+    )
+    
+    doc_ids = [c.document_id for c in media_chunks]
+    
+    if doc_ids:
+        docs = (
+            DocumentModel.select()
+            .where(DocumentModel.id.in_(doc_ids))
+            .order_by(DocumentModel.created_at.desc())
+        )
+        
+        # Кешируем chunk_type для каждого документа
+        doc_chunk_types = {c.document_id: c.chunk_type for c in media_chunks}
+        
+        for doc in docs:
+            try:
+                meta = json.loads(doc.metadata) if isinstance(doc.metadata, str) else (doc.metadata or {})
+            except (json.JSONDecodeError, TypeError):
+                meta = {}
+            
+            chunk_type = doc_chunk_types.get(doc.id, "image_ref")
+            media_type = CHUNK_TYPE_TO_MEDIA.get(chunk_type, "image")
+            
+            # Формируем title из metadata или source
+            title = meta.get("title")
+            if not title:
+                source = meta.get("source", "")
+                if source:
+                    title = Path(source).stem  # Имя файла без расширения
+                else:
+                    title = f"Media #{doc.id}"
+            
+            media_items.append({
+                "id": doc.id,
+                "title": title,
+                "media_type": media_type,
+                "source": meta.get("source", ""),
+                "created_at": doc.created_at,
+                "description": meta.get("description", "")[:100] if meta.get("description") else "",
+            })
+    
+    return render_template(
+        "media.html",
+        media_items=media_items,
+        filter_type=filter_type,
+        total_count=len(media_items),
     )

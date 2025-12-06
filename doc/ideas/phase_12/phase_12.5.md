@@ -1,7 +1,7 @@
 # Phase 12.5: Media Gallery Page
 
-**Статус:** 📋 СПЕЦИФИКАЦИЯ  
-**Дата:** 2025-12-05  
+**Статус:** ✅ ВЫПОЛНЕНО  
+**Дата:** 2025-12-06  
 **Зависимость:** Phase 12.4  
 **Цель:** Реализовать страницу галереи медиа — убрать заглушку "Soon" из sidebar
 
@@ -15,17 +15,22 @@
 
 ## 🎯 Решение
 
-Создать `/media` страницу с:
+Создана страница `/media` с:
 
-- Grid/List view
-- Фильтрация по типу (image/audio/video)
-- Превью для изображений
-- Иконки для аудио/видео
+- Grid view с карточками
+- Фильтрация по типу (image/audio/video/all)
+- Превью для изображений (через `serve_media`)
+- Иконки-заглушки для аудио/видео
 - Клик → document_detail
+- Sidebar обновлён (активная ссылка)
+
+**Особенности реализации:**
+- Фильтрация происходит через поиск чанков типа `image_ref`, `audio_ref`, `video_ref` с индексом 0.
+- `DocumentModel` не имеет поля `title`, оно извлекается из `metadata` или генерируется из имени файла.
 
 ---
 
-## 🔧 Задачи
+## 🔧 Реализация
 
 ### 1. Route
 
@@ -35,19 +40,14 @@
 @ingest_bp.route("/media")
 def media_gallery():
     """Галерея медиа-файлов."""
-    filter_type = request.args.get("type", "all")  # image, audio, video, all
+    # ... логика фильтрации через ChunkModel ...
     
-    # Запрос документов с media_type
-    query = DocumentModel.select().where(
-        DocumentModel.metadata.contains('"media_type":')
-    )
-    
-    if filter_type != "all":
-        query = query.where(
-            DocumentModel.metadata.contains(f'"media_type": "{filter_type}"')
-        )
-    
-    media_items = []
+    # Формирование media_items с обработкой отсутствующего title
+    title = meta.get("title")
+    if not title:
+        source = meta.get("source", "")
+        title = Path(source).stem if source else f"Media #{doc.id}"
+```
     for doc in query.order_by(DocumentModel.created_at.desc()):
         meta = json.loads(doc.metadata) if isinstance(doc.metadata, str) else doc.metadata
         if meta.get("media_type") in ("image", "audio", "video"):
