@@ -243,16 +243,17 @@ class TestSearchService:
 
         mock_cache.get_or_embed.assert_called_once_with("python tutorial")
 
-    def test_search_with_chunk_type_filter(self, search_service, mock_core):
+    def test_search_with_chunk_type_filter(self, search_service, mock_core, mock_cache):
         """Поиск с фильтром по типу чанка."""
         search_service.search("python", chunk_types=["code"])
 
-        mock_core.search_chunks.assert_called_with(
-            query="python",
-            mode="hybrid",
-            limit=20,
-            chunk_type_filter="code",
-        )
+        # Проверяем что вызов был с правильными параметрами (включая query_vector)
+        call_kwargs = mock_core.search_chunks.call_args[1]
+        assert call_kwargs["query"] == "python"
+        assert call_kwargs["mode"] == "hybrid"
+        assert call_kwargs["limit"] == 20
+        assert call_kwargs["chunk_type_filter"] == "code"
+        assert call_kwargs["query_vector"] is not None
 
     def test_search_with_multiple_chunk_types(self, search_service, mock_core):
         """Поиск с несколькими типами чанков."""
@@ -272,11 +273,84 @@ class TestSearchService:
         """get_available_types возвращает типы контента."""
         types = search_service.get_available_types()
 
-        assert len(types) == 4
+        assert len(types) == 5
         assert types[0]["id"] == "text"
         assert types[1]["id"] == "code"
         assert "icon" in types[0]
         assert "label" in types[0]
+
+    def test_search_passes_cached_vector_to_core(self, mock_core, mock_cache):
+        """Закешированный вектор передаётся в core.search_chunks()."""
+        from app.services.search_service import SearchService
+
+        cached_vector = [0.1] * 768
+        mock_cache.get_or_embed.return_value = MagicMock(
+            embedding=cached_vector,
+            from_cache=True,
+            frequency=5,
+        )
+
+        service = SearchService(core=mock_core, cache=mock_cache)
+        service.search("python")
+
+        # Проверяем что вектор был передан
+        call_kwargs = mock_core.search_chunks.call_args[1]
+        assert call_kwargs["query_vector"] == cached_vector
+
+    def test_search_no_cache_passes_none_vector(self, mock_core):
+        """Без кеша query_vector = None."""
+        from app.services.search_service import SearchService
+
+        service = SearchService(core=mock_core, cache=None)
+        service.search("python")
+
+        call_kwargs = mock_core.search_chunks.call_args[1]
+        assert call_kwargs.get("query_vector") is None
+
+    def test_search_documents_returns_document_items(self, mock_core, mock_cache):
+        """search_documents возвращает DocumentResultItem."""
+        from app.services.search_service import SearchService, DocumentResultItem
+
+        # Mock search result
+        mock_doc = MagicMock()
+        mock_doc.id = 1
+        mock_doc.source = "test.md"
+        mock_doc.content = "Test document content"
+        mock_doc.metadata = {"title": "Test Doc", "tags": ["test"]}
+
+        mock_result = MagicMock()
+        mock_result.document = mock_doc
+        mock_result.score = 0.95
+        mock_result.match_type = MagicMock(value="hybrid")
+
+        mock_core.search.return_value = [mock_result]
+
+        service = SearchService(core=mock_core, cache=mock_cache)
+        results = service.search_documents("test query")
+
+        assert len(results) == 1
+        assert isinstance(results[0], DocumentResultItem)
+        assert results[0].doc_id == 1
+        assert results[0].title == "Test Doc"
+        assert results[0].score == 0.95
+
+    def test_search_documents_uses_cached_vector(self, mock_core, mock_cache):
+        """search_documents передаёт закешированный вектор."""
+        from app.services.search_service import SearchService
+
+        cached_vector = [0.2] * 768
+        mock_cache.get_or_embed.return_value = MagicMock(
+            embedding=cached_vector,
+            from_cache=True,
+            frequency=3,
+        )
+        mock_core.search.return_value = []
+
+        service = SearchService(core=mock_core, cache=mock_cache)
+        service.search_documents("test query")
+
+        call_kwargs = mock_core.search.call_args[1]
+        assert call_kwargs["query_vector"] == cached_vector
 
 
 # ============================================================================
@@ -342,6 +416,47 @@ class TestSearchRoutes:
         assert response.status_code == 200
         data = response.get_json()
         assert data == []
+
+    def test_search_results_with_documents_type(self, app, client):
+        """Поиск с result_type=documents использует правильный шаблон."""
+        with app.app_context():
+            # Mock search_documents
+            core = app.extensions.get("semantic_core")
+            if core:
+                # Делаем mock core.search
+                original_search = core.search
+                core.search = MagicMock(return_value=[])
+
+                response = client.get(
+                    "/search/results?q=test&result_type=documents"
+                )
+
+                assert response.status_code == 200
+                # Шаблон documents должен быть использован
+                # Возвращаем сообщение "документы не найдены"
+                assert (
+                    b"\xd0\x94\xd0\xbe\xd0\xba\xd1\x83\xd0\xbc\xd0\xb5\xd0\xbd\xd1\x82\xd1\x8b"
+                    in response.data  # "Документы" в UTF-8
+                    or b"document" in response.data.lower()
+                )
+
+                core.search = original_search
+
+    def test_search_results_chunks_is_default(self, app, client):
+        """По умолчанию result_type=chunks."""
+        with app.app_context():
+            core = app.extensions.get("semantic_core")
+            if core:
+                original_search_chunks = core.search_chunks
+                core.search_chunks = MagicMock(return_value=[])
+
+                response = client.get("/search/results?q=test")
+
+                assert response.status_code == 200
+                # Должен вызваться search_chunks, а не search
+                core.search_chunks.assert_called()
+
+                core.search_chunks = original_search_chunks
 
 
 # ============================================================================
