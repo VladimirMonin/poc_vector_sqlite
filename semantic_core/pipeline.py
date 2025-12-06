@@ -382,6 +382,7 @@ class SemanticCore:
         limit: int = 10,
         mode: str = "hybrid",
         k: int = 60,
+        query_vector: Optional[list[float]] = None,
     ) -> list[SearchResult]:
         """Выполняет поиск документов.
 
@@ -391,6 +392,8 @@ class SemanticCore:
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
             k: Константа для RRF алгоритма (по умолчанию 60).
+            query_vector: Предварительно вычисленный вектор запроса (для кеширования).
+                Если передан, пропускает вызов embedder.embed_query().
 
         Returns:
             Список SearchResult с документами и скорами.
@@ -401,9 +404,8 @@ class SemanticCore:
         if not query or not query.strip():
             raise ValueError("Запрос не может быть пустым")
 
-        # Генерируем вектор для поиска (для vector/hybrid режимов)
-        query_vector = None
-        if mode in ("vector", "hybrid"):
+        # Используем переданный вектор или генерируем новый
+        if mode in ("vector", "hybrid") and query_vector is None:
             query_vector = self.embedder.embed_query(query)
 
         # Выполняем поиск
@@ -427,6 +429,7 @@ class SemanticCore:
         k: int = 60,
         chunk_type_filter: Optional[str] = None,
         context_window: int = 0,
+        query_vector: Optional[list[float]] = None,
     ) -> list[ChunkResult]:
         """Выполняет гранулярный поиск по отдельным чанкам.
 
@@ -444,6 +447,8 @@ class SemanticCore:
                 0 = только найденные чанки (по умолчанию).
                 1 = найденный + по 1 соседу с каждой стороны.
                 N = если N >= количества чанков в документе, возвращается весь документ.
+            query_vector: Предварительно вычисленный вектор запроса (для кеширования).
+                Если передан, пропускает вызов embedder.embed_query().
 
         Returns:
             Список ChunkResult с чанками и их скорами.
@@ -454,9 +459,8 @@ class SemanticCore:
         if not query or not query.strip():
             raise ValueError("Запрос не может быть пустым")
 
-        # Генерируем вектор для поиска (для vector/hybrid режимов)
-        query_vector = None
-        if mode in ("vector", "hybrid"):
+        # Используем переданный вектор или генерируем новый
+        if mode in ("vector", "hybrid") and query_vector is None:
             query_vector = self.embedder.embed_query(query)
 
         # Выполняем гранулярный поиск
