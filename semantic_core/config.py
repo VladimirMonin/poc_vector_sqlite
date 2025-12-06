@@ -461,34 +461,52 @@ class SemanticConfig(BaseSettings):
         # Поддержка nested media config (media.prompts.*, media.chunk_sizes.*, media.processing.*)
         if "media" in raw and isinstance(raw["media"], dict):
             media_dict = {}
-            
+
             # media.prompts
             if "prompts" in raw["media"] and isinstance(raw["media"]["prompts"], dict):
                 prompts = {}
-                for key in ["audio_instructions", "image_instructions", "video_instructions"]:
+                for key in [
+                    "audio_instructions",
+                    "image_instructions",
+                    "video_instructions",
+                ]:
                     if key in raw["media"]["prompts"]:
                         prompts[key] = raw["media"]["prompts"][key]
                 if prompts:
                     media_dict["prompts"] = prompts
-            
+
             # media.chunk_sizes
-            if "chunk_sizes" in raw["media"] and isinstance(raw["media"]["chunk_sizes"], dict):
+            if "chunk_sizes" in raw["media"] and isinstance(
+                raw["media"]["chunk_sizes"], dict
+            ):
                 chunk_sizes = {}
-                for key in ["summary_chunk_size", "transcript_chunk_size", "ocr_text_chunk_size", "ocr_code_chunk_size"]:
+                for key in [
+                    "summary_chunk_size",
+                    "transcript_chunk_size",
+                    "ocr_text_chunk_size",
+                    "ocr_code_chunk_size",
+                ]:
                     if key in raw["media"]["chunk_sizes"]:
                         chunk_sizes[key] = raw["media"]["chunk_sizes"][key]
                 if chunk_sizes:
                     media_dict["chunk_sizes"] = chunk_sizes
-            
+
             # media.processing
-            if "processing" in raw["media"] and isinstance(raw["media"]["processing"], dict):
+            if "processing" in raw["media"] and isinstance(
+                raw["media"]["processing"], dict
+            ):
                 processing = {}
-                for key in ["ocr_parser_mode", "enable_timecodes", "strict_timecode_ordering", "max_timeline_items"]:
+                for key in [
+                    "ocr_parser_mode",
+                    "enable_timecodes",
+                    "strict_timecode_ordering",
+                    "max_timeline_items",
+                ]:
                     if key in raw["media"]["processing"]:
                         processing[key] = raw["media"]["processing"][key]
                 if processing:
                     media_dict["processing"] = processing
-            
+
             if media_dict:
                 flat["media"] = media_dict
 

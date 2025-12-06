@@ -5,12 +5,12 @@
 
 Классы:
     MediaService
-        Сервис для агрегации медиа-чанков.
+        Сервис для работы с медиа-данными.
 """
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from peewee import DoesNotExist
 
@@ -28,24 +28,77 @@ from semantic_core.infrastructure.storage.peewee.models import (
 )
 from semantic_core.utils.logger import get_logger
 
+if TYPE_CHECKING:
+    from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
+    from semantic_core.infrastructure.gemini.audio_analyzer import GeminiAudioAnalyzer
+    from semantic_core.infrastructure.gemini.video_analyzer import GeminiVideoAnalyzer
+    from semantic_core.interfaces import BaseSplitter, BaseVectorStore
+    from semantic_core.config import SemanticConfig
+
 logger = get_logger(__name__)
 
 
 class MediaService:
-    """Сервис для агрегации медиа-данных из разрозненных чанков.
+    """Сервис для работы с медиа-данными.
     
     Объединяет чанки с разными ролями (summary, transcript, OCR)
     в единое структурированное представление MediaDetails.
     
+    Также предоставляет метод reprocess_document() для повторного анализа
+    медиа-файлов с новыми custom_instructions (Phase 14.3.3).
+    
     Примеры использования:
-        >>> service = MediaService()
+        >>> service = MediaService(
+        ...     image_analyzer=image_analyzer,
+        ...     audio_analyzer=audio_analyzer,
+        ...     video_analyzer=video_analyzer,
+        ...     splitter=splitter,
+        ...     store=store,
+        ...     config=config,
+        ... )
+        >>> 
+        >>> # Агрегация данных
         >>> details = service.get_media_details("doc-123")
         >>> print(details.summary)
-        >>> print(details.full_transcript)
-        >>> if details.has_timeline:
-        ...     for item in details.timeline:
-        ...         print(f"{item.formatted_time}: {item.content_preview}")
+        >>> 
+        >>> # Повторный анализ с новыми инструкциями
+        >>> service.reprocess_document(
+        ...     document_id="doc-123",
+        ...     custom_instructions="Extract technical terms",
+        ... )
     """
+    
+    def __init__(
+        self,
+        image_analyzer: Optional["GeminiImageAnalyzer"] = None,
+        audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
+        video_analyzer: Optional["GeminiVideoAnalyzer"] = None,
+        splitter: Optional["BaseSplitter"] = None,
+        store: Optional["BaseVectorStore"] = None,
+        config: Optional["SemanticConfig"] = None,
+    ):
+        """Инициализация MediaService.
+        
+        Args:
+            image_analyzer: Анализатор изображений (для reprocess_document).
+            audio_analyzer: Анализатор аудио (для reprocess_document).
+            video_analyzer: Анализатор видео (для reprocess_document).
+            splitter: Сплиттер для MediaPipeline (для reprocess_document).
+            store: Хранилище для удаления/сохранения чанков (для reprocess_document).
+            config: Конфигурация SemanticCore (для MediaPipeline).
+        
+        Note:
+            Для использования только get_media_details() / get_timeline() / get_chunks_by_role()
+            можно создать без аргументов: MediaService().
+            
+            Для reprocess_document() требуются все аргументы.
+        """
+        self.image_analyzer = image_analyzer
+        self.audio_analyzer = audio_analyzer
+        self.video_analyzer = video_analyzer
+        self.splitter = splitter
+        self.store = store
+        self.config = config
     
     def get_media_details(
         self,
@@ -313,3 +366,270 @@ class MediaService:
             id=chunk_model.id,
             created_at=chunk_model.created_at,
         )
+    
+    def reprocess_document(
+        self,
+        document_id: str,
+        custom_instructions: Optional[str] = None,
+    ) -> Document:
+        """Повторно анализирует медиа-файл с новыми custom_instructions.
+        
+        Phase 14.3.3: SRP-compliant метод для переобработки медиа.
+        
+        Алгоритм:
+        1. Загружает Document из БД (проверяет существование и media_type)
+        2. Извлекает media_path из Document.metadata["source"]
+        3. Удаляет старые медиа-чанки (роли: summary, transcript, ocr)
+        4. Повторно анализирует через Gemini с custom_instructions
+        5. Создаёт новые чанки через MediaPipeline
+        6. Сохраняет чанки в БД через store.save()
+        
+        Args:
+            document_id: ID документа для переобработки.
+            custom_instructions: Опциональные инструкции для Gemini.
+                Примеры:
+                - "Focus on technical terms and code snippets"
+                - "Extract medical terminology"
+                - "Identify speaker names and timestamps"
+        
+        Returns:
+            Обновлённый Document с новыми чанками.
+        
+        Raises:
+            ValueError: Если документ не найден, не медиа-файл, или отсутствуют зависимости.
+            FileNotFoundError: Если медиа-файл не найден по пути из metadata["source"].
+        
+        Examples:
+            >>> # Переобработать с новыми инструкциями
+            >>> service.reprocess_document(
+            ...     document_id="doc-123",
+            ...     custom_instructions="Extract medical terms",
+            ... )
+            >>> 
+            >>> # Переобработать с дефолтными промптами
+            >>> service.reprocess_document("doc-123")
+        
+        Note:
+            Требует наличия analyzers, splitter, store и config в __init__.
+            Удаляет ВСЕ старые медиа-чанки перед созданием новых.
+        """
+        # 1. Проверяем зависимости
+        if not all([self.splitter, self.store, self.config]):
+            raise ValueError(
+                "MediaService.reprocess_document() requires splitter, store, and config. "
+                "Initialize MediaService with these dependencies."
+            )
+        
+        # 2. Загружаем документ из БД
+        try:
+            doc_model = DocumentModel.get_by_id(document_id)
+        except DoesNotExist:
+            raise ValueError(f"Document {document_id} not found")
+        
+        # 3. Проверяем media_type
+        media_type_str = doc_model.media_type
+        if media_type_str not in ("image", "audio", "video"):
+            raise ValueError(
+                f"Document {document_id} is not a media file "
+                f"(media_type={media_type_str})"
+            )
+        
+        media_type = MediaType(media_type_str)  # ← БЕЗ .upper(), т.к. "audio"/"video"/"image"
+        
+        # 4. Извлекаем media_path из metadata
+        doc_metadata = json.loads(doc_model.metadata)
+        media_path_str = doc_metadata.get("source")
+        
+        if not media_path_str:
+            raise ValueError(
+                f"Document {document_id} has no 'source' in metadata. "
+                "Cannot determine media file path."
+            )
+        
+        media_path = Path(media_path_str)
+        
+        if not media_path.exists():
+            raise FileNotFoundError(
+                f"Media file not found: {media_path}. "
+                f"Document {document_id} references missing file."
+            )
+        
+        logger.info(
+            f"🔄 Reprocessing document {document_id}",
+            media_path=str(media_path),
+            media_type=media_type_str,
+            has_custom_instructions=bool(custom_instructions),
+        )
+        
+        # 5. Удаляем старые медиа-чанки
+        deleted_count = self._delete_media_chunks(document_id)
+        logger.debug(
+            f"Deleted {deleted_count} old media chunks",
+            document_id=document_id,
+        )
+        
+        # 6. Выбираем analyzer по media_type
+        analyzer = self._get_analyzer_for_media_type(media_type)
+        
+        if analyzer is None:
+            raise ValueError(
+                f"No analyzer available for media_type={media_type_str}. "
+                "Initialize MediaService with image_analyzer/audio_analyzer/video_analyzer."
+            )
+        
+        # 7. Повторный анализ через Gemini
+        analysis = analyzer.analyze(
+            media_path=media_path,
+            custom_instructions=custom_instructions,
+        )
+        
+        logger.debug(
+            "Media analysis completed",
+            document_id=document_id,
+            analysis_keys=list(analysis.keys()),
+        )
+        
+        # 8. Создаём Document для MediaPipeline
+        document = Document(
+            content=str(media_path),
+            metadata=doc_metadata,
+            media_type=media_type,
+            id=document_id,
+        )
+        
+        # 9. Создаём новые чанки через MediaPipeline
+        new_chunks = self._build_chunks_via_pipeline(
+            document=document,
+            media_path=media_path,
+            analysis=analysis,
+            media_type=media_type,
+        )
+        
+        logger.info(
+            f"Created {len(new_chunks)} new chunks",
+            document_id=document_id,
+            chunk_roles=[c.metadata.get("role") for c in new_chunks],
+        )
+        
+        # 10. Добавляем чанки в document
+        document.chunks = new_chunks
+        
+        # 11. Сохраняем в БД (без векторизации — векторы будут созданы batch-процессом)
+        # store.save() обновит чанки документа
+        self.store.save(document)
+        
+        logger.info(
+            f"✅ Document {document_id} reprocessed successfully",
+            chunk_count=len(new_chunks),
+        )
+        
+        return document
+    
+    def _delete_media_chunks(self, document_id: str) -> int:
+        """Удаляет все медиа-чанки документа (роли: summary, transcript, ocr).
+        
+        Args:
+            document_id: ID документа.
+        
+        Returns:
+            Количество удалённых чанков.
+        """
+        chunks_query = ChunkModel.select().where(
+            ChunkModel.document == document_id
+        )
+        
+        deleted_count = 0
+        for chunk_model in chunks_query:
+            metadata = json.loads(chunk_model.metadata)
+            role = metadata.get("role", "")
+            
+            if role in ("summary", "transcript", "ocr"):
+                chunk_model.delete_instance()
+                deleted_count += 1
+        
+        return deleted_count
+    
+    def _get_analyzer_for_media_type(
+        self, media_type: MediaType
+    ) -> Optional["GeminiImageAnalyzer | GeminiAudioAnalyzer | GeminiVideoAnalyzer"]:
+        """Возвращает analyzer для заданного media_type.
+        
+        Args:
+            media_type: Тип медиа (IMAGE/AUDIO/VIDEO).
+        
+        Returns:
+            Соответствующий analyzer или None.
+        """
+        if media_type == MediaType.IMAGE:
+            return self.image_analyzer
+        elif media_type == MediaType.AUDIO:
+            return self.audio_analyzer
+        elif media_type == MediaType.VIDEO:
+            return self.video_analyzer
+        else:
+            return None
+    
+    def _build_chunks_via_pipeline(
+        self,
+        document: Document,
+        media_path: Path,
+        analysis: dict,
+        media_type: MediaType,
+    ) -> list[Chunk]:
+        """Создаёт чанки через MediaPipeline.
+        
+        Args:
+            document: Document для контекста.
+            media_path: Путь к медиа-файлу.
+            analysis: Результат анализа от Gemini.
+            media_type: Тип медиа (IMAGE/AUDIO/VIDEO).
+        
+        Returns:
+            Список новых Chunk.
+        """
+        from semantic_core.core.media_context import MediaContext
+        from semantic_core.core.media_pipeline import MediaPipeline
+        from semantic_core.processing.steps import SummaryStep, TranscriptionStep, OCRStep
+        
+        # Определяем chunk_type по media_type
+        chunk_type_map = {
+            MediaType.IMAGE: ChunkType.IMAGE_REF,
+            MediaType.AUDIO: ChunkType.AUDIO_REF,
+            MediaType.VIDEO: ChunkType.VIDEO_REF,
+        }
+        chunk_type = chunk_type_map[media_type]
+        
+        # Создаём MediaContext
+        context = MediaContext(
+            media_path=media_path,
+            document=document,
+            analysis=analysis,
+            chunks=[],
+            base_index=0,
+            services={
+                "chunk_type": chunk_type,
+                "fallback_metadata": {},
+            },
+        )
+        
+        # Создаём pipeline со всеми шагами
+        pipeline = MediaPipeline(
+            steps=[
+                SummaryStep(),
+                TranscriptionStep(
+                    splitter=self.splitter,
+                    default_chunk_size=self.config.media.chunk_sizes.transcript_chunk_size,
+                    enable_timecodes=self.config.media.processing.enable_timecodes,
+                ),
+                OCRStep(
+                    splitter=self.splitter,
+                    default_chunk_size=self.config.media.chunk_sizes.ocr_text_chunk_size,
+                    parser_mode=self.config.media.processing.ocr_parser_mode,
+                ),
+            ]
+        )
+        
+        # Выполняем pipeline
+        final_context = pipeline.build_chunks(context)
+        
+        return final_context.chunks

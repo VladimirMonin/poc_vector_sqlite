@@ -1535,3 +1535,55 @@ class SemanticCore:
                 return path
 
         return None
+    
+    def reanalyze(
+        self,
+        document_id: str,
+        custom_instructions: Optional[str] = None,
+    ) -> Document:
+        """Повторно анализирует медиа-файл с новыми custom_instructions.
+        
+        Phase 14.3.3: Тонкая прокси для MediaService.reprocess_document().
+        Делегирует всю логику MediaService для соблюдения SRP.
+        
+        Args:
+            document_id: ID документа для переобработки.
+            custom_instructions: Опциональные инструкции для Gemini.
+        
+        Returns:
+            Обновлённый Document с новыми чанками.
+        
+        Raises:
+            ValueError: Если document_id не найден или не медиа-файл.
+        
+        Examples:
+            >>> # Переобработать с медицинскими инструкциями
+            >>> core.reanalyze(
+            ...     document_id="doc-123",
+            ...     custom_instructions="Extract medical terminology",
+            ... )
+            >>> 
+            >>> # Переобработать с дефолтными промптами
+            >>> core.reanalyze("doc-123")
+        
+        Note:
+            Требует наличия media analyzers в SemanticCore.__init__.
+            Удаляет все старые медиа-чанки перед созданием новых.
+        """
+        from semantic_core.services.media_service import MediaService
+        
+        # Создаём MediaService с зависимостями из SemanticCore
+        media_service = MediaService(
+            image_analyzer=self.image_analyzer,
+            audio_analyzer=self.audio_analyzer,
+            video_analyzer=self.video_analyzer,
+            splitter=self.splitter,
+            store=self.store,
+            config=self.config,
+        )
+        
+        # Делегируем всю логику MediaService
+        return media_service.reprocess_document(
+            document_id=document_id,
+            custom_instructions=custom_instructions,
+        )

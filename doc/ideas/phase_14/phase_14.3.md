@@ -6,6 +6,7 @@
 **Цель:** Сделать систему гибкой через конфигурацию без изменения кода
 
 **Архитектурные принципы:**
+
 - ✅ **SRP:** `MediaService.reprocess_document()` вместо `SemanticCore.reanalyze()`
 - ✅ **Single Source of Truth:** `Document.metadata["source"]` вместо `MediaTaskModel.file_path`
 - ✅ **Template Injection:** Placeholders вместо string concatenation
@@ -376,12 +377,15 @@ media_path = Path(task.file_path)  # ← Что если task удалён?
 ```
 
 **Проблема:** `MediaTask` — это **Queue Item** (очередь). Если чистить старые tasks:
+
 ```sql
 DELETE FROM media_tasks WHERE processed_at < NOW() - INTERVAL '30 days';
 ```
+
 → **Потеряем возможность reanalyze** (нет пути к файлу)!
 
 **Решение:** `Document.metadata["source"]` УЖЕ содержит путь к медиа:
+
 ```python
 # semantic_core/pipeline.py line 680, 709, 838...
 metadata = {"source": str(path)}  # ← Single Source of Truth!
@@ -723,6 +727,7 @@ ocr_parser_mode = "markdown"  # "markdown" детектит code blocks | "plain
 3. ✅ **Single Source of Truth:** `Document.metadata["source"]` вместо `MediaTaskModel.file_path`
 
 **MediaTaskModel может чиститься:**
+
 ```sql
 -- Безопасно! Reanalyze использует Document.metadata
 DELETE FROM media_tasks WHERE processed_at < NOW() - INTERVAL '30 days';
