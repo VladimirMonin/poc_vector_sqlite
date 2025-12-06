@@ -41,6 +41,26 @@
                 
                 <hr>
                 
+                <h6 class="text-muted small text-uppercase mb-2">Минимальный Score</h6>
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="small text-muted">0%</span>
+                    <span class="small fw-bold text-primary" id="min-score-val">0%</span>
+                    <span class="small text-muted">100%</span>
+                </div>
+                <input 
+                    type="range" 
+                    class="form-range" 
+                    id="min-score" 
+                    name="min_score" 
+                    min="0" 
+                    max="100" 
+                    step="5" 
+                    value="0"
+                    oninput="document.getElementById('min-score-val').textContent = this.value + '%'"
+                >
+                
+                <hr>
+                
                 <h6 class="text-muted small text-uppercase mb-2">Вид результатов</h6>
                 <div id="result-type-toggle" class="btn-group btn-group-sm w-100" role="group">
                     <input type="radio" class="btn-check" name="result_type" id="result-chunks" value="chunks" checked>
@@ -77,7 +97,7 @@
                             hx-trigger="keyup[key=='Enter'], search"
                             hx-target="#search-results"
                             hx-indicator="#search-indicator"
-                            hx-include="#type-filters, #search-mode"
+                            hx-include="#type-filters, #search-mode, #min-score, [name='result_type']"
                             name="q"
                         >
                         <span class="input-group-text bg-transparent">
