@@ -275,6 +275,12 @@
 67. [**Context Window: Гений или Дед с деменцией**](67_context_window.md)  
     Расширение контекста соседними чанками: context_window, MatchType.CONTEXT и полный документ при большом window
 
+68. [**Embedding Cache Integration**](68_embedding_cache_integration.md)  
+    Замыкаем цепь: передача query_vector через слои, реальная экономия API-вызовов
+
+69. [**Result Type Abstraction**](69_result_type_abstraction.md)  
+    Чанки vs Документы: toggle в UI, два DTO, нормализация RRF score
+
 ---
 
 ## 🚀 Быстрый старт
