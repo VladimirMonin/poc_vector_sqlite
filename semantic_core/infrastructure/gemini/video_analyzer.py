@@ -49,7 +49,7 @@ class VideoAnalysisSchema(BaseModel):
 
 
 # Системный промпт для анализа видео
-SYSTEM_PROMPT = """You are a video analyst for semantic search indexing.
+SYSTEM_PROMPT_TEMPLATE = """You are a video analyst for semantic search indexing.
 
 You receive video frames and optionally audio. Analyze the content and provide:
 1. description: What happens in the video (3-5 sentences)
@@ -66,7 +66,9 @@ Focus on:
 - People and their interactions
 - Key topics and conclusions
 
-Output valid JSON matching the schema."""
+Output valid JSON matching the schema.
+
+Answer in {language} language."""
 
 
 class GeminiVideoAnalyzer:
@@ -95,6 +97,7 @@ class GeminiVideoAnalyzer:
         model: str = DEFAULT_MODEL,
         audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
         max_output_tokens: int = 65_536,
+        output_language: str = "Russian",
     ):
         """Инициализация анализатора.
 
@@ -103,11 +106,14 @@ class GeminiVideoAnalyzer:
             model: Модель для Vision API (pro для видео).
             audio_analyzer: Опциональный анализатор для отдельной аудио-транскрипции.
             max_output_tokens: Лимит токенов на вывод модели.
+            output_language: Язык для ответов модели.
         """
         self.api_key = api_key
         self.model = model
         self.audio_analyzer = audio_analyzer
         self.max_output_tokens = max_output_tokens
+        self.output_language = output_language
+        self.system_prompt = SYSTEM_PROMPT_TEMPLATE.format(language=output_language)
         self._client = None
         logger.debug(
             "Video analyzer initialized",
@@ -242,7 +248,7 @@ class GeminiVideoAnalyzer:
 
         # 6. Конфигурация запроса
         api_config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=self.system_prompt,
             temperature=0.4,
             max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",

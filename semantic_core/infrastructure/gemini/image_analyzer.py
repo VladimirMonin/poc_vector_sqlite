@@ -29,7 +29,7 @@ class ImageAnalysisSchema(BaseModel):
 
 
 # Системный промпт для анализа изображений
-SYSTEM_PROMPT = """You are an image analyst creating descriptions for semantic search indexing.
+SYSTEM_PROMPT_TEMPLATE = """You are an image analyst creating descriptions for semantic search indexing.
 
 Analyze the image and provide:
 1. alt_text: A concise accessibility description (1 sentence)
@@ -45,7 +45,9 @@ Focus on:
 - Diagrams, charts, relationships between elements
 - All visible details that would help someone understand the image content
 
-Output valid JSON matching the schema."""
+Output valid JSON matching the schema.
+
+Answer in {language} language."""
 
 
 class GeminiImageAnalyzer:
@@ -70,6 +72,7 @@ class GeminiImageAnalyzer:
         api_key: str,
         model: str = "gemini-2.5-flash-lite",
         max_output_tokens: int = 65_536,
+        output_language: str = "Russian",
     ):
         """Инициализация анализатора.
 
@@ -77,10 +80,13 @@ class GeminiImageAnalyzer:
             api_key: API ключ Google Gemini.
             model: Модель для Vision API.
             max_output_tokens: Лимит токенов на вывод модели.
+            output_language: Язык для ответов модели.
         """
         self.api_key = api_key
         self.model = model
         self.max_output_tokens = max_output_tokens
+        self.output_language = output_language
+        self.system_prompt = SYSTEM_PROMPT_TEMPLATE.format(language=output_language)
         self._client = None
         logger.debug(
             "Image analyzer initialized",
@@ -146,9 +152,9 @@ class GeminiImageAnalyzer:
 
         prompt = "\n".join(prompt_parts)
 
-        # 3. Конфигурация запроса
+        # Конфигурация запроса
         config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=self.system_prompt,
             temperature=0.4,
             max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",

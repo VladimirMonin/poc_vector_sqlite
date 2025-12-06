@@ -34,7 +34,7 @@ class AudioAnalysisSchema(BaseModel):
 
 
 # Системный промпт для анализа аудио
-SYSTEM_PROMPT = """You are an audio analyst creating descriptions for semantic search indexing.
+SYSTEM_PROMPT_TEMPLATE = """You are an audio analyst creating descriptions for semantic search indexing.
 
 Analyze the audio and provide:
 1. transcription: Full transcript of the spoken content
@@ -49,7 +49,9 @@ Focus on:
 - Names, dates, and specific details
 - Tasks or follow-up items
 
-Output valid JSON matching the schema."""
+Output valid JSON matching the schema.
+
+Answer in {language} language."""
 
 
 class GeminiAudioAnalyzer:
@@ -77,6 +79,7 @@ class GeminiAudioAnalyzer:
         api_key: str,
         model: str = DEFAULT_MODEL,
         max_output_tokens: int = 65_536,
+        output_language: str = "Russian",
     ):
         """Инициализация анализатора.
 
@@ -84,10 +87,13 @@ class GeminiAudioAnalyzer:
             api_key: API ключ Google Gemini.
             model: Модель для Audio API (по умолчанию flash-lite).
             max_output_tokens: Лимит токенов на вывод модели.
+            output_language: Язык для ответов модели.
         """
         self.api_key = api_key
         self.model = model
         self.max_output_tokens = max_output_tokens
+        self.output_language = output_language
+        self.system_prompt = SYSTEM_PROMPT_TEMPLATE.format(language=output_language)
         self._client = None
         logger.debug(
             "Audio analyzer initialized",
@@ -164,9 +170,9 @@ class GeminiAudioAnalyzer:
             mime_type=mime_type,
         )
 
-        # 5. Конфигурация запроса
+        # Конфигурация запроса
         config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=self.system_prompt,
             temperature=0.3,
             max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",
