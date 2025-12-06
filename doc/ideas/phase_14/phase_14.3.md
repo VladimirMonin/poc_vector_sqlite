@@ -1,9 +1,14 @@
 # ⚙️ Phase 14.3: User Flexibility & Configuration
 
 **Дата:** 2025-12-06  
-**Статус:** Planning  
+**Статус:** In Progress  
 **Зависимости:** Phase 14.1 (ProcessingStep), Phase 14.2 (MediaService)  
 **Цель:** Сделать систему гибкой через конфигурацию без изменения кода
+
+**Архитектурные принципы:**
+- ✅ **SRP:** `MediaService.reprocess_document()` вместо `SemanticCore.reanalyze()`
+- ✅ **Single Source of Truth:** `Document.metadata["source"]` вместо `MediaTaskModel.file_path`
+- ✅ **Template Injection:** Placeholders вместо string concatenation
 
 ---
 
@@ -194,52 +199,73 @@ class SemanticConfig(BaseSettings):
 
 **Модификация:** `semantic_core/infrastructure/gemini/audio_analyzer.py`
 
+**КРИТИЧНО:** Используем **template injection** вместо конкатенации!
+
 ```python
 class GeminiAudioAnalyzer:
-    # DEFAULT_SYSTEM_PROMPT — fallback
-    DEFAULT_SYSTEM_PROMPT = """You are an audio analyst..."""
+    # DEFAULT_SYSTEM_PROMPT с placeholders
+    DEFAULT_SYSTEM_PROMPT = """You are an audio analyst creating descriptions for semantic search indexing.
+Response language: {language}
+
+{custom_instructions}
+
+Return a JSON with the following structure:
+{{
+  "description": "Brief 2-3 sentence summary...",
+  ...
+}}
+
+CRITICAL INSTRUCTIONS FOR TRANSCRIPTION FIELD:
+- Use Markdown formatting...
+"""
     
     def __init__(
         self,
         api_key: str,
         model_name: str = "gemini-2.5-flash",
-        custom_system_prompt: Optional[str] = None,  # ← NEW
-        summary_instructions: Optional[str] = None,  # ← NEW
+        custom_instructions: Optional[str] = None,  # ← NEW
+        output_language: str = "Russian",
     ):
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
+        self.output_language = output_language
         
-        # Формируем итоговый промпт
+        # Формируем итоговый промпт через template injection
         self.system_prompt = self._build_system_prompt(
-            custom_system_prompt,
-            summary_instructions,
+            custom_instructions=custom_instructions,
+            language=output_language,
         )
     
     def _build_system_prompt(
         self,
-        custom_prompt: Optional[str],
-        additional_instructions: Optional[str],
+        custom_instructions: Optional[str],
+        language: str,
     ) -> str:
-        """Формирует системный промпт из конфига."""
-        if custom_prompt:
-            # Полная замена дефолтного промпта
-            base_prompt = custom_prompt
-        else:
-            base_prompt = self.DEFAULT_SYSTEM_PROMPT
+        """Формирует системный промпт через template injection.
         
-        if additional_instructions:
-            # Добавляем инструкции к базовому промпту
-            return f"{base_prompt}\n\nADDITIONAL INSTRUCTIONS:\n{additional_instructions}"
+        Безопасно вставляет custom_instructions ПЕРЕД описанием JSON-схемы.
+        """
+        # Формируем блок инструкций
+        instructions_block = ""
+        if custom_instructions:
+            instructions_block = f"""
+ADDITIONAL INSTRUCTIONS:
+{custom_instructions}
+"""
         
-        return base_prompt
+        # Template injection — безопасно!
+        return self.DEFAULT_SYSTEM_PROMPT.format(
+            language=language,
+            custom_instructions=instructions_block,
+        )
     
-    def analyze(self, audio_path: Path, language: str = "en") -> dict:
-        # Используем self.system_prompt вместо SYSTEM_PROMPT_TEMPLATE
+    def analyze(self, audio_path: Path) -> dict:
+        # Используем self.system_prompt
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=[...],
             config=types.GenerateContentConfig(
-                system_instruction=self.system_prompt.format(language=language),
+                system_instruction=self.system_prompt,
                 response_schema=AudioAnalysisResult,
             ),
         )
@@ -258,14 +284,14 @@ class SemanticCore:
         if self.config.gemini.api_key:
             self.audio_analyzer = GeminiAudioAnalyzer(
                 api_key=self.config.gemini.api_key,
-                custom_system_prompt=self.config.media.prompts.audio_system_prompt,
-                summary_instructions=self.config.media.prompts.audio_summary_instructions,
+                custom_instructions=self.config.media.prompts.audio_summary_instructions,
+                output_language=self.config.media.analysis.language,
             )
             
             self.video_analyzer = GeminiVideoAnalyzer(
                 api_key=self.config.gemini.api_key,
-                custom_system_prompt=self.config.media.prompts.video_system_prompt,
-                ocr_instructions=self.config.media.prompts.video_ocr_instructions,
+                custom_instructions=self.config.media.prompts.video_ocr_instructions,
+                output_language=self.config.media.analysis.language,
             )
 ```
 
@@ -339,120 +365,219 @@ code_chunk_size = 2500        # Средние для code blocks
 
 ## 4. Full rerun с новым анализом
 
-### 4.1 Проблема текущего rerun_step()
+### 4.1 Проблема текущего подхода
 
-**Текущая реализация (Phase 14.1):**
+**Архитектурная ошибка:** `MediaTaskModel` как источник правды для reanalyze.
 
 ```python
-def rerun_step(self, step_name: str, document_id: str):
-    # Загружаем СТАРЫЙ analysis из БД (MediaTaskModel)
-    task = MediaTaskModel.get_or_none(result_document_id=document_id)
-    analysis = {
-        "description": task.result_description,  # ← ИЗ КЭША
-        "transcription": task.result_transcription,
-    }
-    
-    # Запускаем шаг с тем же анализом
-    context = MediaPipelineContext(analysis=analysis, ...)
-    new_context = step.process(context)
+# ПЛОХО — MediaTaskModel временная сущность
+task = MediaTaskModel.get(result_document_id=document_id)
+media_path = Path(task.file_path)  # ← Что если task удалён?
 ```
 
-**Проблема:** Нельзя пересоздать summary с новым промптом (используется старое description).
+**Проблема:** `MediaTask` — это **Queue Item** (очередь). Если чистить старые tasks:
+```sql
+DELETE FROM media_tasks WHERE processed_at < NOW() - INTERVAL '30 days';
+```
+→ **Потеряем возможность reanalyze** (нет пути к файлу)!
 
-### 4.2 Решение — reanalyze()
+**Решение:** `Document.metadata["source"]` УЖЕ содержит путь к медиа:
+```python
+# semantic_core/pipeline.py line 680, 709, 838...
+metadata = {"source": str(path)}  # ← Single Source of Truth!
+```
 
-**Новый метод:** `semantic_core/pipeline.py`
+### 4.2 Решение — MediaService.reprocess_document()
+
+**КРИТИЧНО:** Логика в `MediaService`, НЕ в `SemanticCore` (SRP)!
+
+**Новый метод:** `semantic_core/services/media_service.py`
 
 ```python
-def reanalyze(
-    self,
-    document_id: str,
-    analyzer_override: Optional[str] = None,
-    prompt_override: Optional[str] = None,
-    delete_old_chunks: bool = True,
-) -> str:
-    """Пересоздаёт analysis для существующего медиа-файла.
+class MediaService:
+    def __init__(
+        self,
+        store: BaseVectorStore,
+        embedder: BaseEmbedder,
+        splitter: BaseSplitter,
+        media_pipeline: MediaPipeline,
+    ):
+        self.store = store
+        self.embedder = embedder
+        self.splitter = splitter
+        self.media_pipeline = media_pipeline
     
-    Args:
-        document_id: ID документа для re-analysis.
-        analyzer_override: Имя analyzer'а для override ("audio" | "video" | "image").
-        prompt_override: Ключ из config.media.prompts (например, "audio_summary").
-        delete_old_chunks: Удалять ли старые чанки перед созданием новых.
-    
-    Returns:
-        Новый document_id (или тот же, если перезаписываем).
-    
-    Raises:
-        ValueError: Если документ не найден или не является медиа.
-    """
-    # Находим задачу
-    task = MediaTaskModel.get_or_none(MediaTaskModel.result_document_id == document_id)
-    if not task:
-        raise ValueError(f"Media task not found for document {document_id}")
-    
-    media_path = Path(task.file_path)
-    media_type = task.media_type
-    
-    logger.info(
-        "Re-analyzing media file",
-        document_id=document_id,
-        media_path=str(media_path),
-        prompt_override=prompt_override,
-    )
-    
-    # Выбираем analyzer
-    analyzer = self._get_analyzer(media_type, analyzer_override)
-    
-    # Применяем prompt override (если указан)
-    if prompt_override:
-        self._apply_prompt_override(analyzer, prompt_override)
-    
-    # Запускаем анализ заново
-    new_analysis = analyzer.analyze(media_path)
-    
-    # Удаляем старые чанки
-    if delete_old_chunks:
-        deleted = (
-            ChunkModel.delete()
-            .where(ChunkModel.document_id == document_id)
-            .execute()
+    def reprocess_document(
+        self,
+        document_id: str,
+        new_analysis: dict,
+        delete_old_chunks: bool = True,
+    ) -> str:
+        """Пересоздаёт чанки для медиа-документа с новым анализом.
+        
+        Args:
+            document_id: ID документа для обновления.
+            new_analysis: Новый результат от analyzer.analyze().
+            delete_old_chunks: Удалять ли старые чанки перед созданием новых.
+        
+        Returns:
+            ID обновлённого документа.
+        
+        Raises:
+            ValueError: Если документ не найден или не является медиа.
+            FileNotFoundError: Если медиа-файл не существует.
+        """
+        # 1. Загружаем Document из БД
+        doc_model = DocumentModel.get_by_id(document_id)
+        
+        # 2. Проверяем, что это медиа
+        if doc_model.media_type not in ("image", "audio", "video"):
+            raise ValueError(f"Document {document_id} is not a media file")
+        
+        # 3. Извлекаем путь из Document.metadata (Single Source of Truth!)
+        metadata = json.loads(doc_model.metadata)
+        media_path = Path(metadata["source"])
+        
+        # 4. Проверяем существование файла
+        if not media_path.exists():
+            raise FileNotFoundError(f"Media file not found: {media_path}")
+        
+        logger.info(
+            "Reprocessing media document",
+            document_id=document_id,
+            media_path=str(media_path),
         )
-        logger.info(f"Deleted old chunks", count=deleted)
-    
-    # Создаём новые чанки через MediaPipeline
-    doc = self.store.get_document_by_id(document_id)
-    chunks = self._media_pipeline.build_chunks(
-        analysis=new_analysis,
-        document=doc,
-        media_path=media_path,
-    )
-    
-    # Сохраняем в БД
-    self.store.update_chunks(document_id, chunks)
-    
-    # Обновляем задачу
-    task.result_description = new_analysis.get("description")
-    task.result_transcription = new_analysis.get("transcription")
-    task.result_ocr_text = new_analysis.get("ocr_text")
-    task.save()
-    
-    logger.info(
-        "Re-analysis complete",
-        document_id=document_id,
-        new_chunks=len(chunks),
-    )
-    
-    return document_id
+        
+        # 5. Удаляем старые чанки
+        if delete_old_chunks:
+            deleted = (
+                ChunkModel.delete()
+                .where(ChunkModel.document == document_id)
+                .execute()
+            )
+            logger.info("Deleted old chunks", count=deleted)
+        
+        # 6. Создаём domain Document
+        document = Document(
+            content=str(media_path),
+            metadata=metadata,
+            media_type=MediaType(doc_model.media_type),
+            id=document_id,
+        )
+        
+        # 7. Создаём новые чанки через MediaPipeline
+        context = MediaContext(
+            media_path=media_path,
+            document=document,
+            analysis=new_analysis,
+        )
+        
+        final_context = self.media_pipeline.build_chunks(context)
+        new_chunks = final_context.chunks
+        
+        # 8. Векторизация
+        chunk_texts = [chunk.content for chunk in new_chunks]
+        embeddings = self.embedder.embed_documents(chunk_texts)
+        
+        for chunk, embedding in zip(new_chunks, embeddings):
+            chunk.embedding = embedding
+        
+        # 9. Сохранение в БД
+        self.store.save(document, new_chunks)
+        
+        logger.info(
+            "Reprocessing complete",
+            document_id=document_id,
+            new_chunks_count=len(new_chunks),
+        )
+        
+        return document_id
+```
 
-def _apply_prompt_override(self, analyzer, prompt_key: str):
-    """Применяет prompt override к analyzer."""
-    prompts_config = self.config.media.prompts
+**SemanticCore — тонкий proxy:**
+
+```python
+class SemanticCore:
+    def __init__(self, ...):
+        # Инициализируем MediaService
+        self.media_service = MediaService(
+            store=self.store,
+            embedder=self.embedder,
+            splitter=self.splitter,
+            media_pipeline=self._create_media_pipeline(),
+        )
     
-    if prompt_key == "audio_summary":
-        analyzer.system_prompt = prompts_config.audio_summary_instructions
-    elif prompt_key == "video_ocr":
-        analyzer.ocr_instructions = prompts_config.video_ocr_instructions
-    # ... другие варианты
+    def reanalyze(
+        self,
+        document_id: str,
+        analyzer_type: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+        delete_old_chunks: bool = True,
+    ) -> str:
+        """Пересоздаёт analysis для существующего медиа-файла.
+        
+        Thin proxy для MediaService.reprocess_document().
+        
+        Args:
+            document_id: ID документа для re-analysis.
+            analyzer_type: Тип analyzer ("audio" | "video" | "image").
+            custom_instructions: Дополнительные инструкции для промпта.
+            delete_old_chunks: Удалять ли старые чанки.
+        
+        Returns:
+            ID обновлённого документа.
+        """
+        # 1. Загружаем документ для определения типа
+        doc_model = DocumentModel.get_by_id(document_id)
+        metadata = json.loads(doc_model.metadata)
+        media_path = Path(metadata["source"])
+        media_type = doc_model.media_type
+        
+        # 2. Выбираем analyzer
+        analyzer = self._get_analyzer_for_type(
+            media_type,
+            override_type=analyzer_type,
+            custom_instructions=custom_instructions,
+        )
+        
+        # 3. Запускаем новый анализ
+        logger.info("Running new analysis", media_path=str(media_path))
+        new_analysis = analyzer.analyze(media_path)
+        
+        # 4. Делегируем MediaService
+        return self.media_service.reprocess_document(
+            document_id=document_id,
+            new_analysis=new_analysis,
+            delete_old_chunks=delete_old_chunks,
+        )
+    
+    def _get_analyzer_for_type(
+        self,
+        media_type: str,
+        override_type: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ):
+        """Возвращает analyzer с учётом override."""
+        target_type = override_type or media_type
+        
+        if target_type == "audio":
+            # Создаём временный analyzer с custom instructions
+            if custom_instructions:
+                return GeminiAudioAnalyzer(
+                    api_key=self.config.gemini.api_key,
+                    custom_instructions=custom_instructions,
+                )
+            return self.audio_analyzer
+        
+        elif target_type == "video":
+            if custom_instructions:
+                return GeminiVideoAnalyzer(
+                    api_key=self.config.gemini.api_key,
+                    custom_instructions=custom_instructions,
+                )
+            return self.video_analyzer
+        
+        # ... аналогично для image
 ```
 
 ### 4.3 CLI команда
@@ -558,32 +683,50 @@ ocr_parser_mode = "markdown"  # "markdown" детектит code blocks | "plain
 
 ### 6.1 Этапы разработки
 
-**Week 1: Configuration Infrastructure**
+**Phase 14.3.1: Configuration Infrastructure** ✅ CRITICAL
 
-- [ ] Расширить `SemanticConfig` с `MediaConfig`
-- [ ] Добавить `MediaPromptsConfig`, `MediaChunkSizesConfig`, `MediaProcessingConfig`
-- [ ] Обновить `AudioAnalyzer`, `VideoAnalyzer`, `ImageAnalyzer` для custom prompts
-- [ ] Unit-тесты: загрузка промптов из TOML
+- [ ] Расширить `SemanticConfig` с `MediaPromptsConfig`, `MediaChunkSizesConfig`, `MediaProcessingConfig`
+- [ ] Обновить `AudioAnalyzer`, `VideoAnalyzer` для custom instructions через template injection
+- [ ] Unit-тесты: загрузка промптов из TOML, template placeholders
 
-**Week 2: Per-role Chunk Sizing**
+**Phase 14.3.2: Per-role Chunk Sizing**
 
 - [ ] Модифицировать `TranscriptionStep`, `OCRStep` для dynamic chunk size
 - [ ] Обновить `SemanticCore._create_default_steps()` с конфигом
 - [ ] E2E тест: OCR chunks = 3000 токенов, transcript = 1000
 
-**Week 3: Reanalyze Feature**
+**Phase 14.3.3: MediaService.reprocess_document()** ✅ CRITICAL
 
-- [ ] Реализовать `SemanticCore.reanalyze()`
-- [ ] Добавить `_apply_prompt_override()` helper
+- [ ] Реализовать `MediaService.reprocess_document()`
+- [ ] `SemanticCore.reanalyze()` как thin proxy
+- [ ] Использовать `Document.metadata["source"]` (Single Source of Truth)
+- [ ] Unit-тесты: reprocess с новым анализом, обработка ошибок
+
+**Phase 14.3.4: CLI Integration**
+
 - [ ] Создать CLI команду `semantic reanalyze`
+- [ ] Поддержка `--custom-instructions`, `--keep-old`
 - [ ] E2E тест: reanalyze → новые чанки с обновлённым summary
 
-**Week 4: Polish & Documentation**
+**Phase 14.3.5: Polish & Documentation**
 
 - [ ] Обновить документацию с примерами TOML конфигов
-- [ ] Добавить migration guide для существующих пользователей
-- [ ] Написать статью 76: "User Flexibility через Configuration"
-- [ ] Обновить Flask UI для отображения custom prompts (опционально)
+- [ ] Написать статью 82: "User Flexibility через Configuration"
+- [ ] Migration guide для существующих пользователей
+
+### 6.2 Архитектурные гарантии
+
+**Code Smells Prevention:**
+
+1. ✅ **SRP:** `MediaService.reprocess_document()` вместо `SemanticCore.reanalyze()`
+2. ✅ **Template Injection:** `{custom_instructions}` placeholder вместо `+` конкатенации
+3. ✅ **Single Source of Truth:** `Document.metadata["source"]` вместо `MediaTaskModel.file_path`
+
+**MediaTaskModel может чиститься:**
+```sql
+-- Безопасно! Reanalyze использует Document.metadata
+DELETE FROM media_tasks WHERE processed_at < NOW() - INTERVAL '30 days';
+```
 
 ### 6.2 Примеры конфигураций
 
@@ -640,13 +783,20 @@ ocr_chunk_size = 2500
 
 - ✅ Все промпты можно переопределить через TOML
 - ✅ Chunk sizes работают независимо для transcript/OCR/code
-- ✅ `reanalyze()` пересоздаёт чанки с новым анализом
+- ✅ `MediaService.reprocess_document()` пересоздаёт чанки с новым анализом
+- ✅ `Document.metadata["source"]` — Single Source of Truth (не MediaTaskModel)
 
 **User Experience:**
 
 - ✅ Пользователь может кастомизировать без правки кода
 - ✅ CLI команда `semantic reanalyze` работает
 - ✅ Документация с 5+ примерами конфигов
+
+**Architecture:**
+
+- ✅ `SemanticCore` остаётся тонким фасадом (SRP)
+- ✅ Template injection вместо string concatenation (безопасность)
+- ✅ MediaTaskModel можно чистить без последствий
 
 **Performance:**
 
@@ -655,6 +805,6 @@ ocr_chunk_size = 2500
 
 ---
 
-**End of Phase 14.3 Plan**  
+**End of Phase 14.3 Plan (REVISED)**  
 **Estimated Duration:** 1-2 weeks  
-**Team:** 1 engineer
+**Critical Path:** MediaService.reprocess_document() + Template Injection
