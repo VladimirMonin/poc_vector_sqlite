@@ -131,5 +131,12 @@ from semantic_core.cli.commands import chat_cmd
 
 app.add_typer(chat_cmd, name="chat")
 
+# Phase 14.3.4: Media Reanalyze
+from semantic_core.cli.commands.reanalyze import reanalyze as reanalyze_cmd
+
+app.command(name="reanalyze", help="Повторный анализ медиа-файлов с новыми промптами")(
+    reanalyze_cmd
+)
+
 
 __all__ = ["app", "get_cli_context"]
