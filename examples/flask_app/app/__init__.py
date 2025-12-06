@@ -78,4 +78,11 @@ def create_app(config: dict | FlaskAppConfig | None = None) -> Flask:
         except (json.JSONDecodeError, TypeError):
             return []
 
+    # Регистрация утилит для шаблонов
+    from app.utils.markdown import render_markdown, render_code, truncate_content
+
+    app.add_template_global(render_markdown, name="render_markdown")
+    app.add_template_global(render_code, name="render_code")
+    app.add_template_global(truncate_content, name="truncate_content")
+
     return app
