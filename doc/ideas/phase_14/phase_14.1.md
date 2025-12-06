@@ -5,16 +5,26 @@
 **Зависимости:** Phase 14.0 (Smart-Splitter интеграция)  
 **Цель:** Рефакторинг монолитного `pipeline.py` → модульная step-based система
 
+**Подфазы:**
+
+- **Phase 14.1.0** (Core Architecture) — MediaContext, MediaPipeline, BaseProcessingStep
+- **Phase 14.1.1** (Smart Steps) — SummaryStep, TranscriptionStep, OCRStep
+- **Phase 14.1.2** (Advanced Features) — TimecodeParser, RetryParser, user_instructions
+- **Phase 14.1.3** (Integration) — Обновление SemanticCore, Analyzer промптов
+- **Phase 14.1.4** (Testing & Polish) — E2E тесты, миграция legacy, документация
+
 ---
 
 ## 📋 Оглавление
 
 1. [Мотивация и проблемы текущей архитектуры](#1-мотивация-и-проблемы-текущей-архитектуры)
 2. [Целевая архитектура ProcessingStep](#2-целевая-архитектура-processingstep)
-3. [План реализации](#3-план-реализации)
-4. [Обновление промптов для Markdown-ответов](#4-обновление-промптов-для-markdown-ответов)
-5. [E2E Testing Strategy](#5-e2e-testing-strategy)
-6. [Риски и ограничения](#6-риски-и-ограничения)
+3. [TimecodeParser — Извлечение и валидация таймкодов](#3-timecodeparser--извлечение-и-валидация-таймкодов)
+4. [RetryParser — Resilient JSON Parsing](#4-retryparser--resilient-json-parsing)
+5. [План реализации](#5-план-реализации)
+6. [Обновление промптов для Markdown-ответов](#6-обновление-промптов-для-markdown-ответов)
+7. [E2E Testing Strategy](#7-e2e-testing-strategy)
+8. [Риски и ограничения](#8-риски-и-ограничения)
 
 ---
 
@@ -684,38 +694,82 @@ class SemanticCore:
 
 ---
 
-## 3. План реализации
+## 5. План реализации
 
-### 3.1 Этапы разработки
+### 5.1 Структура подфаз
 
-**Неделя 1: Инфраструктура**
+**Phase 14.1.0: Core Architecture (Week 1)**
 
-- [ ] Создать `semantic_core/processing/steps/` пакет
-- [ ] Реализовать `BaseProcessingStep` и `MediaContext`
+Цель: Фундамент для step-based pipeline.
+
+- [ ] Создать `semantic_core/core/media_context.py` с `MediaPipelineContext` (frozen dataclass)
+- [ ] Создать `semantic_core/core/media_pipeline.py` с `MediaPipeline` executor
+- [ ] Создать `semantic_core/processing/steps/base.py` с `BaseProcessingStep`
 - [ ] Добавить `ProcessingStepError` в exceptions
-- [ ] Написать unit-тесты для `MediaContext.with_chunks()`
+- [ ] Unit-тесты: `MediaPipelineContext.with_chunks()`, `MediaPipeline.build_chunks()`
 
-**Неделя 2: Стандартные шаги**
+**Phase 14.1.1: Smart Steps (Week 2)**
 
-- [ ] Реализовать `SummaryStep`
-- [ ] Реализовать `TranscriptionStep`
-- [ ] Реализовать `OCRStep` с поддержкой `parser_mode`
-- [ ] Написать unit-тесты для каждого шага (с моками)
+Цель: Миграция логики из `_build_media_chunks()` в шаги.
 
-**Неделя 3: Интеграция в pipeline**
+- [ ] Реализовать `SummaryStep` (извлечь логику из `_build_content_from_analysis()`)
+- [ ] Реализовать `TranscriptionStep` (Constructor Injection: `splitter`)
+- [ ] Реализовать `OCRStep` с поддержкой `parser_mode="markdown"`
+- [ ] Unit-тесты для каждого шага (с моками analyzers/splitters)
 
-- [ ] Добавить `_processing_steps` в `SemanticCore.__init__()`
-- [ ] Реализовать `_build_media_chunks_v2()` через step executor
-- [ ] Реализовать `register_step()` для кастомизации
-- [ ] Реализовать `rerun_step()` для идемпотентности
-- [ ] Написать E2E тесты (см. раздел 5)
+**Phase 14.1.2: Advanced Features (Week 2-3)**
 
-**Неделя 4: Миграция и очистка**
+Цель: Таймкоды, user prompts, resilient parsing.
 
-- [ ] Заменить все вызовы `_build_media_chunks()` → `_build_media_chunks_v2()`
-- [ ] Удалить legacy методы `_split_transcription_into_chunks()` и `_split_ocr_into_chunks()`
-- [ ] Обновить документацию
-- [ ] Обновить CLI для поддержки `rerun_step`
+- [ ] Создать `semantic_core/utils/timecode_parser.py` с валидацией по `max_duration_seconds`
+- [ ] Добавить `user_instructions` поле в `MediaPipelineContext`
+- [ ] Интегрировать `TimecodeParser` в `TranscriptionStep`
+- [ ] **ОПЦИОНАЛЬНО:** Создать `RetryParser` для legacy analyzers (если не мигрируем на `response_schema`)
+- [ ] Unit-тесты: `TimecodeParser.parse()`, `inherit_timecode()`, валидация
+
+**Phase 14.1.3: Integration & Analyzer Migration (Week 3)**
+
+Цель: Интеграция в SemanticCore + миграция на `response_schema`.
+
+- [ ] Добавить `MediaPipeline` в `SemanticCore.__init__()` (Constructor Injection)
+- [ ] Обновить `ingest_audio/video/image()` с параметром `user_prompt`
+- [ ] **CRITICAL:** Мигрировать analyzers на Pydantic `response_schema`:
+  - [ ] `audio_analyzer.py` → `AudioAnalysisResult` Pydantic model
+  - [ ] `video_analyzer.py` → `VideoAnalysisResult` Pydantic model
+  - [ ] `image_analyzer.py` → `ImageAnalysisResult` Pydantic model
+- [ ] Обновить промпты с инструкциями для таймкодов `[MM:SS]`
+- [ ] Обновить промпты с секцией **User Context** для `user_instructions`
+- [ ] Удалить `json.loads()` из analyzers (использовать `response.parsed`)
+
+**Phase 14.1.4: Testing & Polish (Week 4)**
+
+Цель: E2E тесты, миграция legacy, документация.
+
+- [ ] E2E тест: `test_audio_with_timecodes()` — проверить `metadata['start_seconds']`
+- [ ] E2E тест: `test_timecode_inheritance()` — чанк без таймкода наследует от предыдущего
+- [ ] E2E тест: `test_user_prompt_injection()` — проверить `metadata['_user_context']`
+- [ ] E2E тест: `test_video_code_detection()` — из Phase 14.0 (уже 7/7 passing)
+- [ ] Заменить все вызовы `_build_media_chunks()` → `MediaPipeline.build_chunks()`
+- [ ] Удалить legacy: `_split_transcription_into_chunks()`, `_split_ocr_into_chunks()`
+- [ ] Написать статью 75: "MediaPipeline Architecture Overview"
+- [ ] Обновить CLI: добавить `--user-prompt` flag для `semantic ingest`
+
+### 5.2 Критические решения
+
+**Принято:**
+
+1. ✅ Constructor Injection в steps (НЕ Service Locator)
+2. ✅ `MediaPipelineContext` frozen dataclass (immutability через `replace()`)
+3. ✅ Миграция на `response_schema` вместо RetryParser (Gemini API гарантирует валидность)
+4. ✅ `TimecodeParser` с валидацией `max_duration_seconds`
+5. ✅ `user_instructions` обязательное поле в `MediaPipelineContext` (Optional[str])
+
+**Отложено на Phase 14.2+:**
+
+- ⏸ Fallback modes для Gemini failures
+- ⏸ Batch embedding для `len(chunks) > 10`
+- ⏸ Timeline UI для Flask app
+- ⏸ Конфигурируемые промпты через TOML
 
 ### 3.2 Dependency Injection Strategy
 
@@ -755,7 +809,469 @@ if splitter is None:
 
 ---
 
-## 4. Обновление промптов для Markdown-ответов
+## 3. TimecodeParser — Извлечение и валидация таймкодов
+
+### 3.1 Мотивация
+
+**Проблема:** Пользователи хотят навигацию по медиа как в YouTube — клик на чанк → плеер перематывает на нужное место.
+
+**Решение:** Извлекаем таймкоды `[MM:SS]` из ответов Gemini и сохраняем в `metadata['start_seconds']`.
+
+### 3.2 Архитектура
+
+**Файл:** `semantic_core/utils/timecode_parser.py`
+
+```python
+import re
+from typing import Optional, Tuple
+from dataclasses import dataclass
+from semantic_core.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+@dataclass
+class TimecodeInfo:
+    """Информация о таймкоде."""
+    original: str  # Оригинальная строка "[02:15]"
+    seconds: int   # Секунды от начала (135)
+    minutes: int   # Минуты (2)
+    secs: int      # Секунды в минуте (15)
+
+
+class TimecodeParser:
+    """Парсер таймкодов из Markdown-транскрипций.
+    
+    Поддерживает форматы:
+    - [MM:SS] — основной формат (рекомендуется для Gemini)
+    - [HH:MM:SS] — расширенный формат (для видео >1 час)
+    
+    Валидация:
+    - Таймкод не может быть больше реальной длительности файла
+    - Таймкоды должны идти в возрастающем порядке (опционально)
+    """
+    
+    # Regex patterns
+    TIMECODE_PATTERN_MMSS = re.compile(r"\[(\d{1,2}):(\d{2})\]")
+    TIMECODE_PATTERN_HHMMSS = re.compile(r"\[(\d{1,2}):(\d{2}):(\d{2})\]")
+    
+    def __init__(
+        self,
+        max_duration_seconds: Optional[int] = None,
+        strict_ordering: bool = False,
+    ):
+        """Инициализация.
+        
+        Args:
+            max_duration_seconds: Максимальная длительность файла (для валидации).
+                                  Если таймкод больше, выбрасывается Warning.
+            strict_ordering: Если True, таймкоды должны идти в возрастающем порядке.
+        """
+        self.max_duration_seconds = max_duration_seconds
+        self.strict_ordering = strict_ordering
+        self._last_timecode_seconds: Optional[int] = None
+    
+    def parse(self, text: str) -> Optional[TimecodeInfo]:
+        """Парсит первый таймкод из текста.
+        
+        Args:
+            text: Текст с таймкодом (например, "[02:15] Speaker introduces topic").
+        
+        Returns:
+            TimecodeInfo или None, если таймкод не найден или невалиден.
+        """
+        # Пробуем HH:MM:SS формат
+        match = self.TIMECODE_PATTERN_HHMMSS.search(text)
+        if match:
+            hours, minutes, secs = map(int, match.groups())
+            total_seconds = hours * 3600 + minutes * 60 + secs
+            original = match.group(0)
+        else:
+            # Пробуем MM:SS формат
+            match = self.TIMECODE_PATTERN_MMSS.search(text)
+            if not match:
+                return None
+            
+            minutes, secs = map(int, match.groups())
+            total_seconds = minutes * 60 + secs
+            original = match.group(0)
+            hours = 0
+        
+        # Валидация: таймкод не может быть больше длительности файла
+        if self.max_duration_seconds is not None:
+            if total_seconds > self.max_duration_seconds:
+                logger.warning(
+                    "Timecode exceeds file duration — ignoring",
+                    timecode=original,
+                    seconds=total_seconds,
+                    max_duration=self.max_duration_seconds,
+                )
+                return None
+        
+        # Валидация: строгий порядок (опционально)
+        if self.strict_ordering and self._last_timecode_seconds is not None:
+            if total_seconds <= self._last_timecode_seconds:
+                logger.warning(
+                    "Timecode order violation — non-ascending",
+                    timecode=original,
+                    seconds=total_seconds,
+                    last_seconds=self._last_timecode_seconds,
+                )
+                return None
+        
+        self._last_timecode_seconds = total_seconds
+        
+        return TimecodeInfo(
+            original=original,
+            seconds=total_seconds,
+            minutes=minutes,
+            secs=secs,
+        )
+    
+    def parse_all(self, text: str) -> list[TimecodeInfo]:
+        """Парсит все таймкоды из текста.
+        
+        Args:
+            text: Текст с несколькими таймкодами.
+        
+        Returns:
+            Список TimecodeInfo (может быть пустым).
+        """
+        timecodes = []
+        
+        # Находим все совпадения
+        for match in self.TIMECODE_PATTERN_HHMMSS.finditer(text):
+            hours, minutes, secs = map(int, match.groups())
+            total_seconds = hours * 3600 + minutes * 60 + secs
+            original = match.group(0)
+            
+            if self._is_valid_timecode(original, total_seconds):
+                timecodes.append(TimecodeInfo(
+                    original=original,
+                    seconds=total_seconds,
+                    minutes=minutes,
+                    secs=secs,
+                ))
+        
+        for match in self.TIMECODE_PATTERN_MMSS.finditer(text):
+            minutes, secs = map(int, match.groups())
+            total_seconds = minutes * 60 + secs
+            original = match.group(0)
+            
+            if self._is_valid_timecode(original, total_seconds):
+                timecodes.append(TimecodeInfo(
+                    original=original,
+                    seconds=total_seconds,
+                    minutes=minutes,
+                    secs=secs,
+                ))
+        
+        return timecodes
+    
+    def _is_valid_timecode(self, original: str, seconds: int) -> bool:
+        """Валидирует таймкод."""
+        if self.max_duration_seconds is not None and seconds > self.max_duration_seconds:
+            logger.warning(
+                "Timecode exceeds file duration",
+                timecode=original,
+                seconds=seconds,
+                max_duration=self.max_duration_seconds,
+            )
+            return False
+        return True
+    
+    def inherit_timecode(
+        self,
+        last_timecode_seconds: Optional[int],
+        chunk_position: int,
+        total_chunks: int,
+        total_duration_seconds: int,
+    ) -> int:
+        """Вычисляет таймкод для чанка без явного таймкода (наследование).
+        
+        Логика:
+        - Если это первый чанк — возвращаем 0
+        - Если есть таймкод от предыдущего чанка — добавляем дельту
+        - Дельта = (total_duration / total_chunks)
+        
+        Args:
+            last_timecode_seconds: Последний известный таймкод (от предыдущего чанка).
+            chunk_position: Позиция текущего чанка (0-based).
+            total_chunks: Общее количество чанков.
+            total_duration_seconds: Общая длительность файла.
+        
+        Returns:
+            Секунды от начала файла.
+        """
+        if chunk_position == 0:
+            return 0
+        
+        if last_timecode_seconds is None:
+            # Равномерное распределение
+            delta = total_duration_seconds / total_chunks
+            return int(chunk_position * delta)
+        
+        # Инкремент от последнего известного таймкода
+        delta = total_duration_seconds / total_chunks
+        return int(last_timecode_seconds + delta)
+```
+
+### 3.3 Использование в TranscriptionStep
+
+```python
+class TranscriptionStep(BaseProcessingStep):
+    def __init__(
+        self,
+        splitter: BaseSplitter,
+        chunk_size_override: Optional[int] = None,
+        enable_timecodes: bool = True,
+    ):
+        self.splitter = splitter
+        self.chunk_size_override = chunk_size_override
+        self.enable_timecodes = enable_timecodes
+    
+    def process(self, context: MediaContext) -> MediaContext:
+        transcription = context.analysis["transcription"]
+        duration_seconds = context.analysis.get("duration_seconds")
+        
+        # Создаём parser с валидацией
+        parser = TimecodeParser(
+            max_duration_seconds=duration_seconds,
+            strict_ordering=False,  # Gemini может ошибиться в порядке
+        )
+        
+        # Разбиваем на чанки
+        split_chunks = self.splitter.split(...)
+        
+        # Обогащаем таймкодами
+        last_timecode = None
+        for idx, chunk in enumerate(split_chunks):
+            # Пробуем извлечь таймкод из контента
+            timecode_info = parser.parse(chunk.content) if self.enable_timecodes else None
+            
+            if timecode_info:
+                chunk.metadata["start_seconds"] = timecode_info.seconds
+                chunk.metadata["timecode_original"] = timecode_info.original
+                last_timecode = timecode_info.seconds
+            else:
+                # Наследуем от предыдущего чанка
+                chunk.metadata["start_seconds"] = parser.inherit_timecode(
+                    last_timecode_seconds=last_timecode,
+                    chunk_position=idx,
+                    total_chunks=len(split_chunks),
+                    total_duration_seconds=duration_seconds or 0,
+                )
+        
+        return context.with_chunks(split_chunks)
+```
+
+---
+
+## 4. RetryParser — Resilient JSON Parsing
+
+### 4.1 Мотивация
+
+**Вопрос:** Нужен ли RetryParser, если Gemini API гарантирует структурированный ответ через `response_schema`?
+
+**Ответ:** **НЕТ для нового кода, ДА для миграции legacy.**
+
+### 4.2 Текущее состояние Analyzers
+
+**Проверка кодовой базы:**
+
+- `audio_analyzer.py` (строка 162): `response_json = json.loads(response.text)`
+- `video_analyzer.py` (строка 211): `response_json = json.loads(response.text)`
+- `image_analyzer.py` (строка 151): `response_json = json.loads(response.text)`
+
+❌ **Текущий код НЕ использует `response_schema`** — парсит JSON вручную!
+
+### 4.3 Два пути решения
+
+#### Вариант A: Миграция на `response_schema` (рекомендуется)
+
+**Phase 14.1.3:** Обновить все analyzers на Pydantic models.
+
+```python
+# audio_analyzer.py (NEW)
+from pydantic import BaseModel, Field
+from google.genai import types
+
+class AudioAnalysisResult(BaseModel):
+    description: str = Field(..., description="Brief 2-3 sentence summary")
+    keywords: list[str] = Field(default_factory=list)
+    participants: list[str] = Field(default_factory=list)
+    action_items: list[str] = Field(default_factory=list)
+    duration_seconds: Optional[int] = None
+    transcription: str = Field(..., description="Markdown-formatted transcript")
+
+# В analyze() методе:
+response = self.client.models.generate_content(
+    model=self.model_name,
+    contents=...,
+    config=types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=AudioAnalysisResult,  # ← Гарантия валидности
+    ),
+)
+
+# Парсинг через .parsed (автоматически Pydantic объект)
+result = response.parsed  # type: AudioAnalysisResult
+return {
+    "type": "audio",
+    "description": result.description,
+    "transcription": result.transcription,
+    # ...
+}
+```
+
+**Плюсы:**
+
+- ✅ Gemini API **гарантирует** валидный JSON
+- ✅ Автоматическая валидация через Pydantic
+- ✅ Не нужен RetryParser вообще
+
+**Минусы:**
+
+- ⚠️ Требует рефакторинга всех 3 analyzers
+- ⚠️ Breaking change для существующих промптов
+
+#### Вариант B: RetryParser для legacy (временное решение)
+
+**Если не хотим трогать analyzers прямо сейчас:**
+
+**Файл:** `semantic_core/infrastructure/gemini/retry_parser.py`
+
+```python
+import json
+import re
+from typing import Any, Optional
+from semantic_core.utils.logger import get_logger
+
+try:
+    from json_repair import repair_json
+    HAS_JSON_REPAIR = True
+except ImportError:
+    HAS_JSON_REPAIR = False
+
+logger = get_logger(__name__)
+
+
+class RetryParser:
+    """Resilient JSON parser для ответов LLM.
+    
+    Стратегии восстановления:
+    1. json.loads() — стандартный парсинг
+    2. repair_json() — автоматическое исправление (если установлена библиотека)
+    3. Regex extraction — извлечение JSON из Markdown code blocks
+    4. Fallback — возврат ошибки
+    
+    NOTE: Этот класс НЕ НУЖЕН, если используется response_schema в Gemini API.
+          Оставлен для обратной совместимости с legacy analyzers.
+    """
+    
+    # Regex для извлечения JSON из Markdown
+    JSON_BLOCK_PATTERN = re.compile(r"```(?:json)?\s*\n(.*?)\n```", re.DOTALL)
+    
+    @classmethod
+    def parse(
+        cls,
+        text: str,
+        context: str = "unknown",
+    ) -> dict[str, Any]:
+        """Парсит JSON с несколькими стратегиями восстановления.
+        
+        Args:
+            text: Текст с JSON (может быть обёрнут в Markdown).
+            context: Контекст для логирования (например, "audio_analyzer").
+        
+        Returns:
+            Распарсенный dict.
+        
+        Raises:
+            ValueError: Если все стратегии провалились.
+        """
+        # Стратегия 1: Прямой парсинг
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.debug(
+                "Standard JSON parsing failed — trying repair strategies",
+                context=context,
+                error=str(e),
+            )
+        
+        # Стратегия 2: repair_json (если установлена)
+        if HAS_JSON_REPAIR:
+            try:
+                repaired = repair_json(text)
+                result = json.loads(repaired)
+                logger.warning(
+                    "JSON repaired successfully",
+                    context=context,
+                    original_length=len(text),
+                    repaired_length=len(repaired),
+                )
+                return result
+            except Exception as e:
+                logger.debug(
+                    "JSON repair failed",
+                    context=context,
+                    error=str(e),
+                )
+        
+        # Стратегия 3: Извлечение из Markdown code block
+        match = cls.JSON_BLOCK_PATTERN.search(text)
+        if match:
+            try:
+                extracted = match.group(1)
+                result = json.loads(extracted)
+                logger.warning(
+                    "JSON extracted from Markdown code block",
+                    context=context,
+                )
+                return result
+            except json.JSONDecodeError:
+                pass
+        
+        # Стратегия 4: Fallback — ошибка
+        logger.error(
+            "All JSON parsing strategies failed",
+            context=context,
+            text_preview=text[:200],
+        )
+        raise ValueError(f"Failed to parse JSON in {context}")
+```
+
+**Использование в audio_analyzer.py (временно):**
+
+```python
+# audio_analyzer.py (строка 162)
+from semantic_core.infrastructure.gemini.retry_parser import RetryParser
+
+# БЫЛО:
+# response_json = json.loads(response.text)
+
+# СТАЛО:
+response_json = RetryParser.parse(response.text, context="audio_analyzer")
+```
+
+### 4.4 Рекомендация
+
+**Phase 14.1.3:**
+
+1. ✅ Мигрировать analyzers на `response_schema` (Вариант A)
+2. ❌ Не добавлять RetryParser (он не нужен)
+3. 📝 Добавить в документацию: "Gemini API guarantees JSON validity via response_schema"
+
+**Если миграция затянется:**
+
+- Временно добавить RetryParser для legacy кода (Вариант B)
+- Пометить как `@deprecated` в docstring
+- Удалить после миграции на `response_schema`
+
+---
+
+## 5. Обновление промптов для Markdown-ответов
 
 ### 4.1 Проблема с текущими промптами
 
@@ -813,6 +1329,7 @@ CRITICAL INSTRUCTIONS FOR TRANSCRIPTION FIELD:
   def example():
       pass
   ```
+
 - DO NOT escape newlines as \\n — use actual line breaks inside the JSON string
 
 Example transcription format:
@@ -822,6 +1339,7 @@ Example transcription format:
 The speaker introduces the topic of semantic search and explains how embeddings work in modern NLP systems.
 
 Key points:
+
 - Embeddings capture semantic meaning
 - Vector databases enable similarity search
 - Context matters more than keywords
@@ -837,6 +1355,7 @@ def cosine_similarity(a, b):
 
 This formula is fundamental to understanding vector search.
 """
+
 ```
 
 #### VideoAnalyzer — OCR with Code Detection
@@ -862,6 +1381,7 @@ CRITICAL INSTRUCTIONS FOR OCR_TEXT FIELD:
   class Example:
       pass
   ```
+
 - Use `## Slide Title` headers for new slides
 - Use bullet points for slide bullet lists:
   - Point 1
@@ -898,7 +1418,9 @@ class UserValidator:
 class UserRepository:
     def save(self, user): ...
 ```
+
 """
+
 ```
 
 ### 4.3 Парсинг Markdown-ответов
@@ -951,7 +1473,7 @@ chunks = splitter.split(temp_doc)  # ← Парсит Markdown → изолир�
 
 ---
 
-## 5. E2E Testing Strategy
+## 7. E2E Testing Strategy
 
 ### 5.1 Зачем E2E тесты?
 
@@ -1250,7 +1772,7 @@ def calculate_similarity(a, b):
 
 ---
 
-## 6. Риски и ограничения
+## 8. Риски и ограничения
 
 ### 6.1 Технические риски
 
