@@ -28,6 +28,7 @@ from semantic_core.domain import (
 from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
 from semantic_core.utils.logger import get_logger, setup_logging, LoggingConfig
+from semantic_core.config import SemanticConfig
 
 # Phase 14.1 imports: Media Pipeline Architecture
 from semantic_core.core.media_context import MediaContext
@@ -96,6 +97,7 @@ class SemanticCore:
         audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
         video_analyzer: Optional["GeminiVideoAnalyzer"] = None,
         media_config: Optional[MediaConfig] = None,
+        config: Optional[SemanticConfig] = None,
         log_level: Optional[str] = None,
         log_file: Optional[str | Path] = None,
         logging_config: Optional[LoggingConfig] = None,
@@ -110,7 +112,8 @@ class SemanticCore:
             image_analyzer: Анализатор изображений (опционально).
             audio_analyzer: Анализатор аудио (опционально).
             video_analyzer: Анализатор видео (опционально).
-            media_config: Конфигурация обработки медиа.
+            media_config: Конфигурация обработки медиа (legacy, используйте config).
+            config: Полная конфигурация SemanticCore (приоритет над media_config).
             log_level: Уровень логирования (DEBUG/INFO/WARNING/ERROR).
             log_file: Путь к файлу логов.
             logging_config: Полная конфигурация логирования (приоритет над log_level/log_file).
@@ -135,7 +138,16 @@ class SemanticCore:
         self.image_analyzer = image_analyzer
         self.audio_analyzer = audio_analyzer
         self.video_analyzer = video_analyzer
-        self.media_config = media_config or MediaConfig()
+        
+        # Phase 14.3: Поддержка полного SemanticConfig для chunk_sizes
+        if config is not None:
+            self.config = config
+            self.media_config = config.media  # Синхронизируем media_config
+        else:
+            # Legacy path: используем media_config напрямую
+            self.config = SemanticConfig()  # Default config
+            self.media_config = media_config or MediaConfig()
+            self.config.media = self.media_config  # Синхронизируем
 
         # Lazy-инициализация компонентов для медиа
         self._rate_limiter: Optional["RateLimiter"] = None
@@ -1474,11 +1486,20 @@ class SemanticCore:
         )
         
         # Создаём pipeline со всеми шагами
+        # Phase 14.3.2: Передаём chunk_sizes из конфигурации
         pipeline = MediaPipeline(
             steps=[
                 SummaryStep(),  # Всегда создаёт summary chunk
-                TranscriptionStep(splitter=self.splitter),  # Если есть transcription
-                OCRStep(splitter=self.splitter),  # Если есть ocr_text (видео)
+                TranscriptionStep(
+                    splitter=self.splitter,
+                    default_chunk_size=self.config.media.chunk_sizes.transcript_chunk_size,
+                    enable_timecodes=self.config.media.processing.enable_timecodes,
+                ),
+                OCRStep(
+                    splitter=self.splitter,
+                    default_chunk_size=self.config.media.chunk_sizes.ocr_text_chunk_size,
+                    parser_mode=self.config.media.processing.ocr_parser_mode,
+                ),
             ]
         )
         

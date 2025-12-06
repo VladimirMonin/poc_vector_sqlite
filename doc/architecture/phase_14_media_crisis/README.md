@@ -320,6 +320,82 @@ UI/CLI приходится вручную собирать данные → д�
 
 ---
 
+### 82. Configuration & Template Injection
+
+**Файл:** [82_configuration_template_injection.md](82_configuration_template_injection.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.3.1)
+
+MediaConfig models + Template Injection pattern для гибкой кастомизации промптов и chunk sizes.
+
+**Проблема:**
+
+Система негибкая после Phase 14.1-14.2:
+- ❌ Промпты захардкожены — нельзя кастомизировать под домен
+- ❌ Chunk size единый — transcript и OCR используют одинаковый размер
+- ❌ Parser mode статичен — OCR всегда Markdown
+
+**Решение: MediaConfig + Template Injection**
+
+**Структура:**
+
+- **MediaPromptsConfig:** `audio_instructions`, `image_instructions`, `video_instructions`
+- **MediaChunkSizesConfig:** `summary_chunk_size`, `transcript_chunk_size`, `ocr_text_chunk_size`, `ocr_code_chunk_size` (с `ge`/`le` validation)
+- **MediaProcessingConfig:** `ocr_parser_mode` (pattern validation), `enable_timecodes`, `max_timeline_items`
+
+**Template Injection Pattern:**
+
+```python
+DEFAULT_SYSTEM_PROMPT = """You are an audio analyst...
+{custom_instructions}
+
+Return a JSON with {{...}}
+"""
+
+def _build_system_prompt(self) -> str:
+    instructions = f"CUSTOM INSTRUCTIONS:\n{self.custom_instructions}\n"
+    return DEFAULT_SYSTEM_PROMPT.format(
+        custom_instructions=instructions,
+        language=self.output_language,
+    )
+```
+
+**Гарантии:**
+- ✅ Placeholders ПЕРЕД JSON schema — безопасная инъекция
+- ✅ Double braces `{{...}}` — не ломаются от `.format()`
+- ✅ Unicode handling — корректная обработка спецсимволов
+
+**TOML Support:**
+
+```toml
+[media.prompts]
+audio_instructions = "Extract medical terms, diagnoses..."
+
+[media.chunk_sizes]
+transcript_chunk_size = 1000  # Маленькие для точности
+ocr_code_chunk_size = 3000    # Большие чтобы не резать код
+
+[media.processing]
+ocr_parser_mode = "plain"  # markdown | plain
+```
+
+**Тестирование:**
+- ✅ 19 config tests (validation, TOML loading, nested parsing)
+- ✅ 19 template injection tests (escaping, JSON schema order, edge cases)
+- ✅ 38/38 PASSED — 100% coverage
+
+**Commit:** `d270238`
+
+**Итоги Phase 14.3.1:**
+
+```
+38 новых тестов (19 config + 19 template injection)
+1062 total tests в проекте (1024 + 38)
+4 новых Pydantic models с валидацией
+✅ Phase 14.3.1 — COMPLETED!
+```
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR

@@ -55,6 +55,7 @@ class OCRStep(BaseProcessingStep):
     
     Attributes:
         splitter: Экземпляр BaseSplitter для чанкинга.
+        default_chunk_size: Размер чанка для OCR текста (токены).
         parser_mode: Режим парсинга ("markdown" или "plain").
     
     Example:
@@ -62,7 +63,11 @@ class OCRStep(BaseProcessingStep):
         >>> splitter = SmartSplitter(...)
         >>> 
         >>> # Для видео с кодом — markdown режим
-        >>> step = OCRStep(splitter=splitter, parser_mode="markdown")
+        >>> step = OCRStep(
+        ...     splitter=splitter,
+        ...     default_chunk_size=1800,
+        ...     parser_mode="markdown",
+        ... )
         >>> 
         >>> context = MediaContext(
         ...     media_path=Path("tutorial.mp4"),
@@ -78,6 +83,7 @@ class OCRStep(BaseProcessingStep):
     def __init__(
         self,
         splitter: BaseSplitter,
+        default_chunk_size: int = 1800,
         parser_mode: Literal["markdown", "plain"] = "markdown",
     ):
         """Инициализация шага.
@@ -85,11 +91,14 @@ class OCRStep(BaseProcessingStep):
         Args:
             splitter: Сплиттер для разбиения OCR текста.
                 Рекомендуется SmartSplitter с MarkdownNodeParser для markdown режима.
+            default_chunk_size: Размер чанка в токенах для OCR текста.
+                Default 1800. Временно меняет splitter.chunk_size на время обработки.
             parser_mode: Режим парсинга:
                 - "markdown": используется для видео с кодом (детектит code blocks)
                 - "plain": обычный текст без структуры
         """
         self.splitter = splitter
+        self.default_chunk_size = default_chunk_size
         self.parser_mode = parser_mode
     
     @property
@@ -134,8 +143,18 @@ class OCRStep(BaseProcessingStep):
             media_type=MediaType.TEXT,
         )
         
-        # Режем через splitter
-        split_chunks = self.splitter.split(temp_doc)
+        # Временно меняем chunk_size у splitter для OCR
+        original_chunk_size = getattr(self.splitter, 'chunk_size', None)
+        if original_chunk_size is not None:
+            self.splitter.chunk_size = self.default_chunk_size
+        
+        try:
+            # Режем через splitter
+            split_chunks = self.splitter.split(temp_doc)
+        finally:
+            # Восстанавливаем оригинальный размер
+            if original_chunk_size is not None:
+                self.splitter.chunk_size = original_chunk_size
         
         # Обогащаем metadata
         ocr_chunks = []

@@ -205,6 +205,7 @@ class CLIContext:
             image_analyzer=image_analyzer,
             audio_analyzer=audio_analyzer,
             video_analyzer=video_analyzer,
+            config=config,  # Phase 14.3: Передаём полный config для chunk_sizes
         )
 
     def _build_batch_manager(self, config: SemanticConfig) -> "BatchManager":

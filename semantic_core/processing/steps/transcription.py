@@ -55,12 +55,17 @@ class TranscriptionStep(BaseProcessingStep):
     
     Attributes:
         splitter: Экземпляр BaseSplitter для чанкинга.
+        default_chunk_size: Размер чанка для transcript текста (токены).
         enable_timecodes: Включить парсинг таймкодов [MM:SS] из транскрипции.
     
     Example:
         >>> from semantic_core.processing.splitters.smart import SmartSplitter
         >>> splitter = SmartSplitter(...)
-        >>> step = TranscriptionStep(splitter=splitter, enable_timecodes=True)
+        >>> step = TranscriptionStep(
+        ...     splitter=splitter,
+        ...     default_chunk_size=2000,
+        ...     enable_timecodes=True,
+        ... )
         >>> context = MediaContext(
         ...     media_path=Path("audio.mp3"),
         ...     document=Document(...),
@@ -78,6 +83,7 @@ class TranscriptionStep(BaseProcessingStep):
     def __init__(
         self,
         splitter: BaseSplitter,
+        default_chunk_size: int = 2000,
         enable_timecodes: bool = True,
     ):
         """Инициализация шага.
@@ -85,10 +91,13 @@ class TranscriptionStep(BaseProcessingStep):
         Args:
             splitter: Сплиттер для разбиения транскрипции.
                 Обычно SmartSplitter с MarkdownNodeParser.
+            default_chunk_size: Размер чанка в токенах для transcript текста.
+                Default 2000. Временно меняет splitter.chunk_size на время обработки.
             enable_timecodes: Если True, парсит таймкоды [MM:SS] и добавляет
                 start_seconds в metadata. Default True.
         """
         self.splitter = splitter
+        self.default_chunk_size = default_chunk_size
         self.enable_timecodes = enable_timecodes
     
     @property
@@ -142,8 +151,18 @@ class TranscriptionStep(BaseProcessingStep):
             media_type=MediaType.TEXT,
         )
         
-        # Режем через splitter
-        split_chunks = self.splitter.split(temp_doc)
+        # Временно меняем chunk_size у splitter для transcript
+        original_chunk_size = getattr(self.splitter, 'chunk_size', None)
+        if original_chunk_size is not None:
+            self.splitter.chunk_size = self.default_chunk_size
+        
+        try:
+            # Режем через splitter
+            split_chunks = self.splitter.split(temp_doc)
+        finally:
+            # Восстанавливаем оригинальный размер
+            if original_chunk_size is not None:
+                self.splitter.chunk_size = original_chunk_size
         
         # Обогащаем metadata (с таймкодами если enabled)
         transcript_chunks = []
