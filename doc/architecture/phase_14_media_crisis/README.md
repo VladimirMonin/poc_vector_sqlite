@@ -146,6 +146,43 @@ language = "Russian"  # Gemini ответит на русском!
 
 ---
 
+### 78. TimecodeParser — Парсинг таймкодов из транскрипций
+
+**Файл:** [78_timecode_parser.md](78_timecode_parser.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (Phase 14.1.2)
+
+Утилита для парсинга `[MM:SS]`/`[HH:MM:SS]` из audio/video транскрипций + интеграция в `TranscriptionStep`.
+
+**Ключевые фичи:**
+
+- **TimecodeParser:** regex-based парсинг таймкодов из текста
+- **Валидация:** `max_duration_seconds`, `strict_ordering` (optional)
+- **Timecode Inheritance:** первый chunk=0, последующие=last+delta
+- **TranscriptionStep.enable_timecodes:** флаг для включения/отключения парсинга
+- **Metadata enrichment:** `start_seconds` (всегда), `timecode_original` (если распарсен)
+
+**Тестирование:**
+
+- ✅ 27 тестов TimecodeParser (Basic, ParseAll, Validation, Inheritance, EdgeCases)
+- ✅ 7 новых тестов TranscriptionStep (timecode integration)
+- ✅ 18 total тестов TranscriptionStep (11 базовых + 7 timecode)
+- ✅ 100% passing (0.16s)
+
+**Commits:**
+
+- `fd4e26b` — TimecodeParser utility (27 тестов)
+- `15c3960` — TranscriptionStep integration (7 новых тестов + RAG fix)
+
+**Итоги Phase 14.1.2 (Partial):**
+
+```
+67 unit-тестов (40 steps + 27 timecode) + 135 core/rag/context = 202 теста
+0.35s execution
+100% passing
+```
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR
