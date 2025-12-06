@@ -110,6 +110,24 @@ def _score_to_class(score: float) -> str:
     return "score-low"
 
 
+def _normalize_rrf_score(score: float, max_score: float = 0.033) -> int:
+    """Нормализовать RRF score в проценты (0-100).
+
+    RRF score обычно в диапазоне 0.01-0.033 (для k=60).
+    Максимум = 1/(k+1) = 1/61 ≈ 0.0164 для одного источника,
+    или ~0.033 для hybrid (два источника).
+
+    Args:
+        score: RRF score (обычно 0.01-0.033).
+        max_score: Максимальный ожидаемый score.
+
+    Returns:
+        Нормализованный процент (0-100).
+    """
+    normalized = min(score / max_score, 1.0)
+    return int(normalized * 100)
+
+
 def _chunk_result_to_item(result: ChunkResult) -> SearchResultItem:
     """Преобразовать ChunkResult в SearchResultItem.
 
@@ -137,7 +155,7 @@ def _chunk_result_to_item(result: ChunkResult) -> SearchResultItem:
         chunk_type=result.chunk_type.value,
         language=result.language,
         score=result.score,
-        score_percent=int(result.score * 100),
+        score_percent=_normalize_rrf_score(result.score),
         score_class=_score_to_class(result.score),
         match_type=result.match_type.value,
         parent_doc_id=result.parent_doc_id,
@@ -180,7 +198,7 @@ def _search_result_to_item(result: SearchResult) -> DocumentResultItem:
         title=metadata.get("title") or source or "Untitled",
         source=source,
         score=result.score,
-        score_percent=int(result.score * 100),
+        score_percent=_normalize_rrf_score(result.score),
         score_class=_score_to_class(result.score),
         match_type=result.match_type.value,
         chunk_count=metadata.get("chunk_count", 0),

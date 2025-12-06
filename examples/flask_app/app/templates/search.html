@@ -72,6 +72,7 @@
                             class="form-control border-start-0"
                             placeholder="Поиск по базе знаний..."
                             autocomplete="off"
+                            list="search-suggestions"
                             hx-get="{{ url_for('search.results') }}"
                             hx-trigger="keyup changed delay:500ms, search"
                             hx-target="#search-results"
