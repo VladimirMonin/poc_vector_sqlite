@@ -48,10 +48,12 @@
 **Исправлено в:** Phase 12
 
 **Файлы:**
+
 - `semantic_core/infrastructure/gemini/audio_analyzer.py:85`
 - `semantic_core/infrastructure/gemini/video_analyzer.py:109`
 
 **Изменение:**
+
 ```python
 # БЫЛО (ограничение в 8x):
 max_output_tokens: int = 8_192
@@ -61,6 +63,7 @@ max_output_tokens: int = 65_536
 ```
 
 **Эффект:**
+
 - Gemini может вернуть ~50,000 слов (~130 минут транскрипции)
 - Модель больше не обрезает длинные аудио
 
@@ -201,6 +204,7 @@ def _split_ocr_into_chunks(
 **Исправлено в:** Phase 2-3 (SOLID рефакторинг)
 
 **Файлы:**
+
 - `semantic_core/config.py:138-158`
 - `semantic_core/cli/context.py:159-163`
 
@@ -221,6 +225,7 @@ splitter = SmartSplitter(
 ```
 
 **Эффект:**
+
 - ✅ Пользователь может менять `chunk_size` через `semantic.toml`
 - ✅ SmartSplitter использует конфигурированные значения
 
@@ -263,10 +268,15 @@ This function iterates...
 """
 
 # SmartSplitter парсит как MARKDOWN (media_type=MediaType.MARKDOWN)
-# Результат:
+
+# Результат
+
 # - Chunk 1: ChunkType.TEXT, content="## Function Example"
+
 # - Chunk 2: ChunkType.CODE, language="python", content="def calculate..."
+
 # - Chunk 3: ChunkType.TEXT, content="This function iterates..."
+
 ```
 
 **Решение:** Изменить 1 строку в `pipeline.py:1501`
@@ -302,6 +312,7 @@ Answer in {language} language."""
 ```
 
 **Проблемы:**
+
 - ❌ Нет инструкций по Markdown форматированию
 - ❌ Длинные лекции → "простыня текста" без параграфов
 - ❌ Code snippets в транскрипциях не выделяются
@@ -332,6 +343,7 @@ CRITICAL INSTRUCTIONS FOR TRANSCRIPTION FIELD:
   def example():
       pass
   ```
+
 - DO NOT escape newlines as \\n — use actual line breaks
 
 Example:
@@ -341,6 +353,7 @@ Example:
 The speaker introduces semantic search.
 
 Key points:
+
 - Embeddings capture meaning
 - Vector databases enable similarity
 
@@ -355,6 +368,7 @@ def cosine_similarity(a, b):
 
 This is fundamental to vector search.
 """
+
 ```
 
 **Аналогично для video_analyzer.py — OCR секция:**
@@ -385,6 +399,7 @@ class UserService:
 
 **Problem:** Mixes validation and persistence.
 """
+
 ```
 
 **Приоритет:** 🟡 **P1** (улучшает quality, не критично для работы)
@@ -468,6 +483,7 @@ def _split_ocr_into_chunks(...):
 ```
 
 **Эффект:**
+
 - ✅ Code blocks из Gemini OCR изолируются в отдельные чанки
 - ✅ `ChunkType.CODE` с `language="python"` для code chunks
 - ✅ Заголовки слайдов сохраняются в `metadata["headers"]`
@@ -510,6 +526,7 @@ CRITICAL INSTRUCTIONS FOR TRANSCRIPTION FIELD:
   def example():
       pass
   ```
+
 - DO NOT escape newlines as \\n — use actual line breaks inside the JSON string
 
 Example transcription format:
@@ -519,6 +536,7 @@ Example transcription format:
 The speaker introduces the topic of semantic search and explains how embeddings work in modern NLP systems.
 
 Key points:
+
 - Embeddings capture semantic meaning
 - Vector databases enable similarity search
 - Context matters more than keywords
@@ -538,6 +556,7 @@ This formula is fundamental to understanding vector search.
 
 The session concludes with practical examples of implementing semantic search in production systems.
 """
+
 ```
 
 ---
@@ -570,6 +589,7 @@ CRITICAL INSTRUCTIONS FOR OCR_TEXT FIELD:
   class Example:
       pass
   ```
+
 - Use `## Slide Title` headers for new slides
 - Use bullet points for slide bullet lists:
   - Point 1
@@ -606,7 +626,9 @@ class UserValidator:
 class UserRepository:
     def save(self, user): ...
 ```
+
 """
+
 ```
 
 ---
@@ -636,21 +658,22 @@ def calculate_total(items):
 This function iterates over items and sums their prices.
 """
 
-
 def test_ocr_detects_code_blocks(core, tmp_path):
     """Проверяет, что OCR с кодом создаёт CODE chunks."""
     from semantic_core.domain import Document, MediaType, Chunk
-    
+
     # Симулируем OCR chunking напрямую
     ocr_text = """
+
 ## Example
 
 ```python
 def hello():
     print("world")
 ```
+
 """
-    
+
     temp_doc = Document(
         content=ocr_text,
         metadata={"source": "test.mp4"},
@@ -665,12 +688,12 @@ def hello():
     assert code_chunks[0].language == "python"
     assert "def hello():" in code_chunks[0].content
 
-
 def test_video_with_code_creates_ocr_code_chunks_e2e(core, tmp_path):
     """E2E тест: видео с кодом → проверка БД."""
     # NOTE: Требует реального видео или mock GeminiVideoAnalyzer
     # Для полноты можно добавить mock, который возвращает OCR с кодом
     pass  # TODO: Implement with mocked analyzer
+
 ```
 
 ---
@@ -836,17 +859,20 @@ if "```" not in result["transcription"] and len(result["transcription"]) > 5000:
 После завершения Phase 14.0:
 
 **Phase 14.1: ProcessingStep Abstraction** (3-4 недели)
+
 - Рефакторинг `_build_media_chunks()` → step-based system
 - `SummaryStep`, `TranscriptionStep`, `OCRStep`
 - `register_step()` для кастомизации
 - `rerun_step()` для идемпотентности
 
 **Phase 14.2: Aggregation & Service Layer** (2 недели)
+
 - `MediaService.get_media_details(doc_id)` — сборка чанков
 - Flask UI `/media/<id>` с timeline
 - Search filters по `role`
 
 **Phase 14.3: User Flexibility** (2 недели)
+
 - Конфигурируемые промпты через `semantic.toml`
 - `ocr_parser_mode` config toggle
 - Per-role chunk sizing

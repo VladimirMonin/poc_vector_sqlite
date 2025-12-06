@@ -363,6 +363,4 @@ class MediaQueueProcessor:
         if result.duration_seconds:
             update_data["result_duration_seconds"] = result.duration_seconds
 
-        MediaTaskModel.update(update_data).where(
-            MediaTaskModel.id == task_id
-        ).execute()
+        MediaTaskModel.update(update_data).where(MediaTaskModel.id == task_id).execute()

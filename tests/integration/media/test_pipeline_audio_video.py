@@ -31,9 +31,7 @@ class TestSemanticCoreAudioIngestion:
         return analyzer
 
     @pytest.fixture
-    def core_with_audio_analyzer(
-        self, mock_embedder, media_db, mock_audio_analyzer
-    ):
+    def core_with_audio_analyzer(self, mock_embedder, media_db, mock_audio_analyzer):
         """SemanticCore с настроенным audio analyzer."""
         from semantic_core import (
             PeeweeVectorStore,
@@ -64,8 +62,14 @@ class TestSemanticCoreAudioIngestion:
         audio_file.write_bytes(b"dummy audio content")
         return audio_file
 
-    @patch("semantic_core.infrastructure.media.utils.files.get_file_mime_type", return_value="audio/mpeg")
-    @patch("semantic_core.infrastructure.media.utils.audio.is_audio_supported", return_value=True)
+    @patch(
+        "semantic_core.infrastructure.media.utils.files.get_file_mime_type",
+        return_value="audio/mpeg",
+    )
+    @patch(
+        "semantic_core.infrastructure.media.utils.audio.is_audio_supported",
+        return_value=True,
+    )
     def test_ingest_audio_sync_success(
         self, mock_is_supported, mock_mime, core_with_audio_analyzer, test_audio_path
     ):
@@ -113,8 +117,14 @@ class TestSemanticCoreAudioIngestion:
         assert all(chunk.chunk_type == "text" for chunk in transcript_chunks)
         assert all(chunk.embedding_status == "READY" for chunk in chunks)
 
-    @patch("semantic_core.infrastructure.media.utils.files.get_file_mime_type", return_value="audio/mpeg")
-    @patch("semantic_core.infrastructure.media.utils.audio.is_audio_supported", return_value=True)
+    @patch(
+        "semantic_core.infrastructure.media.utils.files.get_file_mime_type",
+        return_value="audio/mpeg",
+    )
+    @patch(
+        "semantic_core.infrastructure.media.utils.audio.is_audio_supported",
+        return_value=True,
+    )
     def test_ingest_audio_async_returns_task_id(
         self, mock_is_supported, mock_mime, core_with_audio_analyzer, test_audio_path
     ):
@@ -130,9 +140,7 @@ class TestSemanticCoreAudioIngestion:
         task = MediaTaskModel.get_by_id(task_id)
         assert task.status == "pending"
 
-    def test_ingest_audio_without_analyzer_raises(
-        self, mock_embedder, media_db
-    ):
+    def test_ingest_audio_without_analyzer_raises(self, mock_embedder, media_db):
         """Без audio_analyzer выбрасывает RuntimeError."""
         from semantic_core import (
             PeeweeVectorStore,
@@ -175,9 +183,7 @@ class TestSemanticCoreVideoIngestion:
         return analyzer
 
     @pytest.fixture
-    def core_with_video_analyzer(
-        self, mock_embedder, media_db, mock_video_analyzer
-    ):
+    def core_with_video_analyzer(self, mock_embedder, media_db, mock_video_analyzer):
         """SemanticCore с настроенным video analyzer."""
         from semantic_core import (
             PeeweeVectorStore,
@@ -208,8 +214,14 @@ class TestSemanticCoreVideoIngestion:
         video_file.write_bytes(b"dummy video content")
         return video_file
 
-    @patch("semantic_core.infrastructure.media.utils.files.get_file_mime_type", return_value="video/mp4")
-    @patch("semantic_core.infrastructure.media.utils.video.is_video_supported", return_value=True)
+    @patch(
+        "semantic_core.infrastructure.media.utils.files.get_file_mime_type",
+        return_value="video/mp4",
+    )
+    @patch(
+        "semantic_core.infrastructure.media.utils.video.is_video_supported",
+        return_value=True,
+    )
     def test_ingest_video_sync_success(
         self, mock_is_supported, mock_mime, core_with_video_analyzer, test_video_path
     ):
@@ -252,8 +264,14 @@ class TestSemanticCoreVideoIngestion:
         assert all(chunk.chunk_type == "text" for chunk in transcript_chunks)
         assert all(chunk.embedding_status == "READY" for chunk in chunks)
 
-    @patch("semantic_core.infrastructure.media.utils.files.get_file_mime_type", return_value="video/mp4")
-    @patch("semantic_core.infrastructure.media.utils.video.is_video_supported", return_value=True)
+    @patch(
+        "semantic_core.infrastructure.media.utils.files.get_file_mime_type",
+        return_value="video/mp4",
+    )
+    @patch(
+        "semantic_core.infrastructure.media.utils.video.is_video_supported",
+        return_value=True,
+    )
     def test_ingest_video_async_returns_task_id(
         self, mock_is_supported, mock_mime, core_with_video_analyzer, test_video_path
     ):
@@ -269,9 +287,7 @@ class TestSemanticCoreVideoIngestion:
         task = MediaTaskModel.get_by_id(task_id)
         assert task.status == "pending"
 
-    def test_ingest_video_without_analyzer_raises(
-        self, mock_embedder, media_db
-    ):
+    def test_ingest_video_without_analyzer_raises(self, mock_embedder, media_db):
         """Без video_analyzer выбрасывает RuntimeError."""
         from semantic_core import (
             PeeweeVectorStore,

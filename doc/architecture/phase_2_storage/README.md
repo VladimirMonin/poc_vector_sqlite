@@ -8,9 +8,11 @@
 ## 📖 Содержание фазы
 
 ### 11. Storage Layer: Peewee + RRF + Фильтры
+
 **Файл:** [11_storage_layer_phase2.md](11_storage_layer_phase2.md)
 
 Полная реализация `PeeweeVectorStore`:
+
 - Vector search через `sqlite-vec`
 - Full-text search через FTS5
 - Гибридный поиск через Reciprocal Rank Fusion (RRF)
@@ -18,6 +20,7 @@
 - Bulk operations для production
 
 **Ключевые компоненты:**
+
 - `PeeweeVectorStore` — реализация интерфейса `VectorStore`
 - `DocumentModel` — ORM модель для документов
 - `ChunkModel` — ORM модель для чанков с векторами

@@ -319,7 +319,9 @@ class SemanticCore:
             doc_id=saved_document.id,
             chunk_type=chunk_type.value,
             chunk_count=len(chunks),
-            enriched=enrich_media and analysis_result is not None if enrich_media else False,
+            enriched=enrich_media and analysis_result is not None
+            if enrich_media
+            else False,
         )
 
         return saved_document
@@ -660,7 +662,11 @@ class SemanticCore:
             if task.result_ocr_text:
                 content_parts.append(f"OCR: {task.result_ocr_text}")
 
-            content = "\n\n".join(content_parts) if content_parts else f"Image: {Path(path).name}"
+            content = (
+                "\n\n".join(content_parts)
+                if content_parts
+                else f"Image: {Path(path).name}"
+            )
 
             # Формируем title из alt_text или имени файла
             title = (
@@ -719,9 +725,12 @@ class SemanticCore:
 
             # Обновляем chunk_id в задаче
             from semantic_core.infrastructure.storage.peewee.models import ChunkModel
-            db_chunk = ChunkModel.select().where(
-                ChunkModel.document_id == saved_doc.id
-            ).first()
+
+            db_chunk = (
+                ChunkModel.select()
+                .where(ChunkModel.document_id == saved_doc.id)
+                .first()
+            )
             if db_chunk:
                 task.result_chunk_id = db_chunk.id
                 task.save()
@@ -805,9 +814,15 @@ class SemanticCore:
                 "type": "audio",
                 "description": task.result_description,
                 "transcription": task.result_transcription,
-                "keywords": json.loads(task.result_keywords) if task.result_keywords else None,
-                "participants": json.loads(task.result_participants) if task.result_participants else None,
-                "action_items": json.loads(task.result_action_items) if task.result_action_items else None,
+                "keywords": json.loads(task.result_keywords)
+                if task.result_keywords
+                else None,
+                "participants": json.loads(task.result_participants)
+                if task.result_participants
+                else None,
+                "action_items": json.loads(task.result_action_items)
+                if task.result_action_items
+                else None,
                 "duration_seconds": task.result_duration_seconds,
             }
 
@@ -851,8 +866,7 @@ class SemanticCore:
             )
 
             vector_texts = [
-                self.context_strategy.form_vector_text(chunk, doc)
-                for chunk in chunks
+                self.context_strategy.form_vector_text(chunk, doc) for chunk in chunks
             ]
             embeddings = self.embedder.embed_documents(vector_texts)
             for chunk, embedding in zip(chunks, embeddings):
@@ -953,7 +967,9 @@ class SemanticCore:
                 "type": "video",
                 "description": task.result_description,
                 "transcription": task.result_transcription,
-                "keywords": json.loads(task.result_keywords) if task.result_keywords else None,
+                "keywords": json.loads(task.result_keywords)
+                if task.result_keywords
+                else None,
                 "ocr_text": task.result_ocr_text,
                 "duration_seconds": task.result_duration_seconds,
             }
@@ -996,13 +1012,14 @@ class SemanticCore:
                     "filename": Path(path).name,
                     "_original_path": str(Path(path)),
                     "duration_seconds": task.result_duration_seconds,
-                    "keywords": json.loads(task.result_keywords) if task.result_keywords else [],
+                    "keywords": json.loads(task.result_keywords)
+                    if task.result_keywords
+                    else [],
                 },
             )
 
             vector_texts = [
-                self.context_strategy.form_vector_text(chunk, doc)
-                for chunk in chunks
+                self.context_strategy.form_vector_text(chunk, doc) for chunk in chunks
             ]
             embeddings = self.embedder.embed_documents(vector_texts)
             for chunk, embedding in zip(chunks, embeddings):
@@ -1012,6 +1029,7 @@ class SemanticCore:
 
             # Обновляем chunk_id
             from semantic_core.infrastructure.storage.peewee.models import ChunkModel
+
             db_chunk = (
                 ChunkModel.select()
                 .where(ChunkModel.document_id == saved_doc.id)
@@ -1484,12 +1502,12 @@ class SemanticCore:
         media_path: Path,
     ) -> list[Chunk]:
         """Режет OCR текст на чанки через splitter.
-        
+
         Args:
             ocr_text: Текст, распознанный через OCR из видео.
             base_index: Начальный индекс для нумерации чанков.
             media_path: Путь к медиа-файлу.
-            
+
         Returns:
             Список чанков с role='ocr'.
         """
@@ -1511,11 +1529,11 @@ class SemanticCore:
             chunk.metadata = meta
 
             ocr_chunks.append(chunk)
-        
+
         # Monitor code detection rate for false positives
         code_chunks = [c for c in ocr_chunks if c.chunk_type == ChunkType.CODE]
         code_ratio = len(code_chunks) / len(ocr_chunks) if ocr_chunks else 0
-        
+
         if code_ratio > 0.5:
             logger.warning(
                 "High code ratio in OCR — possible UI text false positives",

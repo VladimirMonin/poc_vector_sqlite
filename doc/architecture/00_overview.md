@@ -154,23 +154,27 @@ graph LR
 ## 🎯 Рекомендуемый порядок изучения
 
 **Для новичков:**
+
 1. [Phase 0: Basics](phase_0_basics/README.md) — базовые концепции *(если файлы будут созданы)*
 2. [Phase 1: SOLID](phase_1_solid/README.md) — архитектурные принципы
 3. [Phase 2: Storage](phase_2_storage/README.md) — как работает поиск
 4. [Phase 4: Smart Parsing](phase_4_smart_parsing/README.md) — обработка контента
 
 **Для разработчиков:**
+
 1. [Phase 1-3](phase_1_solid/README.md) — архитектурный фундамент
 2. [Phase 5](phase_5_batching/README.md) — production оптимизации
 3. [Phase 7-8](phase_7_observability/README.md) — operations и CLI
 4. [Phase 13](phase_13_audit/README.md) — реальные проблемы и решения
 
 **Для пользователей медиа:**
+
 1. [Phase 6: Multimodal](phase_6_multimodal/README.md) — обработка изображений, аудио, видео
 2. [Phase 14: Media Crisis](phase_14_media_crisis/README.md) — multi-chunk архитектура
 3. [Phase 4: Smart Parsing](phase_4_smart_parsing/README.md) — SmartSplitter для кода
 
 **Для RAG applications:**
+
 1. [Phase 9: RAG Integration](phase_9_rag/README.md) — вопрос-ответ к базе знаний
 2. [Phase 12: Flask](phase_12_flask/README.md) — веб-интерфейс для RAG
 3. [Phase 13: Embedding Cache](phase_13_audit/README.md) — оптимизация запросов

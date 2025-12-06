@@ -161,7 +161,9 @@ def upload_files():
             flash(error, "danger")
 
     # Определяем режим (sync/async)
-    total_files = len(text_files) + len(image_files) + len(audio_files) + len(video_files)
+    total_files = (
+        len(text_files) + len(image_files) + len(audio_files) + len(video_files)
+    )
     mode = "async" if total_files >= ASYNC_THRESHOLD else "sync"
     logger.info(
         f"📤 Загружено {len(files)} файлов "
@@ -210,7 +212,9 @@ def upload_files():
         try:
             # Проверяем, есть ли image_analyzer
             if core.image_analyzer is None:
-                logger.warning(f"⚠️ ImageAnalyzer не настроен, пропускаем {image_path.name}")
+                logger.warning(
+                    f"⚠️ ImageAnalyzer не настроен, пропускаем {image_path.name}"
+                )
                 flash(f"⚠️ {image_path.name}: Vision API не настроен", "warning")
                 continue
 
@@ -227,7 +231,9 @@ def upload_files():
     for audio_path in audio_files:
         try:
             if core.audio_analyzer is None:
-                logger.warning(f"⚠️ AudioAnalyzer не настроен, пропускаем {audio_path.name}")
+                logger.warning(
+                    f"⚠️ AudioAnalyzer не настроен, пропускаем {audio_path.name}"
+                )
                 flash(f"⚠️ {audio_path.name}: Audio API не настроен", "warning")
                 continue
 
@@ -243,7 +249,9 @@ def upload_files():
     for video_path in video_files:
         try:
             if core.video_analyzer is None:
-                logger.warning(f"⚠️ VideoAnalyzer не настроен, пропускаем {video_path.name}")
+                logger.warning(
+                    f"⚠️ VideoAnalyzer не настроен, пропускаем {video_path.name}"
+                )
                 flash(f"⚠️ {video_path.name}: Video API не настроен", "warning")
                 continue
 
@@ -362,7 +370,11 @@ def document_detail(doc_id: int):
         "code": "text",
     }
     first_chunk = chunks[0] if chunks else None
-    media_type = CHUNK_TYPE_TO_MEDIA.get(first_chunk.chunk_type, "text") if first_chunk else "text"
+    media_type = (
+        CHUNK_TYPE_TO_MEDIA.get(first_chunk.chunk_type, "text")
+        if first_chunk
+        else "text"
+    )
 
     media_icons = {
         "text": "bi-file-text",
@@ -462,8 +474,10 @@ def reindex_document(doc_id: int):
                     try:
                         content = source_path.read_text(encoding="cp1251")
                     except UnicodeDecodeError:
-                        content = source_path.read_text(encoding="utf-8", errors="replace")
-                
+                        content = source_path.read_text(
+                            encoding="utf-8", errors="replace"
+                        )
+
                 doc = Document(
                     content=content,
                     metadata=metadata,
@@ -482,8 +496,7 @@ def reindex_document(doc_id: int):
                     f" Не удалось удалить старый документ {doc_id} после переиндексации: {delete_error}"
                 )
                 flash(
-                    "Новый документ создан, но старый не удалён: "
-                    f"{delete_error}",
+                    f"Новый документ создан, но старый не удалён: {delete_error}",
                     "warning",
                 )
             else:
@@ -524,13 +537,13 @@ def serve_media(doc_id: int):
         abort(404)
 
     file_path = Path(source)
-    
+
     # Если путь относительный, ищем от корня проекта
     if not file_path.is_absolute():
         # root_path = examples/flask_app/app, нужно 3 уровня вверх до poc_vector_sqlite
         project_root = Path(current_app.root_path).parent.parent.parent
         file_path = project_root / source
-    
+
     if not file_path.exists():
         abort(404)
 
@@ -554,20 +567,20 @@ def serve_media(doc_id: int):
 @ingest_bp.route("/media")
 def media_gallery():
     """Галерея медиа-файлов (изображения, аудио, видео).
-    
+
     Фильтрация по типу через query param ?type=image|audio|video|all.
     """
     import json
-    
+
     filter_type = request.args.get("type", "all")  # image, audio, video, all
-    
+
     # Маппинг chunk_type → media_type
     CHUNK_TYPE_TO_MEDIA = {
         "image_ref": "image",
         "audio_ref": "audio",
         "video_ref": "video",
     }
-    
+
     # Типы чанков для фильтрации
     if filter_type == "all":
         media_chunk_types = ["image_ref", "audio_ref", "video_ref"]
@@ -579,11 +592,11 @@ def media_gallery():
         media_chunk_types = ["video_ref"]
     else:
         media_chunk_types = ["image_ref", "audio_ref", "video_ref"]
-    
+
     # Находим документы, у которых первый чанк — медиа-типа
     # (документ целиком = медиа-файл)
     media_items = []
-    
+
     # Получаем уникальные document_id для медиа-чанков
     media_chunks = (
         ChunkModel.select(ChunkModel.document_id, ChunkModel.chunk_type)
@@ -591,28 +604,32 @@ def media_gallery():
         .where(ChunkModel.chunk_index == 0)  # Только первый чанк
         .distinct()
     )
-    
+
     doc_ids = [c.document_id for c in media_chunks]
-    
+
     if doc_ids:
         docs = (
             DocumentModel.select()
             .where(DocumentModel.id.in_(doc_ids))
             .order_by(DocumentModel.created_at.desc())
         )
-        
+
         # Кешируем chunk_type для каждого документа
         doc_chunk_types = {c.document_id: c.chunk_type for c in media_chunks}
-        
+
         for doc in docs:
             try:
-                meta = json.loads(doc.metadata) if isinstance(doc.metadata, str) else (doc.metadata or {})
+                meta = (
+                    json.loads(doc.metadata)
+                    if isinstance(doc.metadata, str)
+                    else (doc.metadata or {})
+                )
             except (json.JSONDecodeError, TypeError):
                 meta = {}
-            
+
             chunk_type = doc_chunk_types.get(doc.id, "image_ref")
             media_type = CHUNK_TYPE_TO_MEDIA.get(chunk_type, "image")
-            
+
             # Формируем title из metadata или source
             title = meta.get("title")
             if not title:
@@ -621,16 +638,20 @@ def media_gallery():
                     title = Path(source).stem  # Имя файла без расширения
                 else:
                     title = f"Media #{doc.id}"
-            
-            media_items.append({
-                "id": doc.id,
-                "title": title,
-                "media_type": media_type,
-                "source": meta.get("source", ""),
-                "created_at": doc.created_at,
-                "description": meta.get("description", "")[:100] if meta.get("description") else "",
-            })
-    
+
+            media_items.append(
+                {
+                    "id": doc.id,
+                    "title": title,
+                    "media_type": media_type,
+                    "source": meta.get("source", ""),
+                    "created_at": doc.created_at,
+                    "description": meta.get("description", "")[:100]
+                    if meta.get("description")
+                    else "",
+                }
+            )
+
     return render_template(
         "media.html",
         media_items=media_items,
