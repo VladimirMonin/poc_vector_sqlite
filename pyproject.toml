@@ -29,6 +29,27 @@ media = [
     "pydub (>=0.25.0,<0.26.0)",
     "imageio[pyav] (>=2.35.0,<3.0.0)"
 ]
+local-embeddings-mlx = [
+    "mlx>=0.10.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "mlx-embeddings>=0.1.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "mlx-lm>=0.10.0; platform_machine == 'arm64' and sys_platform == 'darwin'"
+]
+local-embeddings = [
+    "sentence-transformers>=2.0.0,<4.0.0",
+    "torch>=2.0.0,<3.0.0"
+]
+local-whisper = [
+    "lightning-whisper-mlx (>=0.1.0,<0.2.0); platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "mlx-whisper (>=0.4.0,<0.5.0); platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "transformers (>=4.40.0,<5.0.0); platform_machine != 'arm64' or sys_platform != 'darwin'",
+    "torch (>=2.0.0,<3.0.0); platform_machine != 'arm64' or sys_platform != 'darwin'",
+    "librosa (>=0.10.0,<0.11.0)",
+    "soundfile (>=0.12.0,<0.13.0)"
+]
+openai = [
+    "openai (>=1.0.0,<2.0.0)",
+    "tiktoken (>=0.5.0,<1.0.0)"
+]
 
 
 [build-system]
