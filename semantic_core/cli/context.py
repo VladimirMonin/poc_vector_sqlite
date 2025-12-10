@@ -137,7 +137,6 @@ class CLIContext:
             init_peewee_database,
         )
         from semantic_core.processing.splitters import SmartSplitter
-        from semantic_core.processing.parsers import MarkdownNodeParser
         from semantic_core.processing.context import HierarchicalContextStrategy
 
         # Database
@@ -154,58 +153,17 @@ class CLIContext:
         # Store
         store = PeeweeVectorStore(database=db)
 
-        # Parser and Splitter
-        parser = MarkdownNodeParser()
-        splitter = SmartSplitter(
-            parser=parser,
-            chunk_size=config.chunk_size,
-            code_chunk_size=config.code_chunk_size,
-        )
+        # Splitter
+        splitter = SmartSplitter()
 
         # Context Strategy
         context_strategy = HierarchicalContextStrategy()
-
-        # Media Analyzers (если включены в конфиге)
-        image_analyzer = None
-        audio_analyzer = None
-        video_analyzer = None
-
-        if config.media_enabled:
-            try:
-                from semantic_core.infrastructure.gemini import (
-                    GeminiImageAnalyzer,
-                    GeminiAudioAnalyzer,
-                    GeminiVideoAnalyzer,
-                )
-
-                image_analyzer = GeminiImageAnalyzer(
-                    api_key=api_key,
-                    max_output_tokens=config.max_output_tokens,
-                    output_language=config.output_language,
-                )
-                audio_analyzer = GeminiAudioAnalyzer(
-                    api_key=api_key,
-                    max_output_tokens=config.max_output_tokens,
-                    output_language=config.output_language,
-                )
-                video_analyzer = GeminiVideoAnalyzer(
-                    api_key=api_key,
-                    max_output_tokens=config.max_output_tokens,
-                    output_language=config.output_language,
-                )
-            except ImportError:
-                # Media dependencies not installed
-                pass
 
         return SemanticCore(
             embedder=embedder,
             store=store,
             splitter=splitter,
             context_strategy=context_strategy,
-            image_analyzer=image_analyzer,
-            audio_analyzer=audio_analyzer,
-            video_analyzer=video_analyzer,
-            config=config,  # Phase 14.3: Передаём полный config для chunk_sizes
         )
 
     def _build_batch_manager(self, config: SemanticConfig) -> "BatchManager":
