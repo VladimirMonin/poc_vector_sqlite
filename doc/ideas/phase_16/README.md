@@ -77,6 +77,7 @@ DebugObservatory (новая подсистема)
 ## 🔗 Связь с Phase 15
 
 **Phase 15** создала multi-provider архитектуру:
+
 ```toml
 [providers.embedder]
 type = "gemini"  # или "local-mlx" или "openai"
@@ -86,6 +87,7 @@ type = "whisper"  # или "gemini"
 ```
 
 **Phase 16** добавляет инспекцию:
+
 ```bash
 # Инспектируем с текущим конфигом
 semantic inspect audio.mp3
@@ -125,6 +127,7 @@ semantic compare \
 ```
 
 **Вывод:**
+
 ```
 ╭──────────────────────────────────────────────────────╮
 │  📊 Provider Comparison Report                       │
@@ -189,6 +192,7 @@ semantic inspect audio.mp3 --config hybrid_config.toml --interactive
 ```
 
 **Интерактивный вывод:**
+
 ```
 ╭───────────────────────────────────────────────────╮
 │  🔍 Interactive Inspection Mode                   │
@@ -300,6 +304,7 @@ semantic golden test golden/search_ml.json \
 ```
 
 **Вывод:**
+
 ```
 ╭───────────────────────────────────────────────────╮
 │  🧪 Golden File Test Results                      │
@@ -355,6 +360,7 @@ Expected: ml_intro.md (rank 1-2), neural_networks.md (rank 1-2)
 **Ключевое отличие от Phase 13:**
 
 Phase 13 Inspector был hardcoded под Gemini:
+
 ```python
 # Phase 13 (старый код)
 class PipelineInspector:
@@ -365,6 +371,7 @@ class PipelineInspector:
 ```
 
 Phase 16 Inspector работает с любыми провайдерами:
+
 ```python
 # Phase 16 (новый код)
 class ProviderInspector:
@@ -520,6 +527,7 @@ semantic compare --matrix snapshots/*/*.json
 ```
 
 **Вывод:**
+
 ```
 ╭────────────────────────────────────────────────────────────╮
 │  📊 Multi-Provider Performance Matrix                      │
@@ -571,6 +579,7 @@ semantic compare --regression \
 ```
 
 **Вывод:**
+
 ```
 ╭────────────────────────────────────────────────────╮
 │  🔍 Regression Analysis                            │
