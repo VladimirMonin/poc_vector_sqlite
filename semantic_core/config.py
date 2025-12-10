@@ -590,7 +590,37 @@ class SemanticConfig(BaseSettings):
         # TOML значения имеют низший приоритет
         # kwargs (CLI args) и env variables переопределят их
         merged = {**toml_data, **data}
+        
+        # === Phase 15.4: Сохраняем вложенные provider dict'ы для ручной установки ===
+        # Pydantic Settings пересоздаёт вложенные модели из env/defaults,
+        # поэтому устанавливаем их вручную ПОСЛЕ super().__init__()
+        
+        provider_configs = {}
+        if "defaults" in merged and isinstance(merged["defaults"], dict):
+            provider_configs["defaults"] = DefaultsConfig(**merged["defaults"])
+            del merged["defaults"]  # Убираем чтобы super() не перезаписал
+        
+        if "providers_gemini" in merged and isinstance(merged["providers_gemini"], dict):
+            provider_configs["providers_gemini"] = GeminiProviderConfig(**merged["providers_gemini"])
+            del merged["providers_gemini"]
+        
+        if "providers_openai" in merged and isinstance(merged["providers_openai"], dict):
+            provider_configs["providers_openai"] = OpenAIProviderConfig(**merged["providers_openai"])
+            del merged["providers_openai"]
+        
+        if "providers_local" in merged and isinstance(merged["providers_local"], dict):
+            provider_configs["providers_local"] = LocalProviderConfig(**merged["providers_local"])
+            del merged["providers_local"]
+        
+        if "providers_ollama" in merged and isinstance(merged["providers_ollama"], dict):
+            provider_configs["providers_ollama"] = OllamaProviderConfig(**merged["providers_ollama"])
+            del merged["providers_ollama"]
+        
         super().__init__(**merged)
+        
+        # Устанавливаем provider конфиги вручную (обходим Pydantic Settings)
+        for field_name, config_obj in provider_configs.items():
+            object.__setattr__(self, field_name, config_obj)
 
     @staticmethod
     def _load_toml(path: Path) -> dict:
@@ -695,6 +725,25 @@ class SemanticConfig(BaseSettings):
 
             if media_dict:
                 flat["media"] = media_dict
+
+        # === Phase 15.4: Поддержка новых секций [defaults] и [providers.*] ===
+        
+        # [defaults] секция
+        if "defaults" in raw and isinstance(raw["defaults"], dict):
+            flat["defaults"] = raw["defaults"]
+        
+        # [providers.*] секции
+        providers_mapping = {
+            "gemini": "providers_gemini",
+            "openai": "providers_openai",
+            "local": "providers_local",
+            "ollama": "providers_ollama",
+        }
+        
+        if "providers" in raw and isinstance(raw["providers"], dict):
+            for provider_key, config_field in providers_mapping.items():
+                if provider_key in raw["providers"]:
+                    flat[config_field] = raw["providers"][provider_key]
 
         # Также поддерживаем плоские ключи (для простоты)
         for key in [
