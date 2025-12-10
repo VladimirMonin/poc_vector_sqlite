@@ -164,8 +164,10 @@ class PeeweeVectorStore(BaseVectorStore):
         )
 
         # Создаём векторную таблицу vec0
+        # NOTE: DROP нужен если dimension изменилась (например, с 768D Gemini на 1024D Qwen3)
+        self.db.execute_sql("DROP TABLE IF EXISTS chunks_vec")
         self.db.execute_sql(f"""
-            CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec
+            CREATE VIRTUAL TABLE chunks_vec
             USING vec0(
                 id INTEGER PRIMARY KEY,
                 embedding FLOAT[{self.dimension}]
