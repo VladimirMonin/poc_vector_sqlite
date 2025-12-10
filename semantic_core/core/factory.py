@@ -320,13 +320,25 @@ class ComponentFactory:
             dimension=embedder.dimension,
         )
 
+        # Создаём splitter и context strategy
+        from semantic_core.processing.parsers import MarkdownNodeParser
+        from semantic_core.processing.splitters import SmartSplitter
+        from semantic_core.processing.context import HierarchicalContextStrategy
+
+        parser = MarkdownNodeParser()
+        splitter = SmartSplitter(parser=parser)
+        context_strategy = HierarchicalContextStrategy()
+
         # Собираем SemanticCore
+        # NOTE: SemanticCore НЕ использует LLM напрямую.
+        # LLM используется только в RAGEngine, который создаётся отдельно.
         core = SemanticCore(
             embedder=embedder,
             store=store,
+            splitter=splitter,
+            context_strategy=context_strategy,
             vision_analyzer=vision,
             transcriber=transcriber,
-            llm=llm,
         )
 
         logger.info(

@@ -40,47 +40,66 @@ class ProviderInspector:
     def __init__(
         self,
         core,  # SemanticCore (избегаем circular import)
-        snapshot_manager: Optional[SnapshotManager] = None,
+        artifacts_root: Optional[Path] = None,
     ):
         """
         Инициализация ProviderInspector.
 
         Args:
             core: Экземпляр SemanticCore
-            snapshot_manager: Менеджер снимков (опционально)
+            artifacts_root: Корневая папка для сохранения artifacts (опционально)
         """
         self.core = core
-        self.snapshot_manager = snapshot_manager or SnapshotManager()
+        
+        # Создаём SnapshotManager с artifacts_root
+        if artifacts_root:
+            self.snapshot_manager = SnapshotManager(artifacts_root=Path(artifacts_root))
+        else:
+            self.snapshot_manager = SnapshotManager()
 
-        logger.trace("provider_inspector_initialized")
+        logger.trace("provider_inspector_initialized", artifacts_root=str(artifacts_root) if artifacts_root else None)
 
     def ingest_with_inspection(
         self,
-        document: Document,
+        path: Optional[str] = None,
+        document: Optional[Document] = None,
         mode: str = "sync",
-        save_snapshot: bool = False,
-        session_path: Optional[Path] = None,
-    ) -> tuple[Document, InspectionSnapshot]:
+    ) -> InspectionSnapshot:
         """
         Индексирует документ с полной инспекцией pipeline.
 
         Args:
-            document: Документ для индексации
+            path: Путь к файлу (для автоматической загрузки)
+            document: Документ для индексации (если уже загружен)
             mode: Режим (sync/async)
-            save_snapshot: Сохранять ли snapshot на диск
-            session_path: Путь к папке сессии (для сохранения)
 
         Returns:
-            Tuple (сохранённый документ, snapshot)
+            InspectionSnapshot с полными данными
         """
         start_time = time.perf_counter()
 
+        # Загружаем документ если передан path
+        if path and not document:
+            from semantic_core.domain import Document
+            
+            file_path = Path(path)
+            content = file_path.read_text(encoding="utf-8")
+            document = Document(
+                content=content,
+                metadata={"source": str(file_path)},
+            )
+
+        if not document:
+            raise ValueError("Either path or document must be provided")
+
         # Создаём snapshot
         source = document.metadata.get("source", "unknown")
-        content_preview = document.content[:500] if document.content else ""
+        content = document.content or ""
+        content_preview = content[:500] if content else ""
 
         snapshot = InspectionSnapshot(
             file_path=source,
+            file_content=content,  # Сохраняем полное содержимое
             file_content_preview=content_preview,
             processing_timestamp=datetime.now(),
             embedder_metadata=self._extract_provider_metadata(self.core.embedder),
@@ -190,14 +209,6 @@ class ProviderInspector:
         # Финализация snapshot
         snapshot.total_duration_ms = (time.perf_counter() - start_time) * 1000
 
-        # Сохраняем snapshot если требуется
-        if save_snapshot:
-            if session_path is None:
-                session_path = self.snapshot_manager.create_session_folder()
-
-            file_prefix = Path(source).stem if source != "unknown" else "document"
-            self.snapshot_manager.save_snapshot(snapshot, session_path, file_prefix)
-
         logger.info(
             "inspection_completed",
             document_id=saved.id,
@@ -205,24 +216,26 @@ class ProviderInspector:
             chunks=len(chunks),
         )
 
+        return snapshot
+
         return saved, snapshot
 
     def search_with_inspection(
         self,
         query: str,
-        limit: int = 10,
+        top_k: int = 10,
         mode: str = "hybrid",
-    ) -> tuple[list, SearchInspection]:
+    ) -> InspectionSnapshot:
         """
         Выполняет поиск с инспекцией.
 
         Args:
             query: Поисковый запрос
-            limit: Лимит результатов
+            top_k: Количество результатов
             mode: Режим поиска (vector/exact/hybrid)
 
         Returns:
-            Tuple (результаты, search inspection)
+            InspectionSnapshot с результатами поиска
         """
         start_time = time.perf_counter()
 
@@ -230,7 +243,7 @@ class ProviderInspector:
         query_vector = self.core.embedder.embed_query(query)
 
         # Поиск
-        results = self.core.search(query=query, limit=limit, mode=mode)
+        results = self.core.search(query=query, limit=top_k, mode=mode)
 
         search_time = (time.perf_counter() - start_time) * 1000
 
@@ -243,17 +256,16 @@ class ProviderInspector:
         inspection = SearchInspection(
             query=query,
             search_mode=mode,
-            limit=limit,
+            limit=top_k,
             query_vector_preview=vec[:20],
             query_vector_dimension=len(vec),
             results=[
                 {
                     "rank": i + 1,
-                    "score": r.score,
-                    "match_type": r.match_type.value if r.match_type else "unknown",
-                    "document_id": r.document.id if r.document else None,
                     "chunk_id": r.chunk_id,
-                    "content_full": r.document.content if r.document else "",
+                    "content": r.document.content if r.document else "",
+                    "similarity": r.score,
+                    "match_type": r.match_type.value if r.match_type else "unknown",
                     "metadata": r.document.metadata if r.document else {},
                 }
                 for i, r in enumerate(results)
@@ -269,6 +281,16 @@ class ProviderInspector:
             results_count=len(results),
             time_ms=search_time,
         )
+
+        # Создаём snapshot только с search results
+        snapshot = InspectionSnapshot(
+            processing_timestamp=datetime.now(),
+            embedder_metadata=self._extract_provider_metadata(self.core.embedder),
+            searches=[inspection],
+            total_duration_ms=search_time,
+        )
+
+        return snapshot
 
         return results, inspection
 

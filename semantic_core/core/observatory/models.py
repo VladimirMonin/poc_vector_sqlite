@@ -82,10 +82,12 @@ class InspectionSnapshot:
     - Сравнения между запусками
     - A/B тестирования провайдеров
     - Регрессионного тестирования
+    - Ручного анализа artifacts (input file, similarity matrix, etc.)
     """
 
     snapshot_version: str = "1.0"  # Версионирование формата
     file_path: str = ""
+    file_content: str = ""  # Полное содержимое входного файла
     file_content_preview: str = ""
     processing_timestamp: Optional[datetime] = None
     total_duration_ms: float = 0.0

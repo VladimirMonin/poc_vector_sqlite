@@ -210,13 +210,50 @@ class TestComponentFactoryVision:
 class TestComponentFactorySemanticCore:
     """Тесты создания полного SemanticCore."""
 
-    def test_create_semantic_core_success(self, gemini_config):
-        """Создание SemanticCore с всеми компонентами.
-        
-        NOTE: Требует integration test из-за lazy imports и реальной БД.
-        Пропускаем пока.
-        """
-        pytest.skip("Requires integration test - lazy imports and real database")
+    @patch("semantic_core.processing.context.HierarchicalContextStrategy")
+    @patch("semantic_core.processing.parsers.MarkdownNodeParser")
+    @patch("semantic_core.processing.splitters.SmartSplitter")
+    @patch("semantic_core.infrastructure.storage.peewee.init_peewee_database")
+    @patch("semantic_core.infrastructure.storage.peewee.PeeweeVectorStore")
+    def test_create_semantic_core_success(
+        self,
+        mock_store_class,
+        mock_init_db,
+        mock_splitter_class,
+        mock_parser_class,
+        mock_context_class,
+        gemini_config,
+    ):
+        """Создание SemanticCore с всеми компонентами."""
+        # Setup mocks
+        mock_db = Mock()
+        mock_init_db.return_value = mock_db
+        mock_store = Mock()
+        mock_store_class.return_value = mock_store
+        mock_parser = Mock()
+        mock_parser_class.return_value = mock_parser
+        mock_splitter = Mock()
+        mock_splitter_class.return_value = mock_splitter
+        mock_context = Mock()
+        mock_context_class.return_value = mock_context
+
+        # Create
+        core = ComponentFactory.create_semantic_core(gemini_config)
+
+        # Verify database initialization
+        mock_init_db.assert_called_once_with(
+            db_path=gemini_config.db_path, dimension=768
+        )
+
+        # Verify store creation
+        mock_store_class.assert_called_once_with(database=mock_db, dimension=768)
+
+        # Verify SemanticCore assembly
+        assert core is not None
+        assert core.embedder is not None
+        assert core.store == mock_store
+        assert core.splitter == mock_splitter
+        assert core.context_strategy == mock_context
 
 
 class TestConvenienceAPI:

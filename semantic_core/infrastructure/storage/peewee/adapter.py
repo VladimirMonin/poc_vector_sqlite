@@ -39,30 +39,66 @@ def _sanitize_fts_query(query: str) -> str:
     """Экранирует запрос для FTS5.
 
     FTS5 использует специальные операторы:
-    - `-` (минус/дефис) = NOT оператор
-    - `*` = prefix match
+    - `()` = группировка (syntax error если не в кавычках)
+    - `?` = неизвестный оператор (syntax error)
+    - `-` = NOT оператор в начале токена
+    - `*` = prefix match в конце токена
     - `"..."` = phrase match
-    - `[...]` = column filter
+    - `[]` = column filter
     - `OR`, `AND`, `NOT` = логические операторы
 
     Стратегия:
-    - Токены с дефисами (не в начале) оборачиваем в кавычки
-    - Токены с квадратными скобками оборачиваем в кавычки
+    1. Если query уже в кавычках — не трогаем
+    2. Если есть круглые скобки () или ? — оборачиваем ВСЁ в кавычки (phrase match)
+    3. Если есть дефисы/квадратные скобки внутри токенов — обораиваем токен
+    4. Иначе возвращаем как есть (для поддержки OR/AND/NOT/*)
 
     Args:
         query: Пользовательский запрос.
 
     Returns:
         Экранированный запрос для FTS5 MATCH.
+
+    Examples:
+        >>> _sanitize_fts_query("Python")
+        'Python'
+        >>> _sanitize_fts_query("What is Python?")
+        '"What is Python?"'
+        >>> _sanitize_fts_query("Python (language)")
+        '"Python (language)"'
+        >>> _sanitize_fts_query("machine-learning")
+        '"machine-learning"'
+        >>> _sanitize_fts_query("Python OR language")
+        'Python OR language'
     """
-    # Разбиваем на токены
+    # Если уже в кавычках — не трогаем
+    if query.startswith('"') and query.endswith('"'):
+        return query
+
+    # Проверяем наличие проблемных символов
+    has_parens = "(" in query or ")" in query
+    has_question = "?" in query
+    has_special = has_parens or has_question
+
+    # Если есть проблемные символы — оборачиваем ВСЁ в кавычки (phrase match)
+    if has_special:
+        # Экранируем внутренние кавычки (FTS5 uses "" for escaping)
+        escaped = query.replace('"', '""')
+        return f'"{escaped}"'
+
+    # Иначе обрабатываем токены по отдельности
     tokens = query.split()
     result = []
 
     for token in tokens:
+        # Пропускаем логические операторы (оставляем как есть)
+        if token.upper() in ("OR", "AND", "NOT"):
+            result.append(token)
+            continue
+
         needs_quoting = False
 
-        # Дефис внутри токена (не в начале) — нужно экранировать
+        # Дефис внутри токена (не в начале для NOT)
         if "-" in token and not token.startswith("-"):
             needs_quoting = True
 

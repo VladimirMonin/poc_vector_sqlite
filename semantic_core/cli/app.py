@@ -157,5 +157,10 @@ app.command(name="reanalyze", help="Повторный анализ медиа-�
     reanalyze_cmd
 )
 
+# Phase 16.1: Observatory Inspect
+from semantic_core.cli.commands import inspect
+
+app.add_typer(inspect.app, name="inspect")
+
 
 __all__ = ["app", "get_cli_context"]
