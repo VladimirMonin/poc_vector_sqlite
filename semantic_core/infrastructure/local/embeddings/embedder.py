@@ -102,6 +102,7 @@ class LocalEmbedder(BaseEmbedder):
             self._tokenizer,
             text,
             max_length=self._config.max_tokens,
+            backend=self._config.backend,
         )
 
     def embed_documents(self, texts: list[str]) -> list[np.ndarray]:
