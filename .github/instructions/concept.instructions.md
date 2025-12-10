@@ -35,6 +35,9 @@ Production-ready библиотека для локального семанти
 | `pydub`          | Извлечение/оптимизация аудио      | `/jiaaro/pydub`                   |
 | `imageio[pyav]`  | Извлечение кадров из видео        | `/imageio/imageio`                |
 | `rich`           | Console logging с цветами         | `/textualize/rich`                |
+| `typer`          | CLI framework для команд          | `/fastapi/typer`                  |
+| `pytest`         | Тестирование и фикстуры           | `/pytest-dev/pytest`              |
+| `python-dotenv`  | Загрузка .env переменных          | `/theskumar/python-dotenv`        |
 
 ### 🗺 Дорожная Карта
 
@@ -52,7 +55,15 @@ Production-ready библиотека для локального семанти
   - **12.1:** Search Query Cache — {CURRENT}
   - **12.2-12.5:** Search UI, Ingest, Chat, Polish — {TODO}
 - **Phase 13:** Total Visual Check & Audit Tools — {DONE}
-- **Phase 14:** Media Content Crisis — {IN PROGRESS} - `doc\ideas\phase_14\phase_14.0.md`
+- **Phase 14:** Media Content Crisis — {DONE}
+- **Phase 15:** Optional Dependencies & Modular Extras — {DONE}
+- **Phase 16:** Debug Observatory & Multi-Provider Inspection — {IN PROGRESS}
+  - **16.0:** Inspector Core — {CURRENT}
+  - **16.1:** CLI Inspect Command
+  - **16.2:** Multi-Provider Snapshots
+  - **16.3:** Comparison & Diff Engine
+  - **16.4:** Interactive Mode
+  - **16.5:** Golden Files Testing
 
 ### 🌐 Flask App (`examples/flask_app/`)
 
@@ -77,10 +88,26 @@ semantic_core/
 ├── core/                     # Высокоуровневая оркестрация
 │   ├── rag.py                # RAGEngine — вопрос-ответ с источниками
 │   ├── media_queue.py        # MediaQueueProcessor
-│   └── context/              # Стратегии сжатия контекста чата
+│   ├── factory.py            # ComponentFactory для создания провайдеров
+│   ├── context/              # Стратегии сжатия контекста чата
+│   └── observatory/          # 🆕 Debug Observatory (Phase 16)
+│       ├── inspector.py      # ProviderInspector — перехват данных
+│       ├── recorder.py       # PipelineRecorder — запись шагов
+│       ├── snapshot.py       # SnapshotManager — сохранение артефактов
+│       └── reporters/        # Экспорт отчётов
+│           ├── console.py    # Rich TUI для терминала
+│           ├── markdown.py   # Markdown отчёты
+│           ├── json.py       # JSON dumps
+│           └── diff.py       # Сравнение снимков
 ├── cli/                      # CLI приложение (Typer + Rich)
 │   ├── app.py                # Точка входа CLI
-│   ├── commands/             # Команды: ingest, search, queue, worker, chat, docs
+│   ├── commands/             # Команды
+│   │   ├── ingest.py         # semantic ingest
+│   │   ├── search.py         # semantic search
+│   │   ├── chat.py           # semantic chat
+│   │   ├── inspect.py        # 🆕 semantic inspect (Phase 16)
+│   │   ├── compare.py        # 🆕 semantic compare (Phase 16)
+│   │   └── golden.py         # 🆕 semantic golden (Phase 16)
 │   ├── chat/                 # Интерактивный RAG-чат
 │   │   └── slash/            # Slash-команды (/search, /sources, /model)
 │   ├── console.py            # Rich console
@@ -118,14 +145,16 @@ semantic_core/
 tests/                        # 645+ unit-тестов
 ├── conftest.py               # Все фикстуры проекта
 ├── unit/                     # Изолированные unit-тесты
-│   ├── core/                 # RAGEngine, BatchManager
+│   ├── core/                 # RAGEngine, BatchManager, ComponentFactory
 │   ├── infrastructure/       # Gemini, LLM, Media utils
 │   ├── cli/                  # CLI команды, конфигурация
 │   └── processing/           # Parsers, Context, Splitters
 ├── integration/              # Тесты с реальной БД
 │   ├── media/                # Pipeline + QueueProcessor
-│   └── search/               # Гибридный поиск
+│   ├── search/               # Гибридный поиск
+│   └── core/                 # 🆕 ComponentFactory integration tests
 ├── e2e/                      # End-to-End с реальными API
+│   └── audit/                # 🆕 PipelineInspector e2e tests (Phase 13)
 └── fixtures/                 # Тестовые данные
 
 docs/                         # Документация проекта
