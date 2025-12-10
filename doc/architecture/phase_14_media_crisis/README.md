@@ -151,6 +151,15 @@ CLI команда для повторного анализа медиа-фай�
 
 ---
 
+### 85. Phase 14 Final Integration & Testing
+
+**Файл:** [85_phase_14_final_integration.md](85_phase_14_final_integration.md)  
+**Статус:** ✅ ЗАВЕРШЕНО
+
+Финальная стабилизация: исправление интерфейсов (BaseParser → DocumentParser), обновление 5 unit-тестов под новый `OCRStep`, 15 интеграционных тестов OCR Markdown parsing. **193 теста проходят, commits `ff6e6f7`, `36792b6`.**
+
+---
+
 ## 🔗 Связанные фазы
 
 - **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — SmartSplitter для OCR
