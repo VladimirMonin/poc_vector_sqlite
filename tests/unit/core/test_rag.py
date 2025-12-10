@@ -76,7 +76,7 @@ def mock_llm():
     """Mock LLM провайдер."""
     return MockLLMProvider(
         response_text="Based on the context, the answer is 42.",
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash-lite",
     )
 
 
@@ -192,11 +192,11 @@ class TestGenerationResult:
         """Базовое создание результата."""
         result = GenerationResult(
             text="Hello, world!",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash-lite",
         )
 
         assert result.text == "Hello, world!"
-        assert result.model == "gemini-2.0-flash"
+        assert result.model == "gemini-2.5-flash-lite"
         assert result.input_tokens is None
         assert result.output_tokens is None
 
@@ -204,7 +204,7 @@ class TestGenerationResult:
         """Результат с токенами."""
         result = GenerationResult(
             text="Response",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash-lite",
             input_tokens=100,
             output_tokens=50,
         )
@@ -232,7 +232,7 @@ class TestRAGResult:
         """Базовое создание RAG результата с чанками."""
         generation = GenerationResult(
             text="Answer",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash-lite",
             input_tokens=100,
             output_tokens=50,
         )
@@ -308,6 +308,7 @@ class TestRAGEngine:
             query="What is the answer?",
             limit=5,
             mode="hybrid",
+            context_window=0,
         )
         mock_core.search.assert_not_called()
 
@@ -348,6 +349,7 @@ class TestRAGEngine:
             query="query",
             limit=5,
             mode="vector",
+            context_window=0,
         )
 
     def test_ask_fts_mode(self, rag_engine, mock_core):
@@ -358,6 +360,7 @@ class TestRAGEngine:
             query="query",
             limit=5,
             mode="fts",
+            context_window=0,
         )
 
     def test_ask_with_temperature(self, rag_engine, mock_llm):
@@ -498,7 +501,7 @@ class TestBaseLLMProvider:
     def test_mock_provider_implements_interface(self, mock_llm):
         """MockLLMProvider реализует BaseLLMProvider."""
         assert isinstance(mock_llm, BaseLLMProvider)
-        assert mock_llm.model_name == "gemini-2.0-flash"
+        assert mock_llm.model_name == "gemini-2.5-flash-lite"
 
     def test_abstract_methods(self):
         """Проверка абстрактных методов."""

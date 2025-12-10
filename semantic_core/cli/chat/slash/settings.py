@@ -26,7 +26,7 @@ class ModelCommand(BaseSlashCommand):
             ctx.console.print(f"Текущая модель: [cyan]{ctx.llm.model_name}[/cyan]")
             ctx.console.print(
                 "[dim]Для смены: /model <название>[/dim]\n"
-                "[dim]Примеры: gemini-2.0-flash, gemini-1.5-pro[/dim]"
+                "[dim]Примеры: gemini-2.5-flash-lite, gemini-1.5-pro[/dim]"
             )
             return SlashResult()
 

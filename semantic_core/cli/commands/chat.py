@@ -4,7 +4,7 @@
 Поддерживает разные режимы поиска, настройки LLM и slash-команды.
 
 Usage:
-    semantic chat                     # Гибридный поиск, gemini-2.0-flash
+    semantic chat                     # Гибридный поиск, gemini-2.5-flash-lite
     semantic chat --model gemini-1.5-pro  # Другая модель
     semantic chat --search vector     # Только векторный поиск
     semantic chat --context 10        # Больше контекста
@@ -43,7 +43,7 @@ chat_cmd = typer.Typer(
 def chat(
     ctx: typer.Context,
     model: str = typer.Option(
-        "gemini-2.0-flash",
+        "gemini-2.5-flash-lite",
         "--model",
         "-m",
         help="Модель LLM для генерации ответов",
@@ -85,6 +85,13 @@ def chat(
         "--full-docs",
         help="Использовать полные документы вместо чанков для контекста",
     ),
+    context_window: int = typer.Option(
+        0,
+        "--context-window",
+        "-cw",
+        help="Количество соседних чанков (0=только найденные, N=±N соседей)",
+        min=0,
+    ),
     history_limit: int = typer.Option(
         10,
         "--history-limit",
@@ -103,10 +110,10 @@ def chat(
         "--compress-at",
         help="Порог токенов для автоматического сжатия истории через LLM",
     ),
-    compress_target: int = typer.Option(
-        10000,
+    compress_target: Optional[int] = typer.Option(
+        None,
         "--compress-target",
-        help="Целевое количество токенов после сжатия (используется с --compress-at)",
+        help="Целевое количество токенов после сжатия (по умолчанию: compress_at // 3)",
     ),
     no_history: bool = typer.Option(
         False,
@@ -192,14 +199,18 @@ def chat(
         history_label = "отключена"
     elif compress_at:
         # Адаптивное сжатие через LLM
+        # Вычисляем target: явно заданный или 1/3 от порога (минимум 1000)
+        actual_target = (
+            compress_target if compress_target else max(compress_at // 3, 1000)
+        )
         compressor = ContextCompressor(llm)
         strategy = AdaptiveWithCompression(
             compressor=compressor,
             threshold_tokens=compress_at,
-            target_tokens=compress_target,
+            target_tokens=actual_target,
         )
         history_manager = ChatHistoryManager(strategy)
-        history_label = f"сжатие при {compress_at} токенов"
+        history_label = f"сжатие при {compress_at} → {actual_target} токенов"
     elif token_budget:
         # По токенам
         history_manager = ChatHistoryManager(TokenBudget(max_tokens=token_budget))
@@ -243,9 +254,11 @@ def chat(
         context_chunks=context_chunks,
         temperature=temperature,
     )
+
     # Сохраняем дополнительные настройки в extra_context
     chat_context.extra_context["_show_sources"] = str(show_sources)
     chat_context.extra_context["_full_docs"] = str(full_docs)
+    chat_context.extra_context["_context_window"] = str(context_window)
     chat_context.extra_context["_max_tokens"] = str(max_tokens) if max_tokens else ""
     chat_context.extra_context["_model"] = model
 
@@ -267,7 +280,7 @@ def chat(
     slash_handler.register(ContextCommand())
 
     # Приветствие
-    _show_welcome(console, model, search_mode, context_chunks, full_docs, history_label)
+    _show_welcome(console, model, search_mode, context_chunks, full_docs, context_window, history_label)
 
     # REPL цикл
     while True:
@@ -289,7 +302,6 @@ def chat(
 
                 # Обрабатываем действие
                 if result.action == SlashAction.EXIT:
-                    console.print("[dim]До свидания! 👋[/dim]")
                     break
                 elif result.action == SlashAction.CLEAR:
                     console.clear()
@@ -297,12 +309,16 @@ def chat(
                     current_full_docs = (
                         chat_context.extra_context.get("_full_docs", "False") == "True"
                     )
+                    current_context_window = int(
+                        chat_context.extra_context.get("_context_window", "0")
+                    )
                     _show_welcome(
                         console,
                         current_model,
                         chat_context.search_mode,
                         chat_context.context_chunks,
                         current_full_docs,
+                        current_context_window,
                         history_label,
                     )
                     console.print("[green]✓ Экран очищен[/green]")
@@ -317,7 +333,11 @@ def chat(
             with console.status("[bold green]Думаю...[/bold green]", spinner="dots"):
                 try:
                     # Получаем историю для RAG (если есть)
-                    history = history_manager.get_history() if history_manager else None
+                    history = (
+                        history_manager.get_history()
+                        if history_manager is not None
+                        else None
+                    )
 
                     # Читаем настройки из контекста
                     current_max_tokens_str = chat_context.extra_context.get(
@@ -331,6 +351,9 @@ def chat(
                     current_full_docs = (
                         chat_context.extra_context.get("_full_docs", "False") == "True"
                     )
+                    current_context_window = int(
+                        chat_context.extra_context.get("_context_window", "0")
+                    )
 
                     result = rag.ask(
                         query=query,
@@ -338,6 +361,7 @@ def chat(
                         temperature=chat_context.temperature,
                         max_tokens=current_max_tokens,
                         full_docs=current_full_docs,
+                        context_window=current_context_window,
                         history=history,
                     )
 
@@ -345,7 +369,7 @@ def chat(
                     chat_context.last_result = result
 
                     # Сохраняем в историю
-                    if history_manager:
+                    if history_manager is not None:
                         input_tokens = result.generation.input_tokens or 0
                         output_tokens = result.generation.output_tokens or 0
                         # Примерное распределение токенов
@@ -381,7 +405,7 @@ def chat(
             # Показываем токены
             if result.total_tokens:
                 history_info = ""
-                if history_manager:
+                if history_manager is not None:
                     msg_count = len(history_manager)
                     total_history_tokens = history_manager.total_tokens()
                     history_info = f" | история: {msg_count} сообщ., {total_history_tokens} токенов"
@@ -411,6 +435,7 @@ def _show_welcome(
     search_mode: str,
     context_chunks: int,
     full_docs: bool = False,
+    context_window: int = 0,
     history_label: str = "до 10 сообщений",
 ) -> None:
     """Показывает приветственное сообщение."""
@@ -420,7 +445,13 @@ def _show_welcome(
         "hybrid": "🔀 Гибридный",
     }
     mode_label = mode_icons.get(search_mode, search_mode)
-    context_mode = "документов" if full_docs else "чанков"
+    
+    if full_docs:
+        context_mode = "документов (полные)"
+    elif context_window > 0:
+        context_mode = f"чанков (±{context_window} соседей)"
+    else:
+        context_mode = "чанков"
 
     welcome_text = (
         f"[bold]🤖 Semantic Chat[/bold]\n\n"

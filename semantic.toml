@@ -9,17 +9,44 @@ level = "INFO"
 # file = "semantic.log"  # Раскомментируйте для записи в файл
 
 [gemini]
-# API ключ читается из переменной окружения GEMINI_API_KEY
+# API ключ: раскомментируй и вставь свой ключ, ИЛИ установи переменную GEMINI_API_KEY
+# api_key = "AIza..."
 model = "models/gemini-embedding-001"
 embedding_dimension = 768
 
 [processing]
 splitter = "smart"           # simple | smart
 context_strategy = "hierarchical"  # basic | hierarchical
+chunk_size = 1800            # Размер текстового чанка (500-8000 символов)
+code_chunk_size = 2000       # Размер чанка кода (500-10000 символов)
 
 [media]
 enabled = true
 rpm_limit = 15  # Запросов в минуту для Vision/Audio API
+max_output_tokens = 65536  # Лимит токенов для Gemini (image/audio/video), макс 65536
+output_language = "Russian"  # Язык ответов анализаторов (Russian/English/French/etc)
+
+# === Media Chunk Sizes (Phase 14.3) ===
+# Разные размеры чанков для разных типов медиа-контента
+[media.chunk_sizes]
+summary_chunk_size = 1500          # Размер чанка для summary/description
+transcript_chunk_size = 2000       # Размер чанка для транскрипции аудио/видео
+ocr_text_chunk_size = 1800         # Размер чанка для обычного OCR текста
+ocr_code_chunk_size = 2000         # Размер чанка для code blocks из OCR (больше, т.к. код плотнее)
+
+# === Media Processing (Phase 14.3) ===
+[media.processing]
+ocr_parser_mode = "markdown"       # markdown | plain — детекция code blocks в OCR
+enable_timecodes = true            # Извлекать таймкоды из транскрипции
+strict_timecode_ordering = false   # Требовать строгого порядка таймкодов
+max_timeline_items = 100           # Лимит элементов timeline (10-500)
+
+# === Custom Prompts (Phase 14.3) ===
+# Кастомизация промптов для анализа медиа
+# [media.prompts]
+# audio_instructions = "Focus on technical terms and speaker names"
+# video_instructions = "Describe on-screen code snippets in detail"
+# image_instructions = "Extract all visible text, especially code"
 
 [search]
 limit = 10      # Результатов по умолчанию

@@ -35,7 +35,7 @@ class SearchCommand(BaseSlashCommand):
             results = ctx.core.search(
                 query=query,
                 limit=5,
-                search_type=ctx.search_mode,  # type: ignore
+                mode=ctx.search_mode,  # Исправлено: search_type -> mode
             )
 
         if not results:

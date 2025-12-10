@@ -74,7 +74,7 @@ class BaseLLMProvider(ABC):
 # semantic_core/infrastructure/llm/gemini.py
 
 class GeminiLLMProvider(BaseLLMProvider):
-    def __init__(self, api_key: str, model: str = "gemini-2.0-flash"):
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash-lite"):
         self._client = genai.Client(api_key=api_key)
         self._model = model
     
@@ -195,7 +195,7 @@ If context doesn't have the answer, say so. Format in Markdown."""
 
 @chat_cmd.callback(invoke_without_command=True)
 def chat(
-    model: str = Option("gemini-2.0-flash", "--model", "-m"),
+    model: str = Option("gemini-2.5-flash-lite", "--model", "-m"),
     context_chunks: int = Option(5, "--context", "-c"),
     search_mode: str = Option("hybrid", "--search", "-s", help="vector/fts/hybrid"),
     full_docs: bool = Option(False, "--full-docs", "-f", help="Подгружать полные документы"),

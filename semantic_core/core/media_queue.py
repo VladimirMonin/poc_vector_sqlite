@@ -77,7 +77,7 @@ class MediaQueueProcessor:
         """Инициализация процессора.
 
         Args:
-            image_analyzer: Анализатор изображений (обязательный).
+            image_analyzer: Анализатор изображений (опциональный).
             rate_limiter: Rate Limiter для API.
             audio_analyzer: Анализатор аудио (опциональный).
             video_analyzer: Анализатор видео (опциональный).
@@ -90,8 +90,11 @@ class MediaQueueProcessor:
         if analyzer is not None and image_analyzer is None:
             image_analyzer = analyzer
 
-        if image_analyzer is None:
-            raise ValueError("image_analyzer is required")
+        # Хотя бы один анализатор должен быть передан
+        if not any([image_analyzer, audio_analyzer, video_analyzer]):
+            raise ValueError(
+                "At least one analyzer (image/audio/video) must be provided"
+            )
         if rate_limiter is None:
             raise ValueError("rate_limiter is required")
 
@@ -360,6 +363,4 @@ class MediaQueueProcessor:
         if result.duration_seconds:
             update_data["result_duration_seconds"] = result.duration_seconds
 
-        MediaTaskModel.update(update_data).where(
-            MediaTaskModel.id == task_id
-        ).execute()
+        MediaTaskModel.update(update_data).where(MediaTaskModel.id == task_id).execute()

@@ -66,8 +66,9 @@ class QuitCommand(BaseSlashCommand):
 
     def execute(self, ctx: ChatContext, args: str) -> SlashResult:
         """Завершить сессию чата."""
-        ctx.console.print("[dim]До свидания! 👋[/dim]")
-        return SlashResult(action=SlashAction.EXIT)
+        return SlashResult(
+            action=SlashAction.EXIT, message="[dim]До свидания! 👋[/dim]"
+        )
 
 
 class TokensCommand(BaseSlashCommand):
@@ -79,7 +80,7 @@ class TokensCommand(BaseSlashCommand):
 
     def execute(self, ctx: ChatContext, args: str) -> SlashResult:
         """Показать статистику токенов в истории."""
-        if not ctx.history_manager:
+        if ctx.history_manager is None:
             ctx.console.print("[yellow]История отключена[/yellow]")
             return SlashResult()
 
@@ -115,7 +116,7 @@ class HistoryCommand(BaseSlashCommand):
 
     def execute(self, ctx: ChatContext, args: str) -> SlashResult:
         """Показать краткую историю сообщений."""
-        if not ctx.history_manager:
+        if ctx.history_manager is None:
             ctx.console.print("[yellow]История отключена[/yellow]")
             return SlashResult()
 
@@ -166,37 +167,44 @@ class CompressCommand(BaseSlashCommand):
 
     def execute(self, ctx: ChatContext, args: str) -> SlashResult:
         """Запустить сжатие истории."""
-        if not ctx.history_manager:
-            ctx.console.print("[yellow]История отключена[/yellow]")
-            return SlashResult()
-
-        # Проверяем, поддерживает ли стратегия сжатие
-        strategy = ctx.history_manager.strategy
-        if not hasattr(strategy, "compressor"):
+        if ctx.history_manager is None:
             ctx.console.print(
-                "[yellow]Текущая стратегия не поддерживает сжатие.\n"
-                "Используйте --compress-at при запуске чата.[/yellow]"
+                "[yellow]История отключена (используйте чат без --no-history)[/yellow]"
             )
             return SlashResult()
 
-        # Получаем историю и принудительно сжимаем
+        # Получаем историю
         messages = ctx.history_manager.get_history()
         if len(messages) < 2:
-            ctx.console.print("[yellow]Недостаточно сообщений для сжатия[/yellow]")
+            ctx.console.print(
+                "[yellow]Недостаточно сообщений для сжатия (минимум 2)[/yellow]"
+            )
             return SlashResult()
 
         before_tokens = ctx.history_manager.total_tokens()
 
+        # Проверяем, поддерживает ли стратегия сжатие
+        strategy = ctx.history_manager.strategy
+
         with ctx.console.status("[bold green]Сжимаю историю...[/bold green]"):
-            # Принудительно вызываем trim
             from semantic_core.core.context.strategies import AdaptiveWithCompression
+            from semantic_core.core.context import ContextCompressor
 
             if isinstance(strategy, AdaptiveWithCompression):
-                # Временно понижаем порог чтобы триггернуть сжатие
+                # Стратегия поддерживает сжатие — используем её компрессор
                 old_threshold = strategy.threshold
-                strategy.threshold = 1  # Любое количество токенов
+                strategy.threshold = 1  # Временно понижаем для триггера
                 ctx.history_manager._messages = strategy.trim(messages)
                 strategy.threshold = old_threshold
+            else:
+                # Любая другая стратегия — создаём временный компрессор
+                compressor = ContextCompressor(ctx.llm)
+                # Сжимаем все сообщения кроме последних 2
+                if len(messages) > 2:
+                    to_compress = messages[:-2]
+                    to_keep = messages[-2:]
+                    summary = compressor.compress(to_compress)
+                    ctx.history_manager._messages = [summary] + to_keep
 
         after_tokens = ctx.history_manager.total_tokens()
 

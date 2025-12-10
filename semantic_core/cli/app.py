@@ -114,8 +114,10 @@ app.add_typer(doctor_cmd.app, name="doctor")
 # Phase 8.0: Core commands
 from semantic_core.cli.commands import ingest_cmd, search_cmd, docs_cmd
 
-app.add_typer(ingest_cmd, name="ingest")
-app.add_typer(search_cmd, name="search")
+app.command(name="ingest", help="Индексация документов в семантическую базу данных")(
+    ingest_cmd
+)
+app.command(name="search", help="Семантический поиск по документам")(search_cmd)
 app.add_typer(docs_cmd, name="docs")
 
 # Phase 8.1: Operations commands
@@ -128,6 +130,13 @@ app.add_typer(worker_cmd, name="worker")
 from semantic_core.cli.commands import chat_cmd
 
 app.add_typer(chat_cmd, name="chat")
+
+# Phase 14.3.4: Media Reanalyze
+from semantic_core.cli.commands.reanalyze import reanalyze as reanalyze_cmd
+
+app.command(name="reanalyze", help="Повторный анализ медиа-файлов с новыми промптами")(
+    reanalyze_cmd
+)
 
 
 __all__ = ["app", "get_cli_context"]

@@ -15,12 +15,13 @@
 from semantic_core.cli.commands import init_cmd
 from semantic_core.cli.commands import config_cmd
 from semantic_core.cli.commands import doctor_cmd
-from semantic_core.cli.commands.ingest import ingest_cmd
-from semantic_core.cli.commands.search import search_cmd
+from semantic_core.cli.commands.ingest import ingest as ingest_cmd
+from semantic_core.cli.commands.search import search as search_cmd
 from semantic_core.cli.commands.docs import docs_cmd
 from semantic_core.cli.commands.queue import queue_cmd
 from semantic_core.cli.commands.worker import worker_cmd
 from semantic_core.cli.commands.chat import chat_cmd
+from semantic_core.cli.commands.reanalyze import reanalyze as reanalyze_cmd
 
 __all__ = [
     "init_cmd",
@@ -32,4 +33,5 @@ __all__ = [
     "queue_cmd",
     "worker_cmd",
     "chat_cmd",
+    "reanalyze_cmd",
 ]

@@ -1,0 +1,60 @@
+# 🏛️ Phase 0: LEGACY — Старая архитектура
+
+> ⚠️ **Устарело:** Эти документы описывают архитектуру до SOLID рефакторинга (Phase 1-3).  
+> Сохранены для исторической справки и понимания эволюции проекта.
+
+---
+
+## 📖 Содержание фазы
+
+### 06. [LEGACY] Структура проекта
+
+**Файл:** [06_LEGACY_project_architecture.md](06_LEGACY_project_architecture.md)
+
+Разделение на `semantic_core` и `domain` в прежней архитектуре. Monolithic design до введения интерфейсов.
+
+---
+
+### 07. [LEGACY] Поток данных
+
+**Файл:** [07_LEGACY_data_flow.md](07_LEGACY_data_flow.md)
+
+Полный цикл обработки: добавление → индексация → поиск в исходной реализации.
+
+---
+
+### 08. [LEGACY] Стратегия нарезки
+
+**Файл:** [08_LEGACY_chunking_strategy.md](08_LEGACY_chunking_strategy.md)
+
+Устаревший `SimpleTextSplitter` (замена — `SmartSplitter` в Phase 4).
+
+---
+
+### 09. [LEGACY] Parent-Child Retrieval
+
+**Файл:** [09_LEGACY_parent_child_retrieval.md](09_LEGACY_parent_child_retrieval.md)
+
+Концепция parent-child chunks осталась, но реализация кардинально изменилась.
+
+---
+
+## 🔄 Что изменилось
+
+**Проблемы старой архитектуры:**
+
+- Тесная связанность (tight coupling)
+- Невозможность подмены компонентов
+- Сложное тестирование
+- Hardcoded зависимости
+
+**Как исправлено:**
+
+- Phase 1: SOLID рефакторинг, интерфейсы
+- Phase 2: Storage Layer абстракция
+- Phase 3: ORM Integration Layer
+- Phase 4: Smart парсинг вместо Simple
+
+---
+
+**← [Вернуться к оглавлению](../00_overview.md)**

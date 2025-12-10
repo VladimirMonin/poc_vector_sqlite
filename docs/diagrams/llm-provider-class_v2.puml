@@ -1,0 +1,77 @@
+@startuml
+title Абстракция LLM провайдеров (LLM Provider Abstraction)
+
+interface BaseLLMProvider <<Adapter>> {
+    +generate(prompt, system_prompt, temperature, max_tokens, history): GenerationResult
+    +model_name: str
+}
+
+class GenerationResult <<Core>> {
+    +text: str
+    +model: str
+    +input_tokens: int
+    +output_tokens: int
+    +finish_reason: str
+    --
+    +total_tokens: int
+}
+
+class GeminiLLMProvider <<Adapter>> {
+    -client: genai.Client
+    -model: str
+    --
+    +generate(...)
+    +model_name: str
+}
+
+class "OpenAIProvider\n(potential)" as openai <<Adapter>> {
+    -client: OpenAI
+    -model: str
+    --
+    +generate(...)
+    +model_name: str
+}
+
+class "OllamaProvider\n(potential)" as ollama <<Adapter>> {
+    -base_url: str
+    -model: str
+    --
+    +generate(...)
+    +model_name: str
+}
+
+class "AnthropicProvider\n(potential)" as anthropic <<Adapter>> {
+    -client: Anthropic
+    -model: str
+    --
+    +generate(...)
+    +model_name: str
+}
+
+BaseLLMProvider <|.. GeminiLLMProvider
+BaseLLMProvider <|.. openai
+BaseLLMProvider <|.. ollama
+BaseLLMProvider <|.. anthropic
+
+BaseLLMProvider --> GenerationResult : returns
+
+note right of GeminiLLMProvider
+    Built-in implementation
+    Uses google-genai SDK
+end note
+
+note bottom of openai
+    User can implement
+    custom providers
+end note
+
+legend right
+    |= Provider |= Models |
+    | Gemini | 2.5-flash, 2.5-pro |
+    | OpenAI | gpt-4o, o1 |
+    | Ollama | llama3, mistral |
+    | Anthropic | claude-3.5 |
+    | <<Adapter>> | Внешние адаптеры |
+    | <<Core>> | Бизнес-логика |
+endlegend
+@enduml

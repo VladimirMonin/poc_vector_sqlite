@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Semantic Knowledge Base{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="bi bi-speedometer2 me-2"></i>
+        Dashboard
+    </h1>
+</div>
+
+<!-- Status Banner -->
+{% if core_available %}
+<div class="alert alert-success d-flex align-items-center" role="alert">
+    <i class="bi bi-check-circle-fill me-2"></i>
+    <div>
+        <strong>SemanticCore активен</strong> — система готова к работе
+    </div>
+</div>
+{% else %}
+<div class="alert alert-warning d-flex align-items-center" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <div>
+        <strong>SemanticCore недоступен</strong> — проверьте GEMINI_API_KEY
+    </div>
+</div>
+{% endif %}
+
+<!-- Stats Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 border-primary">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="bi bi-file-earmark-text display-4 text-primary"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="card-subtitle text-body-secondary">Документы</h6>
+                        <h2 class="card-title mb-0">
+                            {% if stats %}{{ stats.documents }}{% else %}—{% endif %}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 border-success">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="bi bi-puzzle display-4 text-success"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="card-subtitle text-body-secondary">Чанки</h6>
+                        <h2 class="card-title mb-0">
+                            {% if stats %}{{ stats.chunks }}{% else %}—{% endif %}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 border-info">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <i class="bi bi-robot display-4 text-info"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="card-subtitle text-body-secondary">Модель</h6>
+                        <p class="card-title mb-0 small">
+                            {% if stats %}{{ stats.embedding_model }}{% else %}N/A{% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-lightning-charge me-2"></i>
+                Быстрые действия
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('search.index') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-search me-2"></i>
+                        Поиск по базе знаний
+                    </a>
+                    <a href="{{ url_for('ingest.upload_page') }}" class="btn btn-outline-success">
+                        <i class="bi bi-upload me-2"></i>
+                        Загрузить документы
+                    </a>
+                    <a href="{{ url_for('chat.index') }}" class="btn btn-outline-info">
+                        <i class="bi bi-chat-dots me-2"></i>
+                        Начать RAG-чат
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>
+                Информация о системе
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <th scope="row">База данных</th>
+                            <td><code>{% if stats %}{{ stats.db_path }}{% else %}N/A{% endif %}</code></td>
+                        </tr>
+                        <tr>
+                            <th scope="row">SemanticCore</th>
+                            <td>
+                                {% if core_available %}
+                                <span class="badge bg-success">Активен</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">Ограничен</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Версия</th>
+                            <td>Phase 12.0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

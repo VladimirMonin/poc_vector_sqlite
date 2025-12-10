@@ -1,0 +1,13 @@
+<!-- Chat sessions sidebar partial -->
+{% for session in sessions %}
+<a href="{{ url_for('chat.index', session=session.session_id) }}" 
+   class="session-item d-block text-decoration-none text-body">
+    <div class="session-title">{{ session.title }}</div>
+    <div class="session-meta">
+        {{ session.message_count }} сообщ. • 
+        {{ session.updated_at.strftime('%d.%m %H:%M') }}
+    </div>
+</a>
+{% else %}
+<p class="text-muted small">Нет сохранённых чатов</p>
+{% endfor %}

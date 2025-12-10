@@ -1,0 +1,57 @@
+@startuml
+title Пайплайн обработки медиа (Media Processing Pipeline)
+
+start
+
+:Detect media type;
+
+switch (media_type?)
+case (image)
+    :Load with Pillow;
+    :Resize to max 1024px;
+    :Optimize quality;
+    :Send to Vision API;
+    
+case (audio)
+    :Check ffmpeg;
+    :Convert to OGG 32kbps;
+    :Send to Audio API;
+    
+    note right
+        32kbps mono =
+        ~83 min in 20MB
+    end note
+    
+case (video)
+    :Extract frames;
+    
+    switch (frame_mode?)
+    case (total)
+        :N evenly distributed;
+    case (fps)
+        :N per second;
+    case (interval)
+        :Every N seconds;
+    endswitch
+    
+    :Extract audio track;
+    :Send frames + audio;
+endswitch
+
+:Parse JSON response;
+:Create MediaAnalysisResult;
+
+:Generate embedding;
+:Store in VectorStore;
+
+stop
+
+legend right
+    |= Media |= API |
+    | Image | Vision |
+    | Audio | Audio |
+    | Video | Vision + Audio |
+    | start | Начало процесса |
+    | stop | Конец процесса |
+endlegend
+@enduml

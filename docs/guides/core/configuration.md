@@ -105,19 +105,33 @@ project/
 
 | Переменная | semantic.toml эквивалент |
 |------------|-------------------------|
-| `GEMINI_API_KEY` | `gemini.api_key` |
-| `GEMINI_BATCH_KEY` | `gemini.batch_key` |
+| `SEMANTIC_GEMINI_API_KEY` | `gemini.api_key` |
+| `SEMANTIC_GEMINI_BATCH_KEY` | `gemini.batch_key` |
 | `SEMANTIC_DB_PATH` | `db_path` |
 | `SEMANTIC_LOG_LEVEL` | `logging.level` |
-| `SEMANTIC_SPLITTER` | `processing.splitter` |
-| `SEMANTIC_SEARCH_TYPE` | `search.type` |
 
-**.env файл** читается автоматически:
+> ⚠️ **Важно:** Все переменные требуют префикс `SEMANTIC_`!  
+> `GEMINI_API_KEY` без префикса **не работает**.
+
+### macOS / Linux
 
 ```bash
-# .env
-GEMINI_API_KEY=AIzaSy...
-SEMANTIC_LOG_LEVEL=DEBUG
+export SEMANTIC_GEMINI_API_KEY="AIzaSy..."
+export SEMANTIC_LOG_LEVEL="DEBUG"
+```
+
+### Windows (PowerShell)
+
+```powershell
+$env:SEMANTIC_GEMINI_API_KEY = "AIzaSy..."
+$env:SEMANTIC_LOG_LEVEL = "DEBUG"
+```
+
+### Постоянные переменные (Windows)
+
+```powershell
+# Для текущего пользователя
+[Environment]::SetEnvironmentVariable("SEMANTIC_GEMINI_API_KEY", "AIzaSy...", "User")
 ```
 
 ---

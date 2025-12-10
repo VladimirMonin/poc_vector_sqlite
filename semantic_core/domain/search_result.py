@@ -24,11 +24,13 @@ class MatchType(str, Enum):
         VECTOR: Найдено через векторный поиск (семантическое сходство).
         FTS: Найдено через полнотекстовый поиск (ключевые слова).
         HYBRID: Комбинированный результат (RRF).
+        CONTEXT: Соседний чанк (не результат поиска, а контекст).
     """
 
     VECTOR = "vector"
     FTS = "fts"
     HYBRID = "hybrid"
+    CONTEXT = "context"
 
 
 @dataclass

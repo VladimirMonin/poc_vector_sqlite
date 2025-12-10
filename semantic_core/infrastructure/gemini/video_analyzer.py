@@ -5,7 +5,6 @@
         Анализирует видео: кадры + аудио в одном запросе.
 """
 
-import json
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -48,25 +47,73 @@ class VideoAnalysisSchema(BaseModel):
     action_items: list[str] = []
 
 
-# Системный промпт для анализа видео
-SYSTEM_PROMPT = """You are a video analyst for semantic search indexing.
+# Системный промпт для анализа видео (с placeholders)
+DEFAULT_SYSTEM_PROMPT = """You are a video analyst for semantic search indexing.
+Response language: {language}
 
-You receive video frames and optionally audio. Analyze the content and provide:
-1. description: What happens in the video (3-5 sentences)
-2. keywords: 5-10 relevant keywords for search
-3. ocr_text: Any visible text in the frames (null if none)
-4. transcription: Speech transcription if audio provided (null if no audio)
-5. participants: List of identifiable speakers/people
-6. action_items: Tasks or action items mentioned (if any)
+{custom_instructions}
 
-Focus on:
-- Main events and actions
-- Visual elements, text, and graphics
-- Audio content (if provided)
-- People and their interactions
-- Key topics and conclusions
+Return a JSON with:
 
-Output valid JSON matching the schema."""
+{{
+  "description": "What happens in the video (3-5 sentences)",
+  "keywords": ["keyword1", ...],
+  "transcription": "MARKDOWN_FORMATTED_SPEECH_TRANSCRIPT",
+  "ocr_text": "MARKDOWN_FORMATTED_VISUAL_TEXT",
+  "participants": ["Person1", ...],
+  "action_items": ["Task 1", ...],
+  "duration_seconds": <number>
+}}
+
+CRITICAL INSTRUCTIONS FOR OCR_TEXT FIELD:
+- Detect and preserve code blocks from screenshots/screencasts
+- Wrap code in triple backticks with language:
+  ```python
+  class Example:
+      pass
+  ```
+- Use `## Slide Title` headers for new slides
+- Use bullet points for slide bullet lists:
+  - Point 1
+  - Point 2
+- For UI text (buttons, labels), use plain text
+- For diagrams/charts, describe structure in Markdown tables if possible
+
+Example OCR output:
+
+## Introduction to SOLID Principles
+
+### Single Responsibility Principle
+
+A class should have only one reason to change.
+
+**Example:**
+
+```python
+class UserService:
+    def validate(self, user): ...
+    def save(self, user): ...
+```
+
+**Problem:** Mixes validation and persistence.
+
+## Better Design
+
+Split into two classes:
+
+```python
+class UserValidator:
+    def validate(self, user): ...
+
+class UserRepository:
+    def save(self, user): ...
+```
+
+CRITICAL INSTRUCTIONS FOR TRANSCRIPTION FIELD:
+- Use same Markdown formatting rules as OCR
+- Split speech into paragraphs (every 3-5 sentences)
+- Use `## Speaker Name` for speaker changes
+- Wrap code mentioned in speech in triple backticks"""
 
 
 class GeminiVideoAnalyzer:
@@ -94,6 +141,9 @@ class GeminiVideoAnalyzer:
         api_key: str,
         model: str = DEFAULT_MODEL,
         audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
+        max_output_tokens: int = 65_536,
+        output_language: str = "Russian",
+        custom_instructions: Optional[str] = None,
     ):
         """Инициализация анализатора.
 
@@ -101,15 +151,38 @@ class GeminiVideoAnalyzer:
             api_key: API ключ Google Gemini.
             model: Модель для Vision API (pro для видео).
             audio_analyzer: Опциональный анализатор для отдельной аудио-транскрипции.
+            max_output_tokens: Лимит токенов на вывод модели.
+            output_language: Язык для ответов модели.
+            custom_instructions: Кастомные инструкции для промпта (опционально).
         """
         self.api_key = api_key
         self.model = model
         self.audio_analyzer = audio_analyzer
+        self.max_output_tokens = max_output_tokens
+        self.output_language = output_language
+        self.custom_instructions = custom_instructions
+        self.system_prompt = self._build_system_prompt()
         self._client = None
         logger.debug(
             "Video analyzer initialized",
             model=model,
             has_audio_analyzer=audio_analyzer is not None,
+            has_custom_instructions=custom_instructions is not None,
+        )
+
+    def _build_system_prompt(self) -> str:
+        """Собирает system prompt с template injection.
+
+        Returns:
+            Готовый system prompt с инжектированными кастомными инструкциями.
+        """
+        instructions = ""
+        if self.custom_instructions:
+            instructions = f"CUSTOM INSTRUCTIONS:\n{self.custom_instructions}\n"
+
+        return DEFAULT_SYSTEM_PROMPT.format(
+            language=self.output_language,
+            custom_instructions=instructions,
         )
 
     @property
@@ -239,9 +312,9 @@ class GeminiVideoAnalyzer:
 
         # 6. Конфигурация запроса
         api_config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=self.system_prompt,
             temperature=0.4,
-            max_output_tokens=8192,
+            max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",
             response_schema=VideoAnalysisSchema,
             safety_settings=[
@@ -287,16 +360,8 @@ class GeminiVideoAnalyzer:
             operation="video_analysis",
         )
 
-        try:
-            data = json.loads(response.text)
-        except json.JSONDecodeError as e:
-            logger.error(
-                "Failed to parse Gemini response as JSON",
-                path=str(video_path),
-                error=str(e),
-                response_preview=response.text[:500],
-            )
-            raise ValueError(f"Invalid JSON in Gemini response: {e}")
+        # response.parsed возвращает VideoAnalysisSchema (Pydantic)
+        data = response.parsed
 
         # Извлекаем usage_metadata (это Pydantic модель, не словарь)
         tokens_used = None
@@ -311,17 +376,17 @@ class GeminiVideoAnalyzer:
             frames_count=len(frames),
             has_audio=audio_bytes is not None,
             tokens_used=tokens_used,
-            keywords_count=len(data.get("keywords", [])),
+            keywords_count=len(data.keywords),
         )
 
         return MediaAnalysisResult(
-            description=data["description"],
+            description=data.description,
             alt_text=None,  # Видео не имеют alt-text
-            keywords=data.get("keywords", []),
-            ocr_text=data.get("ocr_text"),
-            transcription=data.get("transcription"),
-            participants=data.get("participants", []),
-            action_items=data.get("action_items", []),
+            keywords=data.keywords,
+            ocr_text=data.ocr_text,
+            transcription=data.transcription,
+            participants=data.participants,
+            action_items=data.action_items,
             duration_seconds=duration,
             tokens_used=tokens_used,
         )

@@ -93,18 +93,20 @@ semantic doctor                  # Проверка всех компонент�
 
 Индексация документов:
 
+> ⚠️ **Windows/Typer:** Опции ПЕРЕД путём! Это ограничение Typer/Click.
+
 ```bash
 # Один файл
 semantic ingest README.md
 
-# Папка (рекурсивно)
-semantic ingest ./docs/ --recursive
+# Папка (рекурсивно) — опции ПЕРЕД путём!
+semantic ingest --recursive ./docs/
 
 # С паттерном файлов
-semantic ingest ./docs/ -p "*.md" --recursive
+semantic ingest --recursive -p "*.md" ./docs/
 
 # Только текст (без медиа)
-semantic ingest ./docs/ --no-media
+semantic ingest --no-media ./docs/
 ```
 
 | Опция | Короткая | Описание |
@@ -124,16 +126,16 @@ semantic ingest ./docs/ --no-media
 # Базовый поиск
 semantic search "как работает RRF"
 
-# Больше результатов
-semantic search "query" --limit 20
+# Больше результатов — опции ПЕРЕД запросом!
+semantic search --limit 20 "query"
 
 # Тип поиска
-semantic search "query" --type vector   # Только векторный
-semantic search "query" --type fts      # Только FTS5
-semantic search "query" --type hybrid   # Гибридный (default)
+semantic search --type vector "query"   # Только векторный
+semantic search --type fts "query"      # Только FTS5
+semantic search --type hybrid "query"   # Гибридный (default)
 
 # Порог релевантности
-semantic search "query" --threshold 0.5
+semantic search --threshold 0.5 "query"
 ```
 
 | Опция | Короткая | Описание |

@@ -22,50 +22,71 @@ prerequisites: []
 
 ## Требования 📋
 
-| Требование | Версия |
-|------------|--------|
-| Python | 3.11+ |
-| Poetry | 1.5+ |
-| Gemini API key | [Получить](https://aistudio.google.com/app/apikey) |
+| Требование | Версия | Примечание |
+|------------|--------|------------|
+| Python | 3.13+ | ⚠️ 3.14 не поддерживается на Windows |
+| pip/uv | любая | uv рекомендуется |
+| Gemini API key | [Получить](https://aistudio.google.com/app/apikey) | Бесплатный tier |
 
 ---
 
 ## Шаг 1: Установка 🛠️
+
+### macOS / Linux
 
 ```bash
 # Клонирование
 git clone https://github.com/your/poc_vector_sqlite.git
 cd poc_vector_sqlite
 
-# Установка зависимостей
-poetry install
+# Создание окружения
+python -m venv .venv
+source .venv/bin/activate
 
-# Активация окружения
-poetry shell
+# Установка
+pip install -e ".[media]"
 ```
 
-**С медиа-обработкой** (изображения, аудио, видео):
+### Windows (PowerShell)
 
-```bash
-poetry install --extras media
+```powershell
+# Клонирование
+git clone https://github.com/your/poc_vector_sqlite.git
+cd poc_vector_sqlite
+
+# Создание окружения
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# Установка
+pip install -e ".[media]"
 ```
 
 ---
 
 ## Шаг 2: API ключ 🔑
 
+### macOS / Linux
+
 ```bash
-# Создаём .env файл
-echo "GEMINI_API_KEY=ваш_ключ" > .env
+export SEMANTIC_GEMINI_API_KEY="ваш_ключ"
 ```
 
-Или через semantic.toml:
+### Windows (PowerShell)
+
+```powershell
+$env:SEMANTIC_GEMINI_API_KEY = "ваш_ключ"
+```
+
+### Альтернатива: semantic.toml
 
 ```toml
-# semantic.toml
+# semantic.toml (в корне проекта)
 [gemini]
 api_key = "ваш_ключ"
 ```
+
+> ⚠️ **Важно:** Все переменные окружения требуют префикс `SEMANTIC_`
 
 ---
 
@@ -88,15 +109,17 @@ semantic init
 
 ## Шаг 4: Индексация 📥
 
+> ⚠️ **Windows:** Опции (`--recursive`) ПЕРЕД путём!
+
 ```bash
 # Один файл
 semantic ingest README.md
 
 # Папка с документами (рекурсивно)
-semantic ingest ./docs/ --recursive
+semantic ingest --recursive ./docs/
 
 # Только Markdown файлы
-semantic ingest ./docs/ -p "*.md" --recursive
+semantic ingest --recursive -p "*.md" ./docs/
 ```
 
 Ожидаемый вывод:
@@ -146,10 +169,11 @@ semantic doctor
 
 | Проблема | Решение |
 |----------|---------|
-| `GEMINI_API_KEY not found` | Проверьте .env файл или semantic.toml |
-| `No documents found` | Укажите путь к файлам для ingest |
-| `sqlite-vec not available` | `poetry install` пересоберите |
-| `Rate limit exceeded` | Подождите минуту или используйте Batch API |
+| `API key not configured` | Используйте `SEMANTIC_GEMINI_API_KEY` (с префиксом!) |
+| `Missing argument 'PATH'` | Опции перед путём: `semantic ingest --recursive docs` |
+| `Pillow build failed` (Windows) | Используйте Python 3.13, не 3.14 |
+| `No documents found` | Проверьте путь к файлам |
+| `Rate limit exceeded` | Подождите минуту или batch mode |
 
 ---
 

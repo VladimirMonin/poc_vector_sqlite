@@ -1,0 +1,99 @@
+<!-- Таблица задач (HTMX partial) -->
+<table class="table table-hover mb-0">
+    <thead class="table-light">
+        <tr>
+            <th style="width: 10%">ID</th>
+            <th style="width: 10%">Тип</th>
+            <th style="width: 30%">Файл</th>
+            <th style="width: 15%">Статус</th>
+            <th style="width: 15%">Создан</th>
+            <th style="width: 10%">Попыток</th>
+            <th style="width: 10%">Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if tasks %}
+            {% for task in tasks %}
+            <tr>
+                <td>
+                    <code class="small">{{ task.id[:8] }}</code>
+                </td>
+                <td>
+                    <span class="badge 
+                        {% if task.media_type == 'image' %}bg-success
+                        {% elif task.media_type == 'audio' %}bg-warning
+                        {% elif task.media_type == 'video' %}bg-danger
+                        {% else %}bg-secondary{% endif %}">
+                        {% if task.media_type == 'image' %}<i class="bi bi-image"></i>
+                        {% elif task.media_type == 'audio' %}<i class="bi bi-music-note"></i>
+                        {% elif task.media_type == 'video' %}<i class="bi bi-camera-video"></i>
+                        {% else %}<i class="bi bi-file"></i>{% endif %}
+                        {{ task.media_type }}
+                    </span>
+                </td>
+                <td>
+                    <span class="text-truncate d-inline-block" style="max-width: 300px;" title="{{ task.media_path }}">
+                        {{ task.media_path.split('/')[-1] if '/' in task.media_path else task.media_path.split('\\')[-1] }}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge 
+                        {% if task.status == 'completed' %}bg-success
+                        {% elif task.status == 'failed' %}bg-danger
+                        {% elif task.status == 'processing' %}bg-info
+                        {% else %}bg-warning text-dark{% endif %}">
+                        {% if task.status == 'completed' %}<i class="bi bi-check-circle"></i>
+                        {% elif task.status == 'failed' %}<i class="bi bi-x-circle"></i>
+                        {% elif task.status == 'processing' %}<i class="bi bi-arrow-repeat"></i>
+                        {% else %}<i class="bi bi-clock"></i>{% endif %}
+                        {{ task.status }}
+                    </span>
+                    {% if task.status == 'failed' and task.error_message %}
+                    <button type="button" class="btn btn-sm btn-link p-0 ms-1" 
+                            data-bs-toggle="tooltip" 
+                            title="{{ task.error_message }}">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                    {% endif %}
+                </td>
+                <td class="small text-muted">
+                    {{ task.created_at.strftime('%d.%m %H:%M:%S') if task.created_at else 'N/A' }}
+                </td>
+                <td>
+                    <span class="badge bg-secondary">{{ task.retry_count or 0 }}</span>
+                </td>
+                <td>
+                    {% if task.status == 'failed' %}
+                    <form action="{{ url_for('main.retry_task', task_id=task.id) }}" 
+                          method="POST" 
+                          style="display: inline;">
+                        <button type="submit" 
+                                class="btn btn-sm btn-outline-warning" 
+                                title="Повторить обработку">
+                            <i class="bi bi-arrow-clockwise"></i> Retry
+                        </button>
+                    </form>
+                    {% elif task.status == 'completed' %}
+                    <span class="text-success small">
+                        <i class="bi bi-check2"></i> OK
+                    </span>
+                    {% elif task.status == 'processing' %}
+                    <span class="text-info small">
+                        <i class="bi bi-hourglass-split"></i> ...
+                    </span>
+                    {% else %}
+                    <span class="text-muted small">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="7" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox display-6"></i>
+                    <p class="mt-2 mb-0">Очередь пуста</p>
+                </td>
+            </tr>
+        {% endif %}
+    </tbody>
+</table>

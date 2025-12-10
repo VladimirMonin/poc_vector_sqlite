@@ -28,7 +28,7 @@ def mock_console() -> MagicMock:
 def mock_llm():
     """Мок LLM провайдера."""
     mock = MagicMock()
-    mock.model = "gemini-2.0-flash"
+    mock.model = "gemini-2.5-flash-lite"
     return mock
 
 
@@ -47,7 +47,7 @@ def mock_context(mock_console, mock_llm) -> ChatContext:
         temperature=0.7,
     )
     # Для хранения модели используем extra_context
-    ctx.extra_context["_model"] = "gemini-2.0-flash"
+    ctx.extra_context["_model"] = "gemini-2.5-flash-lite"
     return ctx
 
 

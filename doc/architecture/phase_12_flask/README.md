@@ -1,0 +1,74 @@
+# 🌐 Phase 12: Flask Web Application
+
+> **Статус:** 🔄 В ПАУЗЕ (отдельная ветка)  
+> **Цель:** Веб-интерфейс для поиска, загрузки документов и RAG-чата
+
+---
+
+## 📖 Содержание фазы
+
+### 55. Flask Integration
+
+**Файл:** [55_flask_integration.md](55_flask_integration.md)
+
+Интеграция `SemanticCore` в веб-приложение: Application Factory, DI через `extensions`, HTTP logging.
+
+---
+
+### 56. Query Cache Architecture
+
+**Файл:** [56_query_cache.md](56_query_cache.md)
+
+Кэширование эмбеддингов запросов: экономия API-вызовов, автокомплит, статистика.
+
+---
+
+### 57. Search Interface Architecture
+
+**Файл:** [57_search_interface.md](57_search_interface.md)
+
+HTMX + Flask: интеллектуальный поиск с фильтрами, Markdown рендеринг, Score визуализация.
+
+---
+
+### 58. Content Management Architecture
+
+**Файл:** [58_content_management.md](58_content_management.md)
+
+Drag-n-Drop загрузка, UUID-именование, sync/async индексация, управление документами.
+
+---
+
+### 59. RAG Chat Web Architecture
+
+**Файл:** [59_rag_chat_web.md](59_rag_chat_web.md)
+
+Интерактивный чат через HTMX, персистентные сессии, визуализация источников.
+
+---
+
+### 60. Settings & About Pages
+
+**Файл:** [60_settings_about.md](60_settings_about.md)
+
+Страницы конфигурации и информации о проекте, динамический sidebar.
+
+---
+
+### 61. Flask Integration Lessons: Анатомия проёба
+
+**Файл:** [61_flask_integration_lessons.md](61_flask_integration_lessons.md)
+
+Честный разбор багов: кнопки в никуда, две БД, исчезающие изображения и `chunk_type`.
+
+---
+
+## 🔗 Связанные фазы
+
+- **Phase 2:** [Storage](../phase_2_storage/) — поиск для веб-интерфейса
+- **Phase 9:** [RAG](../phase_9_rag/) — RAG Engine для чата
+- **Phase 13:** [Audit](../phase_13_audit/) — embedding cache для веба
+
+---
+
+**← [Вернуться к оглавлению](../00_overview.md)**

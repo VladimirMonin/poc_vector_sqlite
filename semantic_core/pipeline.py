@@ -23,10 +23,22 @@ from semantic_core.domain import (
     ChunkResult,
     MediaConfig,
     MediaType,
+    MatchType,
 )
 from semantic_core.domain.chunk import Chunk, ChunkType, MEDIA_CHUNK_TYPES
 from semantic_core.infrastructure.storage.peewee.models import EmbeddingStatus
 from semantic_core.utils.logger import get_logger, setup_logging, LoggingConfig
+from semantic_core.config import SemanticConfig
+
+# Phase 14.1 imports: Media Pipeline Architecture
+from semantic_core.core.media_context import MediaContext
+from semantic_core.core.media_pipeline import MediaPipeline
+from semantic_core.processing.parsers.markdown_parser import MarkdownNodeParser
+from semantic_core.processing.steps import (
+    SummaryStep,
+    TranscriptionStep,
+    OCRStep,
+)
 
 if TYPE_CHECKING:
     from semantic_core.infrastructure.gemini.image_analyzer import GeminiImageAnalyzer
@@ -86,6 +98,7 @@ class SemanticCore:
         audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
         video_analyzer: Optional["GeminiVideoAnalyzer"] = None,
         media_config: Optional[MediaConfig] = None,
+        config: Optional[SemanticConfig] = None,
         log_level: Optional[str] = None,
         log_file: Optional[str | Path] = None,
         logging_config: Optional[LoggingConfig] = None,
@@ -100,7 +113,8 @@ class SemanticCore:
             image_analyzer: Анализатор изображений (опционально).
             audio_analyzer: Анализатор аудио (опционально).
             video_analyzer: Анализатор видео (опционально).
-            media_config: Конфигурация обработки медиа.
+            media_config: Конфигурация обработки медиа (legacy, используйте config).
+            config: Полная конфигурация SemanticCore (приоритет над media_config).
             log_level: Уровень логирования (DEBUG/INFO/WARNING/ERROR).
             log_file: Путь к файлу логов.
             logging_config: Полная конфигурация логирования (приоритет над log_level/log_file).
@@ -125,7 +139,16 @@ class SemanticCore:
         self.image_analyzer = image_analyzer
         self.audio_analyzer = audio_analyzer
         self.video_analyzer = video_analyzer
-        self.media_config = media_config or MediaConfig()
+
+        # Phase 14.3: Поддержка полного SemanticConfig для chunk_sizes
+        if config is not None:
+            self.config = config
+            self.media_config = config.media  # Синхронизируем media_config
+        else:
+            # Legacy path: используем media_config напрямую
+            self.config = SemanticConfig()  # Default config
+            self.media_config = media_config or MediaConfig()
+            self.config.media = self.media_config  # Синхронизируем
 
         # Lazy-инициализация компонентов для медиа
         self._rate_limiter: Optional["RateLimiter"] = None
@@ -168,6 +191,10 @@ class SemanticCore:
             ValueError: Если данные некорректны.
             RuntimeError: Если произошла ошибка.
         """
+        # 0. Прямая загрузка медиа-файлов (без парсера/сплиттера)
+        if document.media_type in (MediaType.IMAGE, MediaType.AUDIO, MediaType.VIDEO):
+            return self._ingest_direct_media(document, mode, enrich_media)
+
         # 1. Нарезаем на чанки
         chunks = self.splitter.split(document)
 
@@ -207,13 +234,190 @@ class SemanticCore:
 
         return saved_document
 
+    def _ingest_direct_media(
+        self,
+        document: Document,
+        mode: IngestionMode,
+        enrich_media: bool,
+    ) -> Document:
+        """Обрабатывает медиа-файл напрямую (без парсера/сплиттера).
+
+        Вызывается когда document.media_type != TEXT.
+        Создаёт единственный чанк с правильным типом (IMAGE_REF/AUDIO_REF/VIDEO_REF).
+
+        Args:
+            document: Документ с content=путь_к_файлу.
+            mode: Режим обработки ('sync' или 'async').
+            enrich_media: Вызывать ли Vision/Audio/Video API.
+
+        Returns:
+            Сохранённый Document с ID.
+        """
+        media_path = Path(document.content)
+
+        # 1. Определяем chunk_type по media_type
+        chunk_type_map = {
+            MediaType.IMAGE: ChunkType.IMAGE_REF,
+            MediaType.AUDIO: ChunkType.AUDIO_REF,
+            MediaType.VIDEO: ChunkType.VIDEO_REF,
+        }
+        chunk_type = chunk_type_map[document.media_type]
+
+        logger.debug(
+            "Direct media ingestion",
+            media_type=document.media_type.value,
+            chunk_type=chunk_type.value,
+            path=str(media_path),
+            enrich_media=enrich_media,
+        )
+
+        # 2. Формируем контент и metadata
+        content = str(media_path)
+        metadata: dict = {"_original_path": str(media_path)}
+        analysis_result: Optional[dict] = None
+
+        if enrich_media and mode == "sync":
+            # Вызываем соответствующий анализатор
+            analysis_result = self._analyze_media_for_chunk(
+                chunk_type, media_path, context_text=""
+            )
+
+            if analysis_result is not None:
+                content = self._build_content_from_analysis(analysis_result)
+                metadata.update(
+                    self._build_metadata_from_analysis(analysis_result, media_path)
+                )
+                logger.debug("Media enriched", content_preview=content[:100])
+            else:
+                metadata["_media_error"] = "Analysis failed"
+                logger.warning("Media analysis failed", path=str(media_path))
+
+        elif enrich_media and mode == "async":
+            # Создаём задачу на обогащение (обработается позже)
+            try:
+                task_id = self._create_media_task(
+                    path=str(media_path),
+                    context_text="",
+                )
+                metadata["_media_task_id"] = task_id
+                metadata["_pending_enrichment"] = True
+            except Exception as e:
+                logger.error(f"Failed to create media task: {e}")
+                metadata["_media_error"] = str(e)
+
+        # 3. Собираем чанки (summary + transcript, если есть)
+        chunks = self._build_media_chunks(
+            document=document,
+            media_path=media_path,
+            chunk_type=chunk_type,
+            analysis=analysis_result,
+            fallback_metadata=metadata,
+        )
+
+        # Обновляем метаданные документа (сохраняем _original_path и др.)
+        document.metadata.update(metadata)
+        document.content = content
+
+        # 4. Векторизация
+        if mode == "sync":
+            vector_texts = [
+                self.context_strategy.form_vector_text(chunk, document)
+                for chunk in chunks
+            ]
+            embeddings = self.embedder.embed_documents(vector_texts)
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk.embedding = embedding
+        else:
+            for chunk in chunks:
+                chunk.metadata["_vector_source"] = chunk.content
+                chunk.metadata["_embedding_status"] = EmbeddingStatus.PENDING.value
+                chunk.embedding = None
+
+        # 5. Сохраняем
+        saved_document = self.store.save(document, chunks)
+
+        logger.info(
+            "Direct media ingested",
+            doc_id=saved_document.id,
+            chunk_type=chunk_type.value,
+            chunk_count=len(chunks),
+            enriched=enrich_media and analysis_result is not None
+            if enrich_media
+            else False,
+        )
+
+        return saved_document
+
+    def _build_content_from_analysis(self, result: dict) -> str:
+        """Формирует текстовый контент для SUMMARY чанка из результата анализа медиа.
+
+        Для audio/video возвращает ТОЛЬКО description (без transcription),
+        т.к. transcription будет в отдельных чанках через _split_transcription_into_chunks().
+
+        Args:
+            result: Словарь с результатами от анализатора.
+
+        Returns:
+            Текст для summary chunk.content.
+        """
+        media_type = result.get("type", "unknown")
+
+        if media_type == "image":
+            return result.get("description", "")
+
+        elif media_type == "audio":
+            # Только описание, transcription будет в отдельных чанках
+            return result.get("description", "")
+
+        elif media_type == "video":
+            # Только описание, transcription будет в отдельных чанках
+            return result.get("description", "")
+
+        return ""
+
+    def _build_metadata_from_analysis(self, result: dict, media_path: Path) -> dict:
+        """Формирует metadata из результата анализа медиа.
+
+        Args:
+            result: Словарь с результатами от анализатора.
+            media_path: Путь к медиа-файлу.
+
+        Returns:
+            Словарь метаданных.
+        """
+        metadata: dict = {"_original_path": str(media_path)}
+        media_type = result.get("type", "unknown")
+
+        if media_type == "image":
+            metadata["_vision_alt"] = result.get("alt_text", "")
+            metadata["_vision_keywords"] = result.get("keywords", [])
+            if result.get("ocr_text"):
+                metadata["_vision_ocr"] = result["ocr_text"]
+
+        elif media_type == "audio":
+            metadata["_audio_description"] = result.get("description", "")
+            metadata["_audio_keywords"] = result.get("keywords", [])
+            metadata["_audio_participants"] = result.get("participants", [])
+            metadata["_audio_action_items"] = result.get("action_items", [])
+            if result.get("duration_seconds"):
+                metadata["_audio_duration"] = result["duration_seconds"]
+
+        elif media_type == "video":
+            metadata["_video_keywords"] = result.get("keywords", [])
+            # transcription и ocr_text теперь в отдельных чанках, не дублируем в metadata
+            if result.get("duration_seconds"):
+                metadata["_video_duration"] = result["duration_seconds"]
+
+        return metadata
+
     def search(
         self,
         query: str,
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
-        k: int = 60,
+        k: int = 1,
+        query_vector: Optional[list[float]] = None,
     ) -> list[SearchResult]:
         """Выполняет поиск документов.
 
@@ -222,7 +426,9 @@ class SemanticCore:
             filters: Фильтры по метаданным.
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
-            k: Константа для RRF алгоритма (по умолчанию 60).
+            k: Константа для RRF алгоритма (по умолчанию 1 для резкого ранжирования).
+            query_vector: Предварительно вычисленный вектор запроса (для кеширования).
+                Если передан, пропускает вызов embedder.embed_query().
 
         Returns:
             Список SearchResult с документами и скорами.
@@ -233,9 +439,8 @@ class SemanticCore:
         if not query or not query.strip():
             raise ValueError("Запрос не может быть пустым")
 
-        # Генерируем вектор для поиска (для vector/hybrid режимов)
-        query_vector = None
-        if mode in ("vector", "hybrid"):
+        # Используем переданный вектор или генерируем новый
+        if mode in ("vector", "hybrid") and query_vector is None:
             query_vector = self.embedder.embed_query(query)
 
         # Выполняем поиск
@@ -256,8 +461,10 @@ class SemanticCore:
         filters: Optional[dict] = None,
         limit: int = 10,
         mode: str = "hybrid",
-        k: int = 60,
+        k: int = 1,
         chunk_type_filter: Optional[str] = None,
+        context_window: int = 0,
+        query_vector: Optional[list[float]] = None,
     ) -> list[ChunkResult]:
         """Выполняет гранулярный поиск по отдельным чанкам.
 
@@ -269,8 +476,14 @@ class SemanticCore:
             filters: Фильтры по метаданным документа.
             limit: Максимальное количество результатов.
             mode: Режим поиска ('vector', 'fts', 'hybrid').
-            k: Константа для RRF алгоритма (по умолчанию 60).
+            k: Константа для RRF алгоритма (по умолчанию 1 для резкого ранжирования).
             chunk_type_filter: Фильтр по типу чанка ('text', 'code', 'table', 'image_ref').
+            context_window: Количество соседних чанков в каждую сторону.
+                0 = только найденные чанки (по умолчанию).
+                1 = найденный + по 1 соседу с каждой стороны.
+                N = если N >= количества чанков в документе, возвращается весь документ.
+            query_vector: Предварительно вычисленный вектор запроса (для кеширования).
+                Если передан, пропускает вызов embedder.embed_query().
 
         Returns:
             Список ChunkResult с чанками и их скорами.
@@ -281,9 +494,8 @@ class SemanticCore:
         if not query or not query.strip():
             raise ValueError("Запрос не может быть пустым")
 
-        # Генерируем вектор для поиска (для vector/hybrid режимов)
-        query_vector = None
-        if mode in ("vector", "hybrid"):
+        # Используем переданный вектор или генерируем новый
+        if mode in ("vector", "hybrid") and query_vector is None:
             query_vector = self.embedder.embed_query(query)
 
         # Выполняем гранулярный поиск
@@ -297,7 +509,74 @@ class SemanticCore:
             chunk_type_filter=chunk_type_filter,
         )
 
+        # Расширяем результаты соседними чанками если нужно
+        if context_window > 0 and results:
+            results = self._expand_with_context(results, context_window)
+
         return results
+
+    def _expand_with_context(
+        self,
+        results: list[ChunkResult],
+        window: int,
+    ) -> list[ChunkResult]:
+        """Расширяет результаты соседними чанками.
+
+        Дедуплицирует чанки (если соседи пересекаются).
+        Сохраняет оригинальные скоры для найденных чанков.
+        Соседние чанки получают match_type=CONTEXT и score=0.
+
+        Args:
+            results: Исходные результаты поиска.
+            window: Количество соседей в каждую сторону.
+
+        Returns:
+            Расширенный список ChunkResult.
+        """
+        seen_ids: set[int] = set()
+        expanded: list[ChunkResult] = []
+
+        # Сначала собираем ID всех оригинальных результатов
+        original_ids = {r.chunk_id for r in results}
+
+        for result in results:
+            if result.chunk_id is None:
+                continue
+
+            # Получаем соседние чанки
+            siblings = self.store.get_sibling_chunks(result.chunk_id, window)
+
+            for sibling in siblings:
+                if sibling.id in seen_ids:
+                    continue
+                seen_ids.add(sibling.id)
+
+                # Если это оригинальный результат — используем его
+                if sibling.id in original_ids:
+                    # Находим оригинальный результат
+                    original = next(
+                        (r for r in results if r.chunk_id == sibling.id),
+                        None,
+                    )
+                    if original:
+                        expanded.append(original)
+                else:
+                    # Соседи получают score=0 и match_type=CONTEXT
+                    expanded.append(
+                        ChunkResult(
+                            chunk=sibling,
+                            score=0.0,
+                            match_type=MatchType.CONTEXT,
+                            parent_doc_id=result.parent_doc_id,
+                            parent_doc_title=result.parent_doc_title,
+                            parent_metadata=result.parent_metadata,
+                        )
+                    )
+
+        # Сортируем по документу и chunk_index для правильного порядка
+        expanded.sort(key=lambda r: (r.parent_doc_id, r.chunk_index))
+
+        return expanded
 
     def delete(self, document_id: int) -> int:
         """Удаляет документ и все его чанки.
@@ -338,7 +617,7 @@ class SemanticCore:
         """Индексирует изображение.
 
         Создаёт задачу на анализ изображения. В sync режиме
-        обрабатывает сразу, в async — помещает в очередь.
+        обрабатывает сразу и создаёт searchable Document.
 
         Args:
             path: Путь к файлу изображения.
@@ -347,19 +626,22 @@ class SemanticCore:
             mode: Режим обработки ('sync' или 'async').
 
         Returns:
-            sync: chunk_id (ID созданного чанка).
+            sync: document_id (ID созданного документа).
             async: task_id (ID задачи в очереди).
 
         Raises:
             ValueError: Если файл не является поддерживаемым изображением.
             RuntimeError: Если image_analyzer не настроен.
         """
+        import json
+        from pathlib import Path
         from semantic_core.infrastructure.media.utils import (
             is_image_valid,
             get_media_type,
             get_file_mime_type,
         )
         from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+        from semantic_core.domain import Document, MediaType
 
         # Проверяем, что image_analyzer настроен
         if self.image_analyzer is None:
@@ -390,8 +672,403 @@ class SemanticCore:
                     f"Failed to process image: {task.error_message or 'Unknown error'}"
                 )
 
-            # Возвращаем task_id (chunk_id будет добавлен в Phase 6.1)
+            # Получаем результат анализа
+            task = MediaTaskModel.get_by_id(task_id)
+
+            # Формируем content из результатов анализа
+            content_parts = []
+            if task.result_description:
+                content_parts.append(task.result_description)
+            if task.result_alt_text:
+                content_parts.append(f"Alt: {task.result_alt_text}")
+            if task.result_ocr_text:
+                content_parts.append(f"OCR: {task.result_ocr_text}")
+
+            content = (
+                "\n\n".join(content_parts)
+                if content_parts
+                else f"Image: {Path(path).name}"
+            )
+
+            # Формируем title из alt_text или имени файла
+            title = (
+                task.result_alt_text
+                or Path(path).stem.replace("_", " ").replace("-", " ").title()
+            )
+
+            # Формируем метаданные
+            metadata = {
+                "title": title,
+                "source": str(path),
+                "filename": Path(path).name,
+                "media_type": "image",
+                "mime_type": task.mime_type,
+                "task_id": task_id,
+            }
+            keywords = []
+            if task.result_keywords:
+                try:
+                    keywords = json.loads(task.result_keywords)
+                    metadata["keywords"] = keywords
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            # Создаём Document
+            doc = Document(
+                content=content,
+                metadata=metadata,
+                media_type=MediaType.IMAGE,
+            )
+
+            # Создаём единственный чанк типа IMAGE_REF
+            from semantic_core.domain import Chunk, ChunkType
+
+            chunk = Chunk(
+                content=content,
+                chunk_index=0,
+                chunk_type=ChunkType.IMAGE_REF,
+                metadata={
+                    "source": path,
+                    "filename": Path(path).name,
+                    "alt_text": task.result_alt_text or "",
+                    "keywords": keywords,
+                },
+            )
+
+            # Формируем текст для векторизации с контекстом
+            vector_text = self.context_strategy.form_vector_text(chunk, doc)
+
+            # Генерируем эмбеддинг
+            embeddings = self.embedder.embed_documents([vector_text])
+            chunk.embedding = embeddings[0]
+
+            # Сохраняем напрямую (минуя splitter)
+            saved_doc = self.store.save(doc, [chunk])
+
+            # Обновляем chunk_id в задаче
+            from semantic_core.infrastructure.storage.peewee.models import ChunkModel
+
+            db_chunk = (
+                ChunkModel.select()
+                .where(ChunkModel.document_id == saved_doc.id)
+                .first()
+            )
+            if db_chunk:
+                task.result_chunk_id = db_chunk.id
+                task.save()
+
+            logger.info(
+                "Image indexed as document",
+                document_id=saved_doc.id,
+                path=path,
+            )
+            return str(saved_doc.id)
+
+        else:  # async
             return task_id
+
+    def ingest_audio(
+        self,
+        path: str,
+        user_prompt: Optional[str] = None,
+        context_text: Optional[str] = None,
+        mode: IngestionMode = "sync",
+    ) -> str:
+        """Индексирует аудиофайл.
+
+        Транскрибирует аудио и создаёт searchable Document с AUDIO_REF чанком.
+
+        Args:
+            path: Путь к аудиофайлу.
+            user_prompt: Пользовательский промпт для анализа.
+            context_text: Контекст из метаданных.
+            mode: Режим обработки ('sync' или 'async').
+
+        Returns:
+            sync: document_id (ID созданного документа).
+            async: task_id (ID задачи в очереди).
+
+        Raises:
+            ValueError: Если файл не является аудио.
+            RuntimeError: Если audio_analyzer не настроен.
+        """
+        import json
+        from pathlib import Path
+        from semantic_core.infrastructure.media.utils import (
+            is_audio_supported,
+            get_file_mime_type,
+        )
+        from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+        from semantic_core.domain import Document, MediaType, Chunk, ChunkType
+
+        if self.audio_analyzer is None:
+            raise RuntimeError(
+                "audio_analyzer not configured. "
+                "Pass GeminiAudioAnalyzer to SemanticCore constructor."
+            )
+
+        mime_type = get_file_mime_type(path)
+        if not is_audio_supported(mime_type):
+            raise ValueError(f"Unsupported audio format: {path} (mime: {mime_type})")
+
+        task_id = self._create_media_task(
+            path=path,
+            user_prompt=user_prompt,
+            context_text=context_text,
+        )
+
+        if mode == "sync":
+            # Обрабатываем через MediaQueueProcessor (как для изображений)
+            self._ensure_media_queue()
+            success = self._media_queue.process_task(task_id)
+
+            if not success:
+                task = MediaTaskModel.get_by_id(task_id)
+                raise RuntimeError(
+                    f"Failed to process audio: {task.error_message or 'Unknown error'}"
+                )
+
+            # Получаем результат анализа из задачи
+            task = MediaTaskModel.get_by_id(task_id)
+
+            # Формируем analysis из результатов задачи
+            analysis = {
+                "type": "audio",
+                "description": task.result_description,
+                "transcription": task.result_transcription,
+                "keywords": json.loads(task.result_keywords)
+                if task.result_keywords
+                else None,
+                "participants": json.loads(task.result_participants)
+                if task.result_participants
+                else None,
+                "action_items": json.loads(task.result_action_items)
+                if task.result_action_items
+                else None,
+                "duration_seconds": task.result_duration_seconds,
+            }
+
+            # Формируем content и метаданные документа
+            # Для Document.content используем только description (summary),
+            # т.к. transcription будет в отдельных чанках
+            content = task.result_description or f"Audio: {Path(path).name}"
+
+            title = Path(path).stem.replace("_", " ").replace("-", " ").title()
+
+            metadata = {
+                "title": title,
+                "source": str(path),
+                "filename": Path(path).name,
+                "media_type": "audio",
+                "mime_type": get_file_mime_type(path),
+                "task_id": task_id,
+                "duration_seconds": task.result_duration_seconds,
+            }
+            if task.result_participants:
+                metadata["participants"] = json.loads(task.result_participants)
+            if task.result_keywords:
+                metadata["keywords"] = json.loads(task.result_keywords)
+
+            doc = Document(
+                content=content,
+                metadata=metadata,
+                media_type=MediaType.AUDIO,
+            )
+
+            chunks = self._build_media_chunks(
+                document=doc,
+                media_path=Path(path),
+                chunk_type=ChunkType.AUDIO_REF,
+                analysis=analysis,
+                fallback_metadata={
+                    "source": str(path),
+                    "filename": Path(path).name,
+                    "_original_path": str(Path(path)),
+                },
+            )
+
+            vector_texts = [
+                self.context_strategy.form_vector_text(chunk, doc) for chunk in chunks
+            ]
+            embeddings = self.embedder.embed_documents(vector_texts)
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk.embedding = embedding
+
+            saved_doc = self.store.save(doc, chunks)
+
+            # Обновляем chunk_id (summary chunk c chunk_index=0)
+            from semantic_core.infrastructure.storage.peewee.models import ChunkModel
+
+            db_chunk = (
+                ChunkModel.select()
+                .where(ChunkModel.document_id == saved_doc.id)
+                .order_by(ChunkModel.chunk_index)
+                .first()
+            )
+            if db_chunk:
+                task.result_chunk_id = db_chunk.id
+                task.save()
+
+            logger.info(
+                "Audio indexed as document",
+                document_id=saved_doc.id,
+                path=path,
+                duration=task.result_duration_seconds,
+            )
+            return str(saved_doc.id)
+
+        else:  # async
+            return task_id
+
+    def ingest_video(
+        self,
+        path: str,
+        user_prompt: Optional[str] = None,
+        context_text: Optional[str] = None,
+        mode: IngestionMode = "sync",
+    ) -> str:
+        """Индексирует видеофайл.
+
+        Анализирует видео (кадры + аудио) и создаёт searchable Document с VIDEO_REF чанком.
+
+        Args:
+            path: Путь к видеофайлу.
+            user_prompt: Пользовательский промпт для анализа.
+            context_text: Контекст из метаданных.
+            mode: Режим обработки ('sync' или 'async').
+
+        Returns:
+            sync: document_id (ID созданного документа).
+            async: task_id (ID задачи в очереди).
+
+        Raises:
+            ValueError: Если файл не является видео.
+            RuntimeError: Если video_analyzer не настроен.
+        """
+        import json
+        from pathlib import Path
+        from semantic_core.infrastructure.media.utils import (
+            is_video_supported,
+            get_file_mime_type,
+        )
+        from semantic_core.infrastructure.storage.peewee.models import MediaTaskModel
+        from semantic_core.domain import Document, MediaType, Chunk, ChunkType
+
+        if self.video_analyzer is None:
+            raise RuntimeError(
+                "video_analyzer not configured. "
+                "Pass GeminiVideoAnalyzer to SemanticCore constructor."
+            )
+
+        mime_type = get_file_mime_type(path)
+        if not is_video_supported(mime_type):
+            raise ValueError(f"Unsupported video format: {path} (mime: {mime_type})")
+
+        task_id = self._create_media_task(
+            path=path,
+            user_prompt=user_prompt,
+            context_text=context_text,
+        )
+
+        if mode == "sync":
+            # Обрабатываем через MediaQueueProcessor (как для изображений)
+            self._ensure_media_queue()
+            success = self._media_queue.process_task(task_id)
+
+            if not success:
+                task = MediaTaskModel.get_by_id(task_id)
+                raise RuntimeError(
+                    f"Failed to process video: {task.error_message or 'Unknown error'}"
+                )
+
+            # Получаем результат анализа из задачи
+            task = MediaTaskModel.get_by_id(task_id)
+
+            # Формируем analysis из результатов задачи
+            analysis = {
+                "type": "video",
+                "description": task.result_description,
+                "transcription": task.result_transcription,
+                "keywords": json.loads(task.result_keywords)
+                if task.result_keywords
+                else None,
+                "ocr_text": task.result_ocr_text,
+                "duration_seconds": task.result_duration_seconds,
+            }
+
+            # Формируем content
+            # Для Document.content используем только description (summary),
+            # т.к. transcription будет в отдельных чанках
+            content = task.result_description or f"Video: {Path(path).name}"
+
+            # Формируем title из описания или имени файла
+            title = Path(path).stem.replace("_", " ").replace("-", " ").title()
+
+            # Метаданные
+            metadata = {
+                "title": title,
+                "source": str(path),
+                "filename": Path(path).name,
+                "media_type": "video",
+                "mime_type": get_file_mime_type(path),
+                "task_id": task_id,
+                "duration_seconds": task.result_duration_seconds,
+            }
+            if task.result_keywords:
+                metadata["keywords"] = json.loads(task.result_keywords)
+
+            # Создаём Document и Chunk
+            doc = Document(
+                content=content,
+                metadata=metadata,
+                media_type=MediaType.VIDEO,
+            )
+
+            chunks = self._build_media_chunks(
+                document=doc,
+                media_path=Path(path),
+                chunk_type=ChunkType.VIDEO_REF,
+                analysis=analysis,
+                fallback_metadata={
+                    "source": str(path),
+                    "filename": Path(path).name,
+                    "_original_path": str(Path(path)),
+                    "duration_seconds": task.result_duration_seconds,
+                    "keywords": json.loads(task.result_keywords)
+                    if task.result_keywords
+                    else [],
+                },
+            )
+
+            vector_texts = [
+                self.context_strategy.form_vector_text(chunk, doc) for chunk in chunks
+            ]
+            embeddings = self.embedder.embed_documents(vector_texts)
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk.embedding = embedding
+
+            saved_doc = self.store.save(doc, chunks)
+
+            # Обновляем chunk_id
+            from semantic_core.infrastructure.storage.peewee.models import ChunkModel
+
+            db_chunk = (
+                ChunkModel.select()
+                .where(ChunkModel.document_id == saved_doc.id)
+                .order_by(ChunkModel.chunk_index)
+                .first()
+            )
+            if db_chunk:
+                task.result_chunk_id = db_chunk.id
+                task.save()
+
+            logger.info(
+                "Video indexed as document",
+                document_id=saved_doc.id,
+                path=path,
+                duration=task.result_duration_seconds,
+            )
+            return str(saved_doc.id)
 
         else:  # async
             return task_id
@@ -422,13 +1099,15 @@ class SemanticCore:
         if self._rate_limiter is None:
             from semantic_core.infrastructure.gemini.rate_limiter import RateLimiter
 
-            self._rate_limiter = RateLimiter(rpm_limit=self.media_config.rpm_limit)
+            self._rate_limiter = RateLimiter(rpm_limit=self.config.media_rpm_limit)
 
         if self._media_queue is None:
             from semantic_core.core.media_queue import MediaQueueProcessor
 
             self._media_queue = MediaQueueProcessor(
-                analyzer=self.image_analyzer,
+                image_analyzer=self.image_analyzer,
+                audio_analyzer=self.audio_analyzer,
+                video_analyzer=self.video_analyzer,
                 rate_limiter=self._rate_limiter,
                 embedder=self.embedder,
                 store=self.store,
@@ -752,6 +1431,92 @@ class SemanticCore:
 
         chunk.metadata["_enriched"] = True
 
+    def _build_media_chunks(
+        self,
+        document: Document,
+        media_path: Path,
+        chunk_type: ChunkType,
+        analysis: Optional[dict],
+        fallback_metadata: Optional[dict] = None,
+    ) -> list[Chunk]:
+        """Формирует список чанков для медиа через MediaPipeline.
+
+        Phase 14.1.4: Интеграция MediaPipeline для модульной обработки медиа.
+        Заменяет legacy методы _split_transcription_into_chunks и _split_ocr_into_chunks.
+
+        Pipeline steps:
+        - SummaryStep: Создаёт summary chunk (всегда)
+        - TranscriptionStep: Парсит транскрипцию с таймкодами (если есть)
+        - OCRStep: Парсит OCR текст с таймкодами (если есть, видео)
+
+        Args:
+            document: Document объект для контекста
+            media_path: Путь к медиа-файлу
+            chunk_type: Тип чанка (IMAGE_REF/AUDIO_REF/VIDEO_REF)
+            analysis: Результат анализа от Gemini (словарь)
+            fallback_metadata: Дополнительные метаданные для чанков
+
+        Returns:
+            Список чанков: [summary_chunk, *transcript_chunks, *ocr_chunks]
+        """
+        base_metadata = dict(fallback_metadata or {})
+
+        # Если анализа нет — создаём fallback chunk
+        if analysis is None:
+            return [
+                Chunk(
+                    content=str(media_path),
+                    chunk_index=0,
+                    chunk_type=chunk_type,
+                    metadata=base_metadata,
+                )
+            ]
+
+        # Создаём MediaContext с нужными сервисами
+        # chunk_type и fallback_metadata передаём через services
+        context = MediaContext(
+            media_path=media_path,
+            document=document,
+            analysis=analysis,
+            chunks=[],
+            base_index=0,
+            services={
+                "chunk_type": chunk_type,  # Для SummaryStep
+                "fallback_metadata": base_metadata,  # Для всех шагов
+            },
+        )
+
+        # Создаём pipeline со всеми шагами
+        # Phase 14.3.2: Передаём chunk_sizes из конфигурации
+        # Создаём parser для OCR Markdown parsing
+        markdown_parser = (
+            MarkdownNodeParser()
+            if self.config.media.processing.ocr_parser_mode == "markdown"
+            else None
+        )
+
+        pipeline = MediaPipeline(
+            steps=[
+                SummaryStep(),  # Всегда создаёт summary chunk
+                TranscriptionStep(
+                    splitter=self.splitter,
+                    default_chunk_size=self.config.media.chunk_sizes.transcript_chunk_size,
+                    enable_timecodes=self.config.media.processing.enable_timecodes,
+                ),
+                OCRStep(
+                    parser=markdown_parser,
+                    ocr_text_chunk_size=self.config.media.chunk_sizes.ocr_text_chunk_size,
+                    ocr_code_chunk_size=self.config.media.chunk_sizes.ocr_code_chunk_size,
+                    parser_mode=self.config.media.processing.ocr_parser_mode,
+                ),
+            ]
+        )
+
+        # Выполняем pipeline
+        final_context = pipeline.build_chunks(context)
+
+        return final_context.chunks
+
     def _get_mime_type(self, path: Path) -> str:
         """Определяет MIME-тип файла по расширению."""
         import mimetypes
@@ -779,3 +1544,55 @@ class SemanticCore:
                 return path
 
         return None
+
+    def reanalyze(
+        self,
+        document_id: str,
+        custom_instructions: Optional[str] = None,
+    ) -> Document:
+        """Повторно анализирует медиа-файл с новыми custom_instructions.
+
+        Phase 14.3.3: Тонкая прокси для MediaService.reprocess_document().
+        Делегирует всю логику MediaService для соблюдения SRP.
+
+        Args:
+            document_id: ID документа для переобработки.
+            custom_instructions: Опциональные инструкции для Gemini.
+
+        Returns:
+            Обновлённый Document с новыми чанками.
+
+        Raises:
+            ValueError: Если document_id не найден или не медиа-файл.
+
+        Examples:
+            >>> # Переобработать с медицинскими инструкциями
+            >>> core.reanalyze(
+            ...     document_id="doc-123",
+            ...     custom_instructions="Extract medical terminology",
+            ... )
+            >>>
+            >>> # Переобработать с дефолтными промптами
+            >>> core.reanalyze("doc-123")
+
+        Note:
+            Требует наличия media analyzers в SemanticCore.__init__.
+            Удаляет все старые медиа-чанки перед созданием новых.
+        """
+        from semantic_core.services.media_service import MediaService
+
+        # Создаём MediaService с зависимостями из SemanticCore
+        media_service = MediaService(
+            image_analyzer=self.image_analyzer,
+            audio_analyzer=self.audio_analyzer,
+            video_analyzer=self.video_analyzer,
+            splitter=self.splitter,
+            store=self.store,
+            config=self.config,
+        )
+
+        # Делегируем всю логику MediaService
+        return media_service.reprocess_document(
+            document_id=document_id,
+            custom_instructions=custom_instructions,
+        )

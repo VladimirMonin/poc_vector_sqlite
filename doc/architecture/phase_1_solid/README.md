@@ -1,0 +1,44 @@
+# 🏗️ Phase 1: SOLID Refactoring
+
+> **Статус:** ✅ ЗАВЕРШЕНА  
+> **Цель:** Превратить прототип в production-ready библиотеку с чистой архитектурой
+
+---
+
+## 📖 Содержание фазы
+
+### 10. SOLID Архитектура
+
+**Файл:** [10_solid_refactoring.md](10_solid_refactoring.md)
+
+От прототипа к библиотеке: разделение на независимые слои, введение интерфейсов (`VectorStore`, `Embedder`, `Splitter`), инверсия зависимостей.
+
+**Ключевые достижения:**
+
+- Interfaces вместо concrete classes
+- Dependency Injection через конструкторы
+- Возможность замены Gemini на другие LLM
+- Возможность замены PeeWee на другую ORM
+- Unit-тестирование с mock'ами
+
+---
+
+## 🎯 Архитектурные принципы
+
+**S** — Single Responsibility: каждый класс делает одно дело  
+**O** — Open/Closed: расширяется без модификации  
+**L** — Liskov Substitution: интерфейсы взаимозаменяемы  
+**I** — Interface Segregation: мелкие специализированные интерфейсы  
+**D** — Dependency Inversion: зависимости от абстракций, не реализаций
+
+---
+
+## 🔗 Связанные фазы
+
+- **Phase 2:** [Storage Layer](../phase_2_storage/) — реализация VectorStore
+- **Phase 3:** [Integration Layer](../phase_3_integration/) — ORM интеграция
+- **Phase 4:** [Smart Parsing](../phase_4_smart_parsing/) — умные splitters
+
+---
+
+**← [Вернуться к оглавлению](../00_overview.md)**

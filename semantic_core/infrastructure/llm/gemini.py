@@ -27,7 +27,7 @@ class GeminiLLMProvider(BaseLLMProvider):
         model: Название модели Gemini.
 
     Example:
-        >>> provider = GeminiLLMProvider(api_key="...", model="gemini-2.0-flash")
+        >>> provider = GeminiLLMProvider(api_key="...", model="gemini-2.5-flash-lite")
         >>> result = provider.generate("Что такое RAG?")
         >>> print(result.text)
     """
@@ -35,13 +35,13 @@ class GeminiLLMProvider(BaseLLMProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-2.0-flash",
+        model: str = "gemini-2.5-flash-lite",
     ):
         """Инициализация провайдера.
 
         Args:
             api_key: API ключ Google Gemini.
-            model: Название модели (по умолчанию gemini-2.0-flash).
+            model: Название модели (по умолчанию gemini-2.5-flash-lite).
         """
         self._client = genai.Client(api_key=api_key)
         self._model = model

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки — Semantic KB{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="h3 mb-4">
+            <i class="bi bi-gear me-2"></i>Настройки
+        </h1>
+        
+        <p class="text-muted mb-4">
+            Текущая конфигурация системы (только для чтения).
+        </p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Semantic Core -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-brain me-2"></i>Semantic Core
+            </div>
+            <div class="card-body">
+                {% if semantic_settings %}
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">База данных</td>
+                            <td><code>{{ semantic_settings.db_path }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Модель эмбеддингов</td>
+                            <td><code>{{ semantic_settings.embedding_model }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Размерность</td>
+                            <td>{{ semantic_settings.embedding_dimension }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Уровень логов</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ semantic_settings.log_level }}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Сплиттер</td>
+                            <td>{{ semantic_settings.splitter }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Медиа</td>
+                            <td>
+                                {% if semantic_settings.media_enabled %}
+                                <span class="badge bg-success">Включено</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Выключено</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Semantic Core не настроен
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Flask -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-globe me-2"></i>Flask Application
+            </div>
+            <div class="card-body">
+                {% if flask_settings %}
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Хост</td>
+                            <td><code>{{ flask_settings.host }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Порт</td>
+                            <td>{{ flask_settings.port }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Режим отладки</td>
+                            <td>
+                                {% if flask_settings.debug %}
+                                <span class="badge bg-warning text-dark">DEBUG</span>
+                                {% else %}
+                                <span class="badge bg-success">PRODUCTION</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Папка загрузок</td>
+                            <td><code>{{ flask_settings.upload_folder }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Макс. размер файла</td>
+                            <td>{{ flask_settings.max_content_length_mb }} MB</td>
+                        </tr>
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Конфигурация недоступна
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Info -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>Информация о системе
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <small class="text-muted">Python</small>
+                        <div class="h5 mb-0">{{ system_info.python_version }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Flask</small>
+                        <div class="h5 mb-0">{{ system_info.flask_version }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Semantic Core</small>
+                        <div class="h5 mb-0">{{ system_info.semantic_core_version }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,107 @@
+@startuml
+title Система плагинов: интерфейсы и реализации (Plugin System: Interfaces & Implementations)
+
+interface BaseEmbedder <<Adapter>> as BE {
+    +embed_text(text): ndarray
+    +embed_batch(texts): list[ndarray]
+    +dimension: int
+}
+
+interface BaseVectorStore <<Adapter>> as BVS {
+    +add(doc, chunks)
+    +search(query, limit): list
+    +get_by_id(id): Document
+    +delete(id)
+}
+
+interface BaseSplitter <<Adapter>> as BSP {
+    +split(content): list[Chunk]
+}
+
+interface BaseContextStrategy <<Adapter>> as BCS {
+    +enrich(chunk): str
+}
+
+interface DocumentParser <<Adapter>> as DP {
+    +parse(content): list[Segment]
+}
+
+interface BaseLLMProvider <<Adapter>> as BLLM {
+    +generate(prompt): GenerationResult
+    +model_name: str
+}
+
+interface BaseChatHistoryStrategy <<Adapter>> as BCHS {
+    +should_trim(messages): bool
+    +trim(messages): list
+}
+
+package "Interfaces" <<Adapter>> {
+    BE
+    BVS
+    BSP
+    BCS
+    DP
+    BLLM
+    BCHS
+}
+
+class GeminiEmbedder <<Adapter>> as GE
+class PeeweeVectorStore <<Infrastructure>> as PVS
+class SmartSplitter <<Core>> as SS
+class HierarchicalContextStrategy <<Core>> as HCS
+class MarkdownNodeParser <<Adapter>> as MNP
+class GeminiLLMProvider <<Adapter>> as GLLM
+class TokenLimitStrategy <<Core>> as TLS
+
+package "Implementations" <<Core>> {
+    GE
+    PVS
+    SS
+    HCS
+    MNP
+    GLLM
+    TLS
+}
+
+GE ..|> BE
+PVS ..|> BVS
+SS ..|> BSP
+HCS ..|> BCS
+MNP ..|> DP
+GLLM ..|> BLLM
+TLS ..|> BCHS
+
+note bottom of BE
+    MRL support:
+    768 / 1536 / 3072
+end note
+
+note bottom of BLLM
+    Extensible:
+    OpenAI, Anthropic,
+    Ollama...
+end note
+
+legend right
+    |= Символ |= Значение |
+    | ..|> | реализует (implements) |
+    | <<Adapter>> | Адаптер (внешние интерфейсы) |
+    | <<Core>> | Бизнес-логика (ядро) |
+    | <<Infrastructure>> | Инфраструктура (хранилище) |
+    | BE | BaseEmbedder |
+    | BVS | BaseVectorStore |
+    | BSP | BaseSplitter |
+    | BCS | BaseContextStrategy |
+    | DP | DocumentParser |
+    | BLLM | BaseLLMProvider |
+    | BCHS | BaseChatHistoryStrategy |
+    | GE | GeminiEmbedder |
+    | PVS | PeeweeVectorStore |
+    | SS | SmartSplitter |
+    | HCS | HierarchicalContextStrategy |
+    | MNP | MarkdownNodeParser |
+    | GLLM | GeminiLLMProvider |
+    | TLS | TokenLimitStrategy |
+endlegend
+@enduml

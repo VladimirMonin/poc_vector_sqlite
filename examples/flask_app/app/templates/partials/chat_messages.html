@@ -1,0 +1,12 @@
+<!-- Chat messages partial (history loader) -->
+{% for msg in messages %}
+<div class="message message-{{ msg.role }}">
+    {% if msg.is_user() %}
+        {{ msg.content }}
+    {% else %}
+        <div class="message-content">
+            {{ render_markdown(msg.content) | safe }}
+        </div>
+    {% endif %}
+</div>
+{% endfor %}

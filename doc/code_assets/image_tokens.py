@@ -100,7 +100,7 @@ def estimate_cost(tokens: int, model: str = "gemini-2.5-flash") -> dict:
         },  # per 1K tokens
         "gemini-2.5-flash": {"input": 0.00001875, "output": 0.000075},
         "gemini-2.5-pro": {"input": 0.00125, "output": 0.005},
-        "gemini-2.0-flash": {"input": 0.00001875, "output": 0.000075},
+        "gemini-2.5-flash-lite": {"input": 0.00001875, "output": 0.000075},
     }
 
     rates = pricing.get(model, pricing["gemini-2.5-flash"])

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}О приложении — Semantic KB{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="text-center mb-5">
+            <i class="bi bi-brain display-1 text-primary"></i>
+            <h1 class="h2 mt-3">Semantic Knowledge Base</h1>
+            <p class="lead text-muted">
+                Production-ready библиотека для локального семантического поиска
+            </p>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-info-circle me-2"></i>О проекте
+                </h5>
+                <p class="card-text">
+                    <strong>Semantic Core</strong> — это библиотека для создания интеллектуальных 
+                    систем поиска и анализа документов. Основана на технологиях:
+                </p>
+                <ul>
+                    <li><strong>SQLite + sqlite-vec</strong> — локальное хранение векторов без внешних зависимостей</li>
+                    <li><strong>Google Gemini</strong> — генерация эмбеддингов и мультимодальный анализ</li>
+                    <li><strong>Hybrid Search (RRF)</strong> — комбинация векторного и полнотекстового поиска</li>
+                    <li><strong>RAG</strong> — ответы на вопросы на основе базы знаний</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-stars me-2"></i>Возможности
+                </h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Семантический поиск</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Гибридный поиск (RRF)</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>RAG чат с источниками</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Markdown парсинг</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Анализ изображений</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Транскрипция аудио</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Видео анализ</li>
+                            <li><i class="bi bi-check-circle text-success me-2"></i>Batch API (50% экономия)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-stack me-2"></i>Технологический стек
+                </h5>
+                <div class="row g-3">
+                    <div class="col-4 col-md-3">
+                        <div class="p-2 bg-body-secondary rounded text-center">
+                            <small class="text-muted d-block">Backend</small>
+                            <strong>Flask 3</strong>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <div class="p-2 bg-body-secondary rounded text-center">
+                            <small class="text-muted d-block">Frontend</small>
+                            <strong>HTMX</strong>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <div class="p-2 bg-body-secondary rounded text-center">
+                            <small class="text-muted d-block">UI</small>
+                            <strong>Bootstrap 5</strong>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <div class="p-2 bg-body-secondary rounded text-center">
+                            <small class="text-muted d-block">Database</small>
+                            <strong>SQLite</strong>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <div class="p-2 bg-body-secondary rounded text-center">
+                            <small class="text-muted d-block">ORM</small>
+                            <strong>Peewee</strong>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <div class="p-2 bg-body-secondary rounded text-center">
+                            <small class="text-muted d-block">AI</small>
+                            <strong>Gemini</strong>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <div class="p-2 bg-body-secondary rounded text-center">
+                            <small class="text-muted d-block">Vectors</small>
+                            <strong>sqlite-vec</strong>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <div class="p-2 bg-body-secondary rounded text-center">
+                            <small class="text-muted d-block">Config</small>
+                            <strong>Pydantic</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-file-earmark-text me-2"></i>Лицензия
+                </h5>
+                <p class="card-text">
+                    Этот проект распространяется под лицензией <strong>MIT</strong>.
+                </p>
+                <p class="card-text text-muted small mb-0">
+                    © 2024-2025 Semantic Core Project
+                </p>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary">
+                <i class="bi bi-arrow-left me-2"></i>На главную
+            </a>
+            <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-gear me-2"></i>Настройки
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

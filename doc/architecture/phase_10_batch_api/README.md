@@ -1,0 +1,45 @@
+# 🔄 Phase 10: Batch API Integration
+
+> **Статус:** ✅ ЗАВЕРШЕНА  
+> **Цель:** Реальная интеграция Google Batch API для эмбеддингов
+
+---
+
+## 📖 Содержание фазы
+
+### 50. Batch API: От заглушки к реальности
+
+**Файл:** [50_batch_api_implementation.md](50_batch_api_implementation.md)
+
+Реализация `GeminiBatchClient`, новый SDK (`google-genai`), формат JSONL и проблема совместимости моделей.
+
+**Проблема:**
+
+- Batch API поддерживает только `text-embedding-004`
+- Текущая база использует `embedding-001` (MRL 768)
+- Модели несовместимы (разные размерности векторов)
+
+---
+
+### 51. Миграция на gemini-embedding-001
+
+**Файл:** [51_model_migration.md](51_model_migration.md)
+
+Почему нельзя смешивать модели, MRL (Matryoshka Representation Learning) и план полной переиндексации.
+
+**Решение:**
+
+- Переход на `text-embedding-004` (универсальная модель)
+- Полная переиндексация базы
+- Обновление конфигурации
+
+---
+
+## 🔗 Связанные фазы
+
+- **Phase 5:** [Batching](../phase_5_batching/) — BatchManager архитектура
+- **Phase 8:** [CLI](../phase_8_cli/) — команды для batch обработки
+
+---
+
+**← [Вернуться к оглавлению](../00_overview.md)**

@@ -5,7 +5,6 @@
         Анализирует аудио для транскрипции и семантического поиска.
 """
 
-import json
 import time
 from typing import Optional
 
@@ -33,23 +32,57 @@ class AudioAnalysisSchema(BaseModel):
     action_items: list[str] = []
 
 
-# Системный промпт для анализа аудио
-SYSTEM_PROMPT = """You are an audio analyst creating descriptions for semantic search indexing.
+# Системный промпт для анализа аудио (с placeholders для injection)
+DEFAULT_SYSTEM_PROMPT = """You are an audio analyst creating descriptions for semantic search indexing.
+Response language: {language}
 
-Analyze the audio and provide:
-1. transcription: Full transcript of the spoken content
-2. description: Summary of the audio content (2-4 sentences)
-3. keywords: List of 5-10 relevant keywords for search
-4. participants: List of speaker names/identifiers if mentioned
-5. action_items: List of tasks or action items mentioned (if any)
+{custom_instructions}
 
-Focus on:
-- Main topics discussed
-- Key points and conclusions
-- Names, dates, and specific details
-- Tasks or follow-up items
+Return a JSON with the following structure:
 
-Output valid JSON matching the schema."""
+{{
+  "description": "Brief 2-3 sentence summary of the audio content",
+  "keywords": ["keyword1", "keyword2", ...],
+  "participants": ["Speaker1", "Speaker2", ...],
+  "action_items": ["Task 1", "Task 2", ...],
+  "duration_seconds": <number>,
+  "transcription": "MARKDOWN_FORMATTED_TRANSCRIPT_HERE"
+}}
+
+CRITICAL INSTRUCTIONS FOR TRANSCRIPTION FIELD:
+- Use Markdown formatting (paragraphs, headers, lists)
+- Split long monologues into logical paragraphs (every 3-5 sentences)
+- Use `## Speaker Name` headers for speaker changes
+- Use `**bold**` for emphasis or key terms
+- Use `> quote` for direct quotations
+- For technical content, wrap code snippets in triple backticks with language:
+  ```python
+  def example():
+      pass
+  ```
+- DO NOT escape newlines as \\n — use actual line breaks inside the JSON string
+
+Example transcription format:
+
+## Introduction
+
+The speaker introduces the topic of semantic search and explains how embeddings work in modern NLP systems.
+
+Key points:
+- Embeddings capture semantic meaning
+- Vector databases enable similarity search
+- Context matters more than keywords
+
+## Technical Deep Dive
+
+Here's how we calculate cosine similarity:
+
+```python
+def cosine_similarity(a, b):
+    return dot(a, b) / (norm(a) * norm(b))
+```
+
+This formula is fundamental to understanding vector search."""
 
 
 class GeminiAudioAnalyzer:
@@ -76,19 +109,45 @@ class GeminiAudioAnalyzer:
         self,
         api_key: str,
         model: str = DEFAULT_MODEL,
+        max_output_tokens: int = 65_536,
+        output_language: str = "Russian",
+        custom_instructions: Optional[str] = None,
     ):
         """Инициализация анализатора.
 
         Args:
             api_key: API ключ Google Gemini.
             model: Модель для Audio API (по умолчанию flash-lite).
+            max_output_tokens: Лимит токенов на вывод модели.
+            output_language: Язык для ответов модели.
+            custom_instructions: Кастомные инструкции для промпта (опционально).
         """
         self.api_key = api_key
         self.model = model
+        self.max_output_tokens = max_output_tokens
+        self.output_language = output_language
+        self.custom_instructions = custom_instructions
+        self.system_prompt = self._build_system_prompt()
         self._client = None
         logger.debug(
             "Audio analyzer initialized",
             model=model,
+            has_custom_instructions=custom_instructions is not None,
+        )
+
+    def _build_system_prompt(self) -> str:
+        """Собирает system prompt с template injection.
+
+        Returns:
+            Готовый system prompt с инжектированными кастомными инструкциями.
+        """
+        instructions = ""
+        if self.custom_instructions:
+            instructions = f"CUSTOM INSTRUCTIONS:\n{self.custom_instructions}\n"
+
+        return DEFAULT_SYSTEM_PROMPT.format(
+            language=self.output_language,
+            custom_instructions=instructions,
         )
 
     @property
@@ -161,11 +220,11 @@ class GeminiAudioAnalyzer:
             mime_type=mime_type,
         )
 
-        # 5. Конфигурация запроса
+        # Конфигурация запроса
         config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=self.system_prompt,
             temperature=0.3,
-            max_output_tokens=8192,  # Для длинных транскрипций
+            max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",
             response_schema=AudioAnalysisSchema,
             safety_settings=[
@@ -212,16 +271,8 @@ class GeminiAudioAnalyzer:
             operation="audio_analysis",
         )
 
-        try:
-            data = json.loads(response.text)
-        except json.JSONDecodeError as e:
-            logger.error(
-                "Failed to parse Gemini response as JSON",
-                path=audio_path,
-                error=str(e),
-                response_preview=response.text[:500],
-            )
-            raise ValueError(f"Invalid JSON in Gemini response: {e}")
+        # response.parsed возвращает AudioAnalysisSchema (Pydantic)
+        data = response.parsed
 
         # Извлекаем usage_metadata (это Pydantic модель, не словарь)
         tokens_used = None
@@ -229,7 +280,7 @@ class GeminiAudioAnalyzer:
             tokens_used = getattr(response.usage_metadata, "total_token_count", None)
 
         latency_ms = (time.perf_counter() - start_time) * 1000
-        transcription = data.get("transcription", "")
+        transcription = data.transcription
 
         logger.info(
             "Audio analyzed",
@@ -237,15 +288,15 @@ class GeminiAudioAnalyzer:
             duration_sec=round(duration, 2),
             tokens_used=tokens_used,
             transcription_length=len(transcription),
-            participants_count=len(data.get("participants", [])),
+            participants_count=len(data.participants),
         )
 
         return MediaAnalysisResult(
-            description=data["description"],
+            description=data.description,
             transcription=transcription,
-            keywords=data.get("keywords", []),
-            participants=data.get("participants", []),
-            action_items=data.get("action_items", []),
+            keywords=data.keywords,
+            participants=data.participants,
+            action_items=data.action_items,
             duration_seconds=duration,
             tokens_used=tokens_used,
         )

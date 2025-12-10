@@ -46,7 +46,25 @@ Production-ready библиотека для локального семанти
 - **Phase 8:** CLI & Configuration — {DONE}
 - **Phase 9:** RAG Integration — {DONE}
 - **Phase 10:** Batch API Real Implementation — {DONE}
-- **Phase 11:** Documentation & Diagrams — {IN PROGRESS}
+- **Phase 11:** Documentation & Diagrams — {DONE}
+- **Phase 12:** Flask Web Application — {IN ANOTHER BRANCH. IN PAUSE}
+  - **12.0:** App Skeleton, DI, Logging, Dashboard — {DONE}
+  - **12.1:** Search Query Cache — {CURRENT}
+  - **12.2-12.5:** Search UI, Ingest, Chat, Polish — {TODO}
+- **Phase 13:** Total Visual Check & Audit Tools — {DONE}
+- **Phase 14:** Media Content Crisis — {IN PROGRESS} - `doc\ideas\phase_14\phase_14.0.md`
+
+### 🌐 Flask App (`examples/flask_app/`)
+
+Веб-интерфейс для SemanticCore. Стек: Flask 3 + Bootstrap 5.3 + HTMX + Pydantic Settings.
+
+| Компонент | Файл                 | Назначение                        |
+| --------- | -------------------- | --------------------------------- |
+| Factory   | `app/__init__.py`    | `create_app()` с Pydantic config  |
+| DI        | `app/extensions.py`  | `app.extensions['semantic_core']` |
+| Config    | `app/config.py`      | `FlaskAppConfig` (FLASK\_ prefix) |
+| HTTP Logs | `app/logging.py`     | Middleware с эмодзи (🌐⚡⚠️🔥)    |
+| Dashboard | `app/routes/main.py` | `/`, `/health`                    |
 
 ### 📂 Структура Проекта
 
@@ -123,13 +141,15 @@ docs/                         # Документация проекта
 
 **📖 Точки входа в документацию:**
 
-| Ресурс                     | Путь                                                               | Описание                      |
-| -------------------------- | ------------------------------------------------------------------ | ----------------------------- |
-| **Публичная документация** | [docs/README.md](docs/README.md)                                   | Гайды, концепции, справочники |
-| **Архитектурный сериал**   | [doc/architecture/00_overview.md](doc/architecture/00_overview.md) | 51 концепция в лёгком стиле   |
-| **Планы и отчёты**         | [doc/ideas/](doc/ideas/)                                           | Технические отчёты по фазам   |
+| Ресурс                     | Путь                                                               | Описание                         |
+| -------------------------- | ------------------------------------------------------------------ | -------------------------------- |
+| **Публичная документация** | [docs/README.md](docs/README.md)                                   | Гайды, концепции, справочники    |
+| **Архитектурный сериал**   | [doc/architecture/00_overview.md](doc/architecture/00_overview.md) | 74 статьи, организованы по фазам |
+| **Планы и отчёты**         | [doc/ideas/](doc/ideas/)                                           | Технические отчёты по фазам      |
 
-> ⚠️ `doc/architecture/06-09` помечены как LEGACY — это старая архитектура до SOLID.
+> 📂 **Новая структура:** Архитектурный сериал реорганизован в папки по фазам (`phase_0_legacy/`, `phase_1_solid/`, ..., `phase_14_media_crisis/`). Каждая фаза имеет README с описанием и ссылками на статьи.
+
+> ⚠️ `phase_0_legacy/` содержит старую архитектуру до SOLID рефакторинга.
 
 **🖥️ CLI и интерактивный чат:**
 
@@ -152,6 +172,7 @@ semantic chat                   # Интерактивный RAG-чат
 2. Коммиты делаем походу разработки по правилам из инструкций. Пуш не делаем!
 3. Пишем тесты в пакете `tests/` (pytest). Тесты у нас запускаются из корня проекта.
 4. Когда всё работает и протестировано — заканчиваем фазу
-5. Пишем один или несколько файлов в `doc/architecture/` по завершённой фазе
+5. Вчитываем правила оформления архитектурного сериала: `doc\architecture\00_documentation_style_guide.md`
+5. Пишем статьи в `doc/architecture/phase_N/` по завершённой фазе
 6. Следуем стайл-гайду: минимум кода, максимум объяснений и диаграмм
-7. Обновляем оглавление в `00_overview.md`
+7. Обновляем README фазы (`phase_N/README.md`) со ссылками на новые статьи

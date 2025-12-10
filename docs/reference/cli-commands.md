@@ -100,7 +100,7 @@ semantic search "точный термин" -t fts -T 0.5
 
 | Флаг | Короткая | Тип | Default | Описание |
 |------|----------|-----|---------|----------|
-| `--model` | `-m` | str | gemini-2.0-flash | LLM модель |
+| `--model` | `-m` | str | gemini-2.5-flash-lite | LLM модель |
 | `--context` | `-c` | int | 5 | Чанков контекста |
 | `--search` | `-s` | str | hybrid | Режим поиска |
 | `--temperature` | `-t` | float | 0.7 | Температура |

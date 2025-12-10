@@ -5,7 +5,6 @@
         Анализирует изображения для семантического поиска.
 """
 
-import json
 import time
 from typing import Optional
 
@@ -28,12 +27,14 @@ class ImageAnalysisSchema(BaseModel):
     ocr_text: Optional[str] = None
 
 
-# Системный промпт для анализа изображений
-SYSTEM_PROMPT = """You are an image analyst creating descriptions for semantic search indexing.
+# Системный промпт для анализа изображений (с placeholders)
+DEFAULT_SYSTEM_PROMPT = """You are an image analyst creating descriptions for semantic search indexing.
+
+{custom_instructions}
 
 Analyze the image and provide:
 1. alt_text: A concise accessibility description (1 sentence)
-2. description: Detailed description of the image content (2-4 sentences)
+2. description: Comprehensive detailed description of all visible elements, text, diagrams, relationships, and context. Be thorough and complete - describe everything you see in as much detail as needed for full understanding.
 3. keywords: List of 5-10 relevant keywords for search
 4. ocr_text: Any visible text in the image (null if none)
 
@@ -42,8 +43,12 @@ Focus on:
 - Colors, mood, and style
 - Text/OCR if present
 - Context clues
+- Diagrams, charts, relationships between elements
+- All visible details that would help someone understand the image content
 
-Output valid JSON matching the schema."""
+Output valid JSON matching the schema.
+
+Answer in {language} language."""
 
 
 class GeminiImageAnalyzer:
@@ -67,19 +72,45 @@ class GeminiImageAnalyzer:
         self,
         api_key: str,
         model: str = "gemini-2.5-flash-lite",
+        max_output_tokens: int = 65_536,
+        output_language: str = "Russian",
+        custom_instructions: Optional[str] = None,
     ):
         """Инициализация анализатора.
 
         Args:
             api_key: API ключ Google Gemini.
             model: Модель для Vision API.
+            max_output_tokens: Лимит токенов на вывод модели.
+            output_language: Язык для ответов модели.
+            custom_instructions: Кастомные инструкции для промпта (опционально).
         """
         self.api_key = api_key
         self.model = model
+        self.max_output_tokens = max_output_tokens
+        self.output_language = output_language
+        self.custom_instructions = custom_instructions
+        self.system_prompt = self._build_system_prompt()
         self._client = None
         logger.debug(
             "Image analyzer initialized",
             model=model,
+            has_custom_instructions=custom_instructions is not None,
+        )
+
+    def _build_system_prompt(self) -> str:
+        """Собирает system prompt с template injection.
+
+        Returns:
+            Готовый system prompt с инжектированными кастомными инструкциями.
+        """
+        instructions = ""
+        if self.custom_instructions:
+            instructions = f"CUSTOM INSTRUCTIONS:\n{self.custom_instructions}\n"
+
+        return DEFAULT_SYSTEM_PROMPT.format(
+            language=self.output_language,
+            custom_instructions=instructions,
         )
 
     @property
@@ -141,11 +172,11 @@ class GeminiImageAnalyzer:
 
         prompt = "\n".join(prompt_parts)
 
-        # 3. Конфигурация запроса
+        # Конфигурация запроса
         config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=self.system_prompt,
             temperature=0.4,
-            max_output_tokens=1024,
+            max_output_tokens=self.max_output_tokens,
             response_mime_type="application/json",
             response_schema=ImageAnalysisSchema,
             safety_settings=[
@@ -192,16 +223,8 @@ class GeminiImageAnalyzer:
             operation="image_analysis",
         )
 
-        try:
-            data = json.loads(response.text)
-        except json.JSONDecodeError as e:
-            logger.error(
-                "Failed to parse Gemini response as JSON",
-                path=image_path,
-                error=str(e),
-                response_preview=response.text[:500],
-            )
-            raise ValueError(f"Invalid JSON in Gemini response: {e}")
+        # response.parsed возвращает ImageAnalysisSchema (Pydantic)
+        data = response.parsed
 
         # Извлекаем usage_metadata (это Pydantic модель, не словарь)
         tokens_used = None
@@ -213,14 +236,14 @@ class GeminiImageAnalyzer:
             "Image analyzed",
             latency_ms=round(latency_ms, 2),
             tokens_used=tokens_used,
-            keywords_count=len(data.get("keywords", [])),
-            has_ocr=bool(data.get("ocr_text")),
+            keywords_count=len(data.keywords),
+            has_ocr=bool(data.ocr_text),
         )
 
         return MediaAnalysisResult(
-            description=data["description"],
-            alt_text=data.get("alt_text"),
-            keywords=data.get("keywords", []),
-            ocr_text=data.get("ocr_text"),
+            description=data.description,
+            alt_text=data.alt_text,
+            keywords=data.keywords,
+            ocr_text=data.ocr_text,
             tokens_used=tokens_used,
         )

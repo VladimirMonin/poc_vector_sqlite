@@ -1,0 +1,67 @@
+# 📚 Phase 11: Documentation
+
+> **Статус:** ✅ ЗАВЕРШЕНА  
+> **Цель:** Production-ready документация и кросс-платформенная совместимость
+
+---
+
+## 📖 Содержание фазы
+
+### 52. Documentation Architecture
+
+**Файл:** [52_documentation_architecture.md](52_documentation_architecture.md)
+
+Две папки `doc/` и `docs/`: разделение аудиторий, стилевые правила, структура публичной документации.
+
+**Аудитории:**
+
+- `doc/` — для разработчиков проекта (внутренняя документация)
+- `docs/` — для пользователей библиотеки (публичная документация)
+
+---
+
+### 53. Cross-Platform Compatibility: Windows Support
+
+**Файл:** [53_windows_compatibility.md](53_windows_compatibility.md)
+
+Python версии, CLI-парсинг, PowerShell vs Bash, пути и кодировки.
+
+**Проблемы Windows:**
+
+- Пути с `\` вместо `/`
+- PowerShell требует `'` для одиночных аргументов
+- Кодировка CP1251 vs UTF-8
+- Path separators в путях
+
+---
+
+### 54. Python Truthiness Trap: Когда пустой объект — не None
+
+**Файл:** [54_python_truthiness_trap.md](54_python_truthiness_trap.md)
+
+Коварный баг с `__len__()` и `if not obj:`, E2E тесты для слэш-команд.
+
+**Проблема:**
+
+```python
+results = search()  # возвращает [] (пустой список)
+if not results:  # ← True, потому что __len__() == 0
+    return "No results"  # ← срабатывает!
+```
+
+**Решение:**
+
+```python
+if results is None:  # ← явная проверка на None
+```
+
+---
+
+## 🔗 Связанные фазы
+
+- **Phase 8:** [CLI](../phase_8_cli/) — кросс-платформенный CLI
+- **Phase 9:** [RAG](../phase_9_rag/) — баг с truthiness в slash-командах
+
+---
+
+**← [Вернуться к оглавлению](../00_overview.md)**

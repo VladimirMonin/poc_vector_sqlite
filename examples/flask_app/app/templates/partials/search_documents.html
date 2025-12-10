@@ -1,0 +1,95 @@
+<!-- Результаты поиска по документам (HTMX partial) -->
+{% if results %}
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <span class="text-muted">
+        Найдено <strong>{{ results|length }}</strong> документов по запросу 
+        <span class="badge bg-primary">{{ query }}</span>
+    </span>
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 g-3">
+    {% for result in results %}
+    <div class="col">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="card-title mb-0">
+                        <a href="{{ url_for('ingest.document_detail', doc_id=result.doc_id) }}" 
+                           class="text-decoration-none stretched-link">
+                            <i class="bi bi-file-earmark-text me-1"></i>
+                            {{ result.title }}
+                        </a>
+                    </h6>
+                    
+                    <!-- Score -->
+                    <span class="badge bg-success position-relative" 
+                          title="Релевантность: {{ result.score }}" 
+                          style="z-index: 10;">
+                        <i class="bi bi-bullseye"></i>
+                        {{ result.score_percent }}%
+                    </span>
+                </div>
+                
+                <!-- Match type badge -->
+                <div class="mb-2">
+                    <span class="badge 
+                        {% if result.match_type == 'vector' %}bg-purple text-white
+                        {% elif result.match_type == 'fts' %}bg-dark
+                        {% else %}bg-primary{% endif %} me-1">
+                        {% if result.match_type == 'vector' %}
+                            <i class="bi bi-diagram-3"></i> semantic
+                        {% elif result.match_type == 'fts' %}
+                            <i class="bi bi-search"></i> keyword
+                        {% else %}
+                            <i class="bi bi-intersect"></i> hybrid
+                        {% endif %}
+                    </span>
+                    
+                    {% if result.chunk_count > 0 %}
+                    <span class="badge bg-secondary">
+                        <i class="bi bi-layers me-1"></i>{{ result.chunk_count }} чанков
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <!-- Description -->
+                {% if result.description %}
+                <p class="card-text small text-muted">
+                    {{ result.description }}
+                </p>
+                {% endif %}
+                
+                <!-- Footer -->
+                <div class="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
+                    <!-- Source path -->
+                    <small class="text-muted text-truncate" style="max-width: 60%;" 
+                           title="{{ result.source }}">
+                        {% if result.source %}
+                        <i class="bi bi-folder me-1"></i>{{ result.source|basename }}
+                        {% endif %}
+                    </small>
+                    
+                    <!-- Tags -->
+                    <div>
+                        {% for tag in result.tags[:3] %}
+                        <span class="badge bg-body-secondary">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<!-- Нет результатов -->
+<div class="text-center text-muted py-5">
+    <i class="bi bi-emoji-frown display-1 mb-3"></i>
+    <p class="lead">Документы не найдены</p>
+    <p class="small">
+        Попробуйте изменить запрос или расширить фильтры.
+    </p>
+</div>
+{% endif %}
