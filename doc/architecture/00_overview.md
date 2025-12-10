@@ -105,6 +105,13 @@ Multi-chunk media architecture, multilingual analysis, SmartSplitter для OCR
 
 ---
 
+### 🔬 Phase 16: Debug Observatory
+
+**[Phase 16: Debug Observatory](phase_16_observatory/README.md)**  
+Provider-agnostic инспекция, CLI команда `semantic inspect`, критический FTS5 bugfix
+
+---
+
 ## 🚀 Быстрый старт
 
 ```bash
