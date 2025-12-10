@@ -24,6 +24,7 @@ class SemanticCore:
 ```
 
 **Проблемы:**
+
 1. **Невозможно использовать Whisper** для транскрипции вместо Gemini Audio
 2. **Невозможно использовать LLaVA** для vision вместо Gemini Vision
 3. **Нет информации о модели** - embedder не знает свою размерность
@@ -48,6 +49,7 @@ class SemanticCore:
 ### 1. Расширение BaseEmbedder
 
 **Было:**
+
 ```python
 class BaseEmbedder(ABC):
     @abstractmethod
@@ -60,6 +62,7 @@ class BaseEmbedder(ABC):
 ```
 
 **Стало:**
+
 ```python
 class BaseEmbedder(ABC):
     @abstractmethod
@@ -84,6 +87,7 @@ class BaseEmbedder(ABC):
 ```
 
 **Зачем:**
+
 - `SmartSplitter` может динамически подстраиваться под модель
 - Валидация размерности при сохранении в БД
 - Метаданные для логирования и мониторинга
@@ -129,6 +133,7 @@ class ITranscriber(ABC):
 ```
 
 **Реализации:**
+
 - `GeminiAudioAnalyzer` (уже есть) → адаптировать под интерфейс
 - `WhisperTranscriber` (Phase 15.1) → новый класс
 - `AssemblyAITranscriber` (будущее) → легко добавить
@@ -168,6 +173,7 @@ class IVisionAnalyzer(ABC):
 ```
 
 **Реализации:**
+
 - `GeminiImageAnalyzer` (уже есть) → адаптировать
 - `LLaVAAnalyzer` (Phase 15.X) → локальная vision модель
 - `AzureVisionAnalyzer` (будущее) → enterprise решение
@@ -197,6 +203,7 @@ class SemanticCore:
 ```
 
 **Преимущества:**
+
 - ✅ Можно передать **любую** реализацию интерфейса
 - ✅ Старый код продолжает работать (deprecated параметры)
 - ✅ Готово к миграции в Phase 15.4 (фабрики)
@@ -210,6 +217,7 @@ class SemanticCore:
 ![Class Diagram](../diagrams/images/phase15_interface_contracts_classes.webp)
 
 **Что показано:**
+
 - 3 новых интерфейса: `BaseEmbedder`, `ITranscriber`, `IVisionAnalyzer`
 - DTOs для каждого: `TranscriptionResult`, `VisionResult`
 - Связь с `SemanticCore` через dependency injection
@@ -221,6 +229,7 @@ class SemanticCore:
 ![Sequence Diagram - Embedding](../diagrams/images/phase15_embedding_sequence.webp)
 
 **Поток:**
+
 1. Client запрашивает embedding через `SemanticCore`
 2. Проверяется `embedder.max_tokens` перед отправкой
 3. Возвращается вектор с известной `embedder.dimension`
@@ -233,6 +242,7 @@ class SemanticCore:
 ![Sequence Diagram - Transcription](../diagrams/images/phase15_transcription_providers.webp)
 
 **Сценарий:**
+
 - Один и тот же код работает с Gemini Audio **и** Whisper
 - `ITranscriber` скрывает различия между провайдерами
 - Результат всегда `TranscriptionResult` (унифицированный DTO)
@@ -385,6 +395,7 @@ class WhisperTranscriber(ITranscriber):
 ```
 
 **Использование:**
+
 ```python
 # Старый способ (Gemini)
 core = SemanticCore(
@@ -404,6 +415,7 @@ core = SemanticCore(
 ### Почему свойства, а не параметры конструктора?
 
 **Плохо:**
+
 ```python
 class BaseEmbedder(ABC):
     def __init__(self, dimension: int, max_tokens: int):
@@ -412,6 +424,7 @@ class BaseEmbedder(ABC):
 ```
 
 **Хорошо (текущее решение):**
+
 ```python
 class BaseEmbedder(ABC):
     @property
@@ -420,6 +433,7 @@ class BaseEmbedder(ABC):
 ```
 
 **Причины:**
+
 1. Разные модели имеют **фиксированные** характеристики (Gemini всегда 768D)
 2. Избегаем ошибок пользователя (`dimension=1536` для Gemini не имеет смысла)
 3. Metadata **вычисляется**, а не задаётся (для future моделей с динамической размерностью)
@@ -429,12 +443,14 @@ class BaseEmbedder(ABC):
 ### Почему не использовать Protocol (PEP 544)?
 
 **Protocol (structural typing):**
+
 ```python
 class ITranscriber(Protocol):
     def transcribe(self, audio_path: Path) -> TranscriptionResult: ...
 ```
 
 **ABC (nominal typing) — наш выбор:**
+
 ```python
 class ITranscriber(ABC):
     @abstractmethod
@@ -442,6 +458,7 @@ class ITranscriber(ABC):
 ```
 
 **Причины:**
+
 1. **Явная документация** - разработчик видит что нужно наследоваться
 2. **Runtime проверка** - ошибки видны сразу при создании объекта
 3. **IDE поддержка** - автокомплит для абстрактных методов
@@ -452,13 +469,17 @@ class ITranscriber(ABC):
 ## 🎓 Ключевые уроки
 
 ### 1. **Interface Segregation Principle (ISP)**
+
 Каждый интерфейс делает **одну вещь**:
+
 - `BaseEmbedder` - только эмбеддинги
 - `ITranscriber` - только audio → text
 - `IVisionAnalyzer` - только image → analysis
 
 ### 2. **Dependency Inversion Principle (DIP)**
+
 `SemanticCore` зависит от **абстракций**, не от конкретных классов:
+
 ```python
 # DIP: зависимость от абстракции
 def __init__(self, transcriber: ITranscriber):
@@ -470,6 +491,7 @@ def __init__(self, transcriber: GeminiAudioAnalyzer):
 ```
 
 ### 3. **Open/Closed Principle (OCP)**
+
 Система **открыта для расширения** (новые провайдеры), но **закрыта для модификации** (SemanticCore не меняется при добавлении Whisper).
 
 ---
@@ -477,6 +499,7 @@ def __init__(self, transcriber: GeminiAudioAnalyzer):
 ## 📝 Резюме
 
 **Что сделано:**
+
 - ✅ Расширен `BaseEmbedder` свойствами `dimension` и `max_tokens`
 - ✅ Создан `ITranscriber` для унификации audio → text
 - ✅ Создан `IVisionAnalyzer` для унификации image → analysis
@@ -485,6 +508,7 @@ def __init__(self, transcriber: GeminiAudioAnalyzer):
 
 **Результат:**
 SemanticCore теперь **провайдеро-агностичен** — можно использовать любую комбинацию AI-моделей:
+
 - Gemini embeddings + Whisper transcription + LLaVA vision
 - Local embeddings + Gemini Audio + Azure Vision
 - OpenAI embeddings + AssemblyAI + Gemini Vision
