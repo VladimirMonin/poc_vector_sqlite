@@ -131,7 +131,7 @@ class TestComponentFactoryLLM:
 
         mock_gemini_llm.assert_called_once_with(
             api_key="test-gemini-key",
-            model_name="models/gemini-2.0-flash",
+            model="models/gemini-2.0-flash",
         )
 
     def test_create_llm_openai(self, gemini_config):
