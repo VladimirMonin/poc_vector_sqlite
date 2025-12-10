@@ -47,7 +47,7 @@ from typing import Literal, Optional
 
 from semantic_core.core.media_context import MediaContext
 from semantic_core.domain import Chunk, ChunkType
-from semantic_core.interfaces.parser import BaseParser
+from semantic_core.interfaces.parser import DocumentParser
 from semantic_core.processing.steps.base import BaseProcessingStep
 from semantic_core.utils.logger import get_logger
 
@@ -91,7 +91,7 @@ class OCRStep(BaseProcessingStep):
 
     def __init__(
         self,
-        parser: Optional[BaseParser] = None,
+        parser: Optional[DocumentParser] = None,
         ocr_text_chunk_size: int = 1800,
         ocr_code_chunk_size: int = 2000,
         parser_mode: Literal["markdown", "plain"] = "markdown",
@@ -103,7 +103,7 @@ class OCRStep(BaseProcessingStep):
                 Если None, используется plain режим без детекции code blocks.
             ocr_text_chunk_size: Размер чанка в токенах для обычного текста.
                 Default 1800 (~2048 токенов Gemini).
-            ocr_code_chunk_size: Размер чанка в токенах для code blocks.
+            ocr_code_chunk_size: Размер чанка в токенов для code blocks.
                 Default 2000 (код плотнее текста).
             parser_mode: Режим парсинга:
                 - "markdown": используется parser для детекции code blocks

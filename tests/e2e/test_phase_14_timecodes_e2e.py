@@ -133,12 +133,21 @@ def semantic_core(
     mock_embedder,
     mock_audio_analyzer,
     mock_video_analyzer,
+    tmp_path,
 ) -> SemanticCore:
     """SemanticCore с временной БД и моками."""
+    from semantic_core.config import SemanticConfig
+    
     parser = MarkdownNodeParser()
     splitter = SmartSplitter(parser=parser, chunk_size=500)
     context = HierarchicalContextStrategy(include_doc_title=True)
     store = PeeweeVectorStore(test_db)
+    
+    # Создаём конфиг с правильной структурой
+    config = SemanticConfig(
+        db_path=str(tmp_path / "test.db"),
+        gemini_api_key="fake-key-for-tests",
+    )
     
     return SemanticCore(
         embedder=mock_embedder,
@@ -147,6 +156,7 @@ def semantic_core(
         context_strategy=context,
         audio_analyzer=mock_audio_analyzer,
         video_analyzer=mock_video_analyzer,
+        config=config,
     )
 
 

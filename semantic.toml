@@ -39,7 +39,7 @@ ocr_code_chunk_size = 2000         # Размер чанка для code blocks 
 ocr_parser_mode = "markdown"       # markdown | plain — детекция code blocks в OCR
 enable_timecodes = true            # Извлекать таймкоды из транскрипции
 strict_timecode_ordering = false   # Требовать строгого порядка таймкодов
-max_timeline_items = 1000          # Лимит элементов timeline
+max_timeline_items = 100           # Лимит элементов timeline (10-500)
 
 # === Custom Prompts (Phase 14.3) ===
 # Кастомизация промптов для анализа медиа

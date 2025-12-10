@@ -111,11 +111,12 @@ def test_transcription_step_with_default_chunk_size_1800(
 
 
 def test_ocr_step_uses_custom_chunk_size(smart_splitter, sample_document):
-    """OCRStep использует default_chunk_size для OCR текста."""
+    """OCRStep использует ocr_text_chunk_size для разбиения текста."""
     # Arrange
+    parser = MarkdownNodeParser()
     step = OCRStep(
-        splitter=smart_splitter,
-        default_chunk_size=1500,  # Custom size
+        parser=None,  # plain режим
+        ocr_text_chunk_size=2200,  # Custom size
         parser_mode="plain",
     )
     
@@ -130,28 +131,29 @@ def test_ocr_step_uses_custom_chunk_size(smart_splitter, sample_document):
     # Act
     result_context = step.process(context)
     
-    # Assert: chunk_size временно изменён, затем восстановлен
-    assert smart_splitter.chunk_size == 1800, "chunk_size должен быть восстановлен"
+    # Assert: OCRStep создал чанки с кастомным размером
     assert len(result_context.chunks) > 0, "Должны быть созданы чанки"
-
-
-def test_ocr_step_restores_original_chunk_size_after_processing(
+    assert result_context.chunks[0].metadata["role"] == "ocr"
+    # OCRStep не использует splitter, поэтому не меняет его chunk_size
+    assert smart_splitter.chunk_size == 1800, "splitter не должен быть затронут"
+def test_ocr_step_does_not_affect_splitter(
     smart_splitter, sample_document
 ):
-    """OCRStep восстанавливает chunk_size после обработки."""
+    """OCRStep не модифицирует splitter (не использует его в Phase 14.1)."""
     # Arrange
     original_chunk_size = smart_splitter.chunk_size
     
+    parser = MarkdownNodeParser()
     step = OCRStep(
-        splitter=smart_splitter,
-        default_chunk_size=2200,
+        parser=parser,
+        ocr_text_chunk_size=2200,
         parser_mode="markdown",
     )
     
     context = MediaContext(
         media_path=Path("video.mp4"),
         document=sample_document,
-        analysis={"ocr_text": "Short text"},  # Короткий текст
+        analysis={"ocr_text": "# Header\n\nShort text\n\n```python\ncode\n```"},
         chunks=[],
         base_index=0,
     )
@@ -159,21 +161,24 @@ def test_ocr_step_restores_original_chunk_size_after_processing(
     # Act
     result_context = step.process(context)
     
-    # Assert
+    # Assert: splitter остался нетронутым
+    assert smart_splitter.chunk_size == original_chunk_size
+    assert len(result_context.chunks) > 0, "Чанки должны быть созданы"
     assert smart_splitter.chunk_size == original_chunk_size
     assert len(result_context.chunks) >= 0  # Чанки созданы или нет
 
 
 def test_ocr_step_with_default_chunk_size_1800(smart_splitter, sample_document):
-    """OCRStep по умолчанию использует 1800 токенов."""
+    """OCRStep по умолчанию использует 1800 токенов для текста."""
     # Arrange
+    parser = MarkdownNodeParser()
     step = OCRStep(
-        splitter=smart_splitter,
+        parser=parser,
         parser_mode="markdown",
     )
     
     # Assert
-    assert step.default_chunk_size == 1800, "Default chunk_size должен быть 1800"
+    assert step.ocr_text_chunk_size == 1800, "Default ocr_text_chunk_size должен быть 1800"
 
 
 # ============================================================================
@@ -193,9 +198,11 @@ def test_multiple_steps_do_not_interfere_with_chunk_size(
         default_chunk_size=2500,
         enable_timecodes=False,
     )
+    # OCRStep теперь не использует splitter - использует свой simple chunking
+    parser = MarkdownNodeParser()
     ocr_step = OCRStep(
-        splitter=smart_splitter,
-        default_chunk_size=1500,
+        parser=parser,
+        ocr_text_chunk_size=1500,
         parser_mode="plain",
     )
     
@@ -214,8 +221,8 @@ def test_multiple_steps_do_not_interfere_with_chunk_size(
     context = transcript_step.process(context)
     context = ocr_step.process(context)
     
-    # Assert
-    assert smart_splitter.chunk_size == original_chunk_size
+    # Assert: TranscriptionStep должен восстановить chunk_size, OCRStep не трогает его
+    assert smart_splitter.chunk_size == original_chunk_size, "chunk_size должен быть восстановлен"
     assert len(context.chunks) > 0, "Чанки от обоих шагов созданы"
 
 
@@ -263,19 +270,13 @@ def test_transcription_step_handles_splitter_without_chunk_size_attribute():
 
 
 def test_ocr_step_handles_splitter_without_chunk_size_attribute():
-    """OCRStep работает, даже если splitter не имеет chunk_size."""
+    """OCRStep не использует splitter в Phase 14.1 - использует свой simple chunking."""
     
-    class DummySplitter:
-        """Mock splitter без chunk_size."""
-        
-        def split(self, document):
-            return []
-    
-    # Arrange
-    dummy_splitter = DummySplitter()
+    # Arrange: OCRStep в plain режиме делает простое разбиение текста
+    parser = MarkdownNodeParser()
     step = OCRStep(
-        splitter=dummy_splitter,
-        default_chunk_size=1800,
+        parser=None,  # plain режим - parser не нужен
+        ocr_text_chunk_size=1800,
         parser_mode="plain",
     )
     
@@ -296,5 +297,6 @@ def test_ocr_step_handles_splitter_without_chunk_size_attribute():
     # Act (не должно упасть)
     result_context = step.process(context)
     
-    # Assert
-    assert len(result_context.chunks) == 0  # DummySplitter возвращает []
+    # Assert: должны быть созданы чанки
+    assert len(result_context.chunks) > 0, "OCRStep должен создать хотя бы один чанк"
+    assert result_context.chunks[0].metadata["role"] == "ocr"

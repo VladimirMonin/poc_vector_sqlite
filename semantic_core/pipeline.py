@@ -1099,7 +1099,7 @@ class SemanticCore:
         if self._rate_limiter is None:
             from semantic_core.infrastructure.gemini.rate_limiter import RateLimiter
 
-            self._rate_limiter = RateLimiter(rpm_limit=self.media_config.rpm_limit)
+            self._rate_limiter = RateLimiter(rpm_limit=self.config.media_rpm_limit)
 
         if self._media_queue is None:
             from semantic_core.core.media_queue import MediaQueueProcessor
