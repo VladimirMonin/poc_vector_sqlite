@@ -34,6 +34,7 @@ from semantic_core.interfaces.llm import BaseLLMProvider
 from semantic_core.interfaces.transcriber import ITranscriber
 from semantic_core.interfaces.vision import IVisionAnalyzer
 from semantic_core.utils.logger import get_logger
+from semantic_core.utils.dependencies import require_provider
 
 logger = get_logger(__name__)
 
@@ -78,6 +79,7 @@ class ComponentFactory:
         )
 
         if provider == "gemini":
+            require_provider("google", "Gemini embeddings")
             from semantic_core.infrastructure.gemini.embedder import GeminiEmbedder
 
             return GeminiEmbedder(
@@ -87,24 +89,13 @@ class ComponentFactory:
             )
 
         elif provider == "local":
-            try:
-                from semantic_core.infrastructure.local.embeddings import LocalEmbedder
+            require_provider("local_embeddings", "Local embeddings")
+            from semantic_core.infrastructure.local.embeddings import LocalEmbedder
 
-                return LocalEmbedder(
-                    model=config.providers_local.embedding_model,
-                    device=config.providers_local.device,
-                )
-            except ImportError as e:
-                logger.error(
-                    "❌ Local embedder не доступен",
-                    emoji="❌",
-                    error=str(e),
-                )
-                raise ImportError(
-                    "Local embedder dependencies not installed. "
-                    "Install with: pip install semantic-core[local-embeddings-mlx] "
-                    "or pip install semantic-core[local-embeddings]"
-                ) from e
+            return LocalEmbedder(
+                model=config.providers_local.embedding_model,
+                device=config.providers_local.device,
+            )
 
         elif provider == "openai":
             logger.error(
@@ -145,6 +136,7 @@ class ComponentFactory:
         )
 
         if provider == "gemini":
+            require_provider("google", "Gemini LLM")
             from semantic_core.infrastructure.llm.gemini import GeminiLLMProvider
 
             return GeminiLLMProvider(
@@ -153,52 +145,32 @@ class ComponentFactory:
             )
 
         elif provider == "openai":
-            try:
-                from semantic_core.infrastructure.openai.llm import (
-                    OpenAILLMProvider,
-                    ProviderPreset,
-                )
+            require_provider("openai", "OpenAI LLM")
+            from semantic_core.infrastructure.openai.llm import (
+                OpenAILLMProvider,
+                ProviderPreset,
+            )
 
-                return OpenAILLMProvider(
-                    api_key=config.providers_openai.api_key,
-                    provider=ProviderPreset.OPENAI,
-                    model=config.providers_openai.llm_model,
-                    base_url=config.providers_openai.base_url,
-                )
-            except ImportError as e:
-                logger.error(
-                    "❌ OpenAI LLM не доступен",
-                    emoji="❌",
-                    error=str(e),
-                )
-                raise ImportError(
-                    "OpenAI dependencies not installed. "
-                    "Install with: pip install semantic-core[openai]"
-                ) from e
+            return OpenAILLMProvider(
+                api_key=config.providers_openai.api_key,
+                provider=ProviderPreset.OPENAI,
+                model=config.providers_openai.llm_model,
+                base_url=config.providers_openai.base_url,
+            )
 
         elif provider == "ollama":
-            try:
-                from semantic_core.infrastructure.openai.llm import (
-                    OpenAILLMProvider,
-                    ProviderPreset,
-                )
+            require_provider("openai", "Ollama LLM (via OpenAI SDK)")
+            from semantic_core.infrastructure.openai.llm import (
+                OpenAILLMProvider,
+                ProviderPreset,
+            )
 
-                return OpenAILLMProvider(
-                    api_key="not-needed",  # Ollama не требует API key
-                    provider=ProviderPreset.OLLAMA,
-                    model=config.providers_ollama.llm_model,
-                    base_url=config.providers_ollama.base_url,
-                )
-            except ImportError as e:
-                logger.error(
-                    "❌ Ollama LLM не доступен",
-                    emoji="❌",
-                    error=str(e),
-                )
-                raise ImportError(
-                    "OpenAI dependencies required for Ollama. "
-                    "Install with: pip install semantic-core[openai]"
-                ) from e
+            return OpenAILLMProvider(
+                api_key="not-needed",  # Ollama не требует API key
+                provider=ProviderPreset.OLLAMA,
+                model=config.providers_ollama.llm_model,
+                base_url=config.providers_ollama.base_url,
+            )
 
         raise ValueError(
             f"Unknown LLM provider: {provider}. "
@@ -245,24 +217,17 @@ class ComponentFactory:
             return None
 
         elif provider == "whisper":
-            try:
-                from semantic_core.infrastructure.local.whisper import (
-                    WhisperTranscriber,
-                )
+            require_provider("local_whisper", "Whisper transcription")
+            from semantic_core.infrastructure.local.whisper import (
+                WhisperTranscriber,
+            )
 
-                return WhisperTranscriber(
-                    model_size=config.providers_local.whisper_model,
-                    device=config.providers_local.device
-                    if config.providers_local.device != "auto"
-                    else None,
-                )
-            except ImportError as e:
-                logger.warning(
-                    "⚠️ Whisper не доступен, транскрипция отключена",
-                    emoji="⚠️",
-                    error=str(e),
-                )
-                return None
+            return WhisperTranscriber(
+                model_size=config.providers_local.whisper_model,
+                device=config.providers_local.device
+                if config.providers_local.device != "auto"
+                else None,
+            )
 
         raise ValueError(
             f"Unknown transcription provider: {provider}. "
