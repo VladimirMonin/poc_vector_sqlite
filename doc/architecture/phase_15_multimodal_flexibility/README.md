@@ -13,7 +13,7 @@
 | **15.2** | [83_whisper_local_transcription.md](./83_whisper_local_transcription.md) | Local Whisper транскрипция — MLX/CUDA/CPU | ✅ Done |
 | **15.3** | [84_openai_llm_provider.md](./84_openai_llm_provider.md) | OpenAI & Ollama LLM — unified provider API | ✅ Done |
 | **15.4** | [85_configuration_factory.md](./85_configuration_factory.md) | Configuration & Factory — Pydantic + DI | ✅ Done |
-| **15.5** | TBD | Optional Dependencies & Error Handling | 📋 Planned |
+| **15.5** | [86_optional_dependencies.md](./86_optional_dependencies.md) | Optional Dependencies & Error Handling | ✅ Done |
 
 ---
 
@@ -204,9 +204,10 @@ except ImportError:
 3. **[83_whisper_local_transcription.md](./83_whisper_local_transcription.md)** — Local Whisper
 4. **[84_openai_llm_provider.md](./84_openai_llm_provider.md)** — OpenAI & Ollama LLM
 5. **[85_configuration_factory.md](./85_configuration_factory.md)** — Configuration & Factory
+6. **[86_optional_dependencies.md](./86_optional_dependencies.md)** — Optional Dependencies & Error Handling
 
 ---
 
-**Статус:** ✅ Phase 15.0-15.4 Complete | 📋 Phase 15.5 Planned  
+**Статус:** ✅ Phase 15.0-15.5 Complete  
 **Дата:** 2025-01-12  
 **Автор:** AI Agent (Copilot)

@@ -18,16 +18,51 @@
 
 ## 🚀 Быстрый старт
 
-```bash
-# Установка
-poetry install
-poetry install --extras media  # + Pillow, pydub, imageio для мультимодальности
+### Установка
 
-# Настройка
+```bash
+# Минимальная установка (только core)
+poetry install
+
+# С Google Gemini (рекомендуется)
+poetry install --extras google
+
+# С мультимодальностью (изображения, аудио, видео)
+poetry install --extras media
+
+# Полная установка (все провайдеры)
+poetry install --extras all
+```
+
+### Дополнительные провайдеры
+
+| Extra | Описание | Установка |
+|-------|----------|-----------|
+| `google` | Google Gemini API (embeddings, vision, audio) | `poetry install --extras google` |
+| `openai` | OpenAI API (embeddings, GPT) | `poetry install --extras openai` |
+| `media` | Обработка медиа (Pillow, pydub, imageio) | `poetry install --extras media` |
+| `local-embeddings-mlx` | Локальные embeddings (Apple Silicon) | `poetry install --extras local-embeddings-mlx` |
+| `local-whisper-mlx` | Локальный Whisper (Apple Silicon) | `poetry install --extras local-whisper-mlx` |
+| `local-embeddings` | Локальные embeddings (CPU/GPU) | `poetry install --extras local-embeddings` |
+| `local-whisper` | Локальный Whisper (CPU/GPU) | `poetry install --extras local-whisper` |
+| `all-google` | Google + media | `poetry install --extras all-google` |
+| `all-local-mlx` | Все локальные (MLX) + media | `poetry install --extras all-local-mlx` |
+| `all-local` | Все локальные (CPU/GPU) + media | `poetry install --extras all-local` |
+| `all` | Всё | `poetry install --extras all` |
+
+### Настройка
+
+```bash
 cp .env.example .env
 # GEMINI_API_KEY=your_key (https://aistudio.google.com/apikey)
 
-# Тесты
+# Диагностика окружения
+poetry run semantic doctor --verbose
+```
+
+### Тесты
+
+```bash
 poetry run pytest tests/ -v
 ```
 
