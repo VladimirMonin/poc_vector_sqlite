@@ -141,7 +141,7 @@ class ComponentFactory:
 
             return GeminiLLMProvider(
                 api_key=config.providers_gemini.api_key,
-                model_name=config.providers_gemini.llm_model,
+                model=config.providers_gemini.llm_model,
             )
 
         elif provider == "openai":
