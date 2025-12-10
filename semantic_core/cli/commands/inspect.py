@@ -44,15 +44,8 @@ from semantic_core.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-app = typer.Typer(
-    help="🔬 X-Ray диагностика pipeline.",
-    invoke_without_command=True,
-)
 
-
-@app.callback(invoke_without_command=True)
 def inspect(
-    ctx: typer.Context,
     file_path: Path = typer.Argument(
         ...,
         exists=True,
@@ -219,16 +212,20 @@ def inspect(
             console.print("[bold cyan]STEP 4:[/bold cyan] Saving artifacts...\n")
             
             session_name = f"session_{snapshot.processing_timestamp.strftime('%Y-%m-%d_%H-%M-%S')}"
+            session_folder = artifacts_root / session_name
+            session_folder.mkdir(parents=True, exist_ok=True)
+            
+            file_prefix = file_path.stem  # mixed_content_example
             snapshot_path = inspector.snapshot_manager.save_snapshot(
                 snapshot,
-                session_name=session_name,
+                session_path=session_folder,
+                file_prefix=file_prefix,
                 compress=False,  # Don't compress for easy inspection
             )
             
             console.print(f"[green]✓[/green] Snapshot saved: {snapshot_path}")
             
             # Save input file copy
-            session_folder = artifacts_root / session_name
             input_copy_path = session_folder / f"input_{file_path.name}"
             input_copy_path.write_text(file_path.read_text(), encoding="utf-8")
             console.print(f"[green]✓[/green] Input file copy: {input_copy_path}")
@@ -264,7 +261,3 @@ def inspect(
         logger.error(f"Inspection failed: {e}", exc_info=True)
         console.print(f"\n[bold red]❌ Inspection failed:[/bold red] {e}\n")
         raise typer.Exit(code=1)
-
-
-if __name__ == "__main__":
-    app()
