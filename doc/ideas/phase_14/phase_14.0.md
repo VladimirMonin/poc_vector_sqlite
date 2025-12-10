@@ -82,6 +82,95 @@
 
 ---
 
+## ✅ СТАТУС ИСПРАВЛЕНИЯ (Phase 14.5 - Декабрь 2025)
+
+**Дата завершения:** 2025-12-10  
+**Статус:** ✅ ПОЛНОСТЬЮ ЗАВЕРШЕНО
+
+### Что было исправлено
+
+#### 1. ✅ max_output_tokens увеличен до 65,536
+
+- `audio_analyzer.py`, `video_analyzer.py`, `image_analyzer.py`
+- Полная транскрипция и OCR без обрезки
+
+#### 2. ✅ Multi-chunk architecture через MediaPipeline
+
+- Phase 14.1: Step-based архитектура (SummaryStep, TranscriptionStep, OCRStep)
+- Медиа разбивается на множество чанков с ролями: `summary`, `transcript`, `ocr`
+- Splitter интегрирован во все steps
+
+#### 3. ✅ OCR Markdown Parsing (Phase 14.5)
+
+**Критическое улучшение:** Code blocks изолируются в отдельные чанки
+
+**Реализация:**
+
+- `OCRStep` теперь использует `MarkdownNodeParser` напрямую
+- Code blocks (```python) детектятся и создаются как `ChunkType.CODE`
+- Обычный текст → `ChunkType.TEXT`
+- Разные `chunk_size` для кода (`ocr_code_chunk_size=2000`) и текста (`ocr_text_chunk_size=1800`)
+
+**Файлы:**
+
+- `semantic_core/processing/steps/ocr.py` — переработан
+- `tests/unit/processing/steps/test_ocr_step.py` — 15+ unit-тестов
+- `tests/integration/media/test_ocr_markdown_parsing.py` — 15+ интеграционных тестов с реальным MarkdownNodeParser
+
+**Metadata enrichment:**
+
+- `hierarchical_context` — breadcrumbs из заголовков Markdown
+- `language` — язык code block (python, javascript, bash)
+- `start_line`, `end_line` — позиция в исходном тексте
+- `role="ocr"`, `parent_media_path`
+
+#### 4. ✅ Конфигурация через TOML (Phase 14.3)
+
+- `MediaChunkSizesConfig`: `summary_chunk_size`, `transcript_chunk_size`, `ocr_text_chunk_size`, `ocr_code_chunk_size`
+- `MediaProcessingConfig`: `ocr_parser_mode` (markdown/plain), `enable_timecodes`
+- `MediaPromptsConfig`: кастомные промпты для image/audio/video analysis
+
+#### 5. ✅ MediaService & Aggregation Layer (Phase 14.2)
+
+- `MediaService.get_media_details()` — агрегация всех чанков в `MediaDetails` DTO
+- `MediaService.get_timeline()` — таймкоды для видео-плеера
+- `MediaService.reprocess_document()` — реанализ с новыми промптами
+
+#### 6. ✅ CLI Integration (Phase 14.3.4)
+
+- `semantic reanalyze <doc_id>` — повторный анализ медиа
+- `--prompt` для custom instructions
+- `--force` для скриптов без подтверждения
+- Rich UI: tables, panels, spinners
+
+### Результаты
+
+**Тестирование:**
+
+- 193+ тестов для Phase 14 компонентов
+- Unit-тесты: mock-based для изоляции
+- Integration-тесты: с реальным MarkdownNodeParser
+- E2E-тесты: полный pipeline с таймкодами
+
+**Документация:**
+
+- 15 архитектурных статей в `doc/architecture/phase_14_media_crisis/`
+- Детальное описание каждого шага: от проблемы до решения
+
+**Code quality:**
+
+- SOLID принципы: SRP (MediaService), DI (steps), OCP (MediaPipeline)
+- Type safety: Pydantic models для всех конфигов
+- Logging: semantic logging с эмодзи и trace level
+- -109 LOC удалено (legacy код), +2000 LOC добавлено (качественный код)
+
+### Следующие шаги
+
+- ⏸ Flask UI для медиа-плеера (Phase 12, отложено)
+- 📝 Финальный отчёт Phase 14 (16_phase_14_final_report.md)
+
+---
+
 ## 3. Предыстория: как мы здесь оказались
 
 ### Phase 6.0: Images + Queue (Июнь 2025)

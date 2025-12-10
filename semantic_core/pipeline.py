@@ -33,6 +33,7 @@ from semantic_core.config import SemanticConfig
 # Phase 14.1 imports: Media Pipeline Architecture
 from semantic_core.core.media_context import MediaContext
 from semantic_core.core.media_pipeline import MediaPipeline
+from semantic_core.processing.parsers.markdown_parser import MarkdownNodeParser
 from semantic_core.processing.steps import (
     SummaryStep,
     TranscriptionStep,
@@ -138,7 +139,7 @@ class SemanticCore:
         self.image_analyzer = image_analyzer
         self.audio_analyzer = audio_analyzer
         self.video_analyzer = video_analyzer
-        
+
         # Phase 14.3: Поддержка полного SemanticConfig для chunk_sizes
         if config is not None:
             self.config = config
@@ -1439,22 +1440,22 @@ class SemanticCore:
         fallback_metadata: Optional[dict] = None,
     ) -> list[Chunk]:
         """Формирует список чанков для медиа через MediaPipeline.
-        
+
         Phase 14.1.4: Интеграция MediaPipeline для модульной обработки медиа.
         Заменяет legacy методы _split_transcription_into_chunks и _split_ocr_into_chunks.
-        
+
         Pipeline steps:
         - SummaryStep: Создаёт summary chunk (всегда)
         - TranscriptionStep: Парсит транскрипцию с таймкодами (если есть)
         - OCRStep: Парсит OCR текст с таймкодами (если есть, видео)
-        
+
         Args:
             document: Document объект для контекста
             media_path: Путь к медиа-файлу
             chunk_type: Тип чанка (IMAGE_REF/AUDIO_REF/VIDEO_REF)
             analysis: Результат анализа от Gemini (словарь)
             fallback_metadata: Дополнительные метаданные для чанков
-        
+
         Returns:
             Список чанков: [summary_chunk, *transcript_chunks, *ocr_chunks]
         """
@@ -1484,9 +1485,16 @@ class SemanticCore:
                 "fallback_metadata": base_metadata,  # Для всех шагов
             },
         )
-        
+
         # Создаём pipeline со всеми шагами
         # Phase 14.3.2: Передаём chunk_sizes из конфигурации
+        # Создаём parser для OCR Markdown parsing
+        markdown_parser = (
+            MarkdownNodeParser()
+            if self.config.media.processing.ocr_parser_mode == "markdown"
+            else None
+        )
+
         pipeline = MediaPipeline(
             steps=[
                 SummaryStep(),  # Всегда создаёт summary chunk
@@ -1496,16 +1504,17 @@ class SemanticCore:
                     enable_timecodes=self.config.media.processing.enable_timecodes,
                 ),
                 OCRStep(
-                    splitter=self.splitter,
-                    default_chunk_size=self.config.media.chunk_sizes.ocr_text_chunk_size,
+                    parser=markdown_parser,
+                    ocr_text_chunk_size=self.config.media.chunk_sizes.ocr_text_chunk_size,
+                    ocr_code_chunk_size=self.config.media.chunk_sizes.ocr_code_chunk_size,
                     parser_mode=self.config.media.processing.ocr_parser_mode,
                 ),
             ]
         )
-        
+
         # Выполняем pipeline
         final_context = pipeline.build_chunks(context)
-        
+
         return final_context.chunks
 
     def _get_mime_type(self, path: Path) -> str:
@@ -1535,43 +1544,43 @@ class SemanticCore:
                 return path
 
         return None
-    
+
     def reanalyze(
         self,
         document_id: str,
         custom_instructions: Optional[str] = None,
     ) -> Document:
         """Повторно анализирует медиа-файл с новыми custom_instructions.
-        
+
         Phase 14.3.3: Тонкая прокси для MediaService.reprocess_document().
         Делегирует всю логику MediaService для соблюдения SRP.
-        
+
         Args:
             document_id: ID документа для переобработки.
             custom_instructions: Опциональные инструкции для Gemini.
-        
+
         Returns:
             Обновлённый Document с новыми чанками.
-        
+
         Raises:
             ValueError: Если document_id не найден или не медиа-файл.
-        
+
         Examples:
             >>> # Переобработать с медицинскими инструкциями
             >>> core.reanalyze(
             ...     document_id="doc-123",
             ...     custom_instructions="Extract medical terminology",
             ... )
-            >>> 
+            >>>
             >>> # Переобработать с дефолтными промптами
             >>> core.reanalyze("doc-123")
-        
+
         Note:
             Требует наличия media analyzers в SemanticCore.__init__.
             Удаляет все старые медиа-чанки перед созданием новых.
         """
         from semantic_core.services.media_service import MediaService
-        
+
         # Создаём MediaService с зависимостями из SemanticCore
         media_service = MediaService(
             image_analyzer=self.image_analyzer,
@@ -1581,7 +1590,7 @@ class SemanticCore:
             store=self.store,
             config=self.config,
         )
-        
+
         # Делегируем всю логику MediaService
         return media_service.reprocess_document(
             document_id=document_id,
