@@ -52,38 +52,75 @@
 
 ---
 
-### Phase 15.1: Whisper Adapter (запланировано)
+### Phase 15.1: Whisper Adapter ✅ ЗАВЕРШЕНО
 
-**Статус:** 📅 ЗАПЛАНИРОВАНО  
-**Оценка:** 4-5 дней
+**Файл:** [82_whisper_transcription.md](82_whisper_transcription.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (10.12.2025)  
+**Коммит:** `bf517af`
 
 Интеграция OpenAI Whisper для локальной транскрипции:
 
 - `WhisperTranscriber` реализует `ITranscriber`
+- Device auto-detection (MLX/CUDA/MPS/CPU)
 - Поддержка моделей: tiny, base, small, medium, large
-- Chunking для длинных аудио (>30 минут)
-- Конфигурация через `[providers.whisper]` секцию
+- Segments с таймкодами (фикс донора)
+- 26 unit-тестов + 1 E2E тест
+
+**Бенефиты:**
+
+- 💰 Экономия $7.50/час vs Gemini Audio
+- 🌐 Офлайн-режим
+- ⚡ 5× realtime на Apple M3 Max
 
 ---
 
-### Phase 15.2: Local Embeddings (запланировано)
+### Phase 15.2: Local Embeddings ✅ ЗАВЕРШЕНО
 
-**Статус:** 📅 ЗАПЛАНИРОВАНО  
-**Оценка:** 3-4 дня
+**Файл:** [83_local_embeddings.md](83_local_embeddings.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (10.12.2025)  
+**Коммиты:** `276c757`, `1216c44`
 
-Локальные эмбеддинги через sentence-transformers:
+Локальные эмбеддинги через MLX и sentence-transformers:
 
-- `LocalEmbedder` реализует `BaseEmbedder`
-- Поддержка моделей: multilingual-e5, labse, paraphrase-multilingual
-- Настраиваемая размерность (384-1024)
-- Кеширование моделей + GPU acceleration
+- `LocalEmbedder` для Apple Silicon (MLX)
+- `SentenceTransformerEmbedder` (универсальный)
+- Поддержка 6 моделей (all-MiniLM, Qwen3, bge-small, и др.)
+- 27+ unit-тестов + 6 integration-тестов
+
+**Бенефиты:**
+
+- 💰 Экономия $60/год vs Gemini Embedding
+- 🌐 Офлайн векторный поиск
+- ⚡ 1200 docs/sec на Apple M3 Max
 
 ---
 
-### Phase 15.3: OpenAI LLM Provider (запланировано)
+### Phase 15.3: OpenAI LLM Provider ✅ ЗАВЕРШЕНО
+
+**Файл:** [84_openai_llm_provider.md](84_openai_llm_provider.md)  
+**Статус:** ✅ ЗАВЕРШЕНО (10.12.2025)  
+**Коммит:** `15d2c8d`
+
+Универсальный адаптер для OpenAI-совместимых LLM API:
+
+- `OpenAILLMProvider` реализует `BaseLLMProvider`
+- ProviderPreset система (OpenAI, OpenRouter, Ollama, vLLM, LM Studio)
+- `generate()` + `generate_stream()`
+- Token counting через tiktoken
+- 13+ unit-тестов с httpx mocks
+
+**Бенефиты:**
+
+- 🔓 Нет вендор-лока (легко переключаться между провайдерами)
+- 💰 Ollama бесплатно vs $2.50/1M токенов (GPT-4o)
+- 🏠 Офлайн RAG через локальные модели
+
+---
+
+### Phase 15.4: Configuration & Factory (запланировано)
 
 **Статус:** 📅 ЗАПЛАНИРОВАНО  
-**Оценка:** 3-4 дня
+**Оценка:** 2-3 дня
 
 Интеграция OpenAI для RAG:
 
