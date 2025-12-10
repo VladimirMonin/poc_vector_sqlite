@@ -104,6 +104,12 @@ from semantic_core.integrations import SemanticIndex
 from semantic_core.pipeline import SemanticCore
 from semantic_core.batch_manager import BatchManager
 
+# Factory Layer (Phase 15.4)
+from semantic_core.core.factory import create_core, ComponentFactory
+
+# Config Layer
+from semantic_core.config import SemanticConfig, get_config
+
 __all__ = [
     # Version
     "__version__",
@@ -151,4 +157,10 @@ __all__ = [
     # Pipeline
     "SemanticCore",
     "BatchManager",
+    # Factory (Phase 15.4)
+    "create_core",
+    "ComponentFactory",
+    # Config
+    "SemanticConfig",
+    "get_config",
 ]
