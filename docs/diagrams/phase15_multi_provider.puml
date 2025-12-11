@@ -1,0 +1,49 @@
+@startuml phase15_multi_provider
+title Multi-Provider Architecture
+
+package "Gemini" {
+    [GeminiEmbedder]
+    [GeminiLLMProvider]
+    [GeminiImageAnalyzer]
+}
+
+package "Local" {
+    [LocalEmbedder]
+    [WhisperTranscriber]
+}
+
+package "OpenAI" {
+    [OpenAILLMProvider]
+}
+
+interface "BaseEmbedder" as BE
+interface "BaseLLMProvider" as BL
+interface "ITranscriber" as IT
+interface "IVisionAnalyzer" as IV
+
+[GeminiEmbedder] ..|> BE
+[LocalEmbedder] ..|> BE
+[GeminiLLMProvider] ..|> BL
+[OpenAILLMProvider] ..|> BL
+[WhisperTranscriber] ..|> IT
+[GeminiImageAnalyzer] ..|> IV
+
+[ComponentFactory] ..> BE
+[ComponentFactory] ..> BL
+[ComponentFactory] ..> IT
+[ComponentFactory] ..> IV
+
+[SemanticCore] o-- BE
+[SemanticCore] o-- BL
+
+note right of GeminiEmbedder
+Cloud-based
+Model: gemini-embedding-001
+end note
+
+note right of LocalEmbedder
+Offline
+Models: MiniLM, Qwen
+end note
+
+@enduml

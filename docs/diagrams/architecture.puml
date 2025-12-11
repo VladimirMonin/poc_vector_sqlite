@@ -1,14 +1,13 @@
-@startuml
+@startuml architecture
 title Semantic Core Architecture
 
-package "Domain Layer" {
-    [Document] as doc
-    [Chunk] as chunk
-    [SearchResult] as sr
-    [MediaAnalysisResult] as mar
+package "Domain" {
+    [Document]
+    [Chunk]
+    [SearchResult]
 }
 
-package "Interfaces Layer" {
+package "Interfaces" {
     interface "BaseEmbedder" as emb
     interface "BaseVectorStore" as vs
     interface "BaseSplitter" as sp
@@ -16,13 +15,16 @@ package "Interfaces Layer" {
     interface "DocumentParser" as dp
 }
 
-package "Infrastructure Layer" {
+package "Infrastructure" {
     package "Gemini" {
         [GeminiEmbedder] as ge
         [GeminiLLMProvider] as glp
         [ImageAnalyzer] as ia
         [AudioAnalyzer] as aa
-        [VideoAnalyzer] as va
+    }
+    package "Local" {
+        [LocalEmbedder] as le
+        [WhisperTranscriber] as wt
     }
     package "Storage" {
         [PeeweeVectorStore] as pvs
@@ -33,48 +35,50 @@ package "Infrastructure Layer" {
     }
 }
 
-package "Core Layer" {
+package "Core" {
     [SemanticCore] as sc
     [RAGEngine] as rag
     [MediaQueueProcessor] as mqp
     [BatchManager] as bm
+    [ComponentFactory] as factory
 }
 
-package "CLI Layer" {
-    [ingest] as cli_i
-    [search] as cli_s
-    [chat] as cli_c
+package "CLI" {
+    [ingest]
+    [search]
+    [chat]
 }
 
-cli_i --> sc
-cli_s --> sc
-cli_c --> rag
+[ingest] --> sc
+[search] --> sc
+[chat] --> rag
 
 sc --> emb
 sc --> vs
 sc --> sp
-rag --> llm
+sc --> llm
+
 rag --> sc
 
-ge ..|> emb
-glp ..|> llm
-pvs ..|> vs
-ss ..|> sp
-mnp ..|> dp
+emb <|.. ge
+emb <|.. le
+llm <|.. glp
+vs <|.. pvs
+sp <|.. ss
+dp <|.. mnp
 
-sc --> mqp
-mqp --> ia
-mqp --> aa
-mqp --> va
+factory ..> sc
+factory ..> emb
+factory ..> llm
 
 note right of sc
-    Центральный оркестратор
-    всех операций
+Core orchestrator
+Multi-provider support
 end note
 
-legend right
-    |= Символ |= Значение |
-    | --> | Использует |
-    | ..|> | Реализует |
-endlegend
+note right of factory
+DI container
+Creates all providers
+end note
+
 @enduml

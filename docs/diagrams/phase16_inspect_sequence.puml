@@ -1,0 +1,53 @@
+@startuml phase16_inspect_sequence
+title Observatory Inspection Flow
+
+actor Developer
+participant "CLI" as CLI
+participant "ProviderInspector" as Inspector
+participant "SemanticCore" as Core
+participant "SnapshotManager" as Manager
+
+Developer -> CLI: semantic inspect --query "test"
+activate CLI
+
+CLI -> Inspector: new ProviderInspector(core)
+activate Inspector
+
+Inspector -> Manager: new SnapshotManager()
+activate Manager
+
+CLI -> Inspector: search_with_inspection(query)
+
+Inspector -> Inspector: start_time = now()
+Inspector -> Core: search(query)
+activate Core
+
+Core -> Core: embed_query()
+Core -> Core: vector_search()
+Core --> Inspector: results
+
+deactivate Core
+
+Inspector -> Inspector: duration = now() - start_time
+Inspector -> Inspector: extract_metadata()
+
+Inspector -> Manager: save_snapshot(snapshot)
+Manager -> Manager: write JSON to disk
+Manager --> Inspector: snapshot_path
+
+Inspector --> CLI: InspectionSnapshot
+deactivate Inspector
+deactivate Manager
+
+CLI -> Developer: Display results + metadata
+deactivate CLI
+
+note right of Inspector
+Captures:
+- Provider info
+- Query data
+- Results
+- Duration
+end note
+
+@enduml

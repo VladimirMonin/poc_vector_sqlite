@@ -1,0 +1,30 @@
+@startuml phase15_factory_sequence
+title ComponentFactory Creation Flow
+
+actor Client
+participant "ComponentFactory" as Factory
+participant "SemanticConfig" as Config
+participant "SemanticCore" as Core
+
+Client -> Config: get_config()
+Config --> Client: config
+
+Client -> Factory: create_semantic_core(config)
+activate Factory
+
+Factory -> Factory: create_embedder(config)
+note right: Gemini or Local
+
+Factory -> Factory: create_llm(config)
+note right: Gemini or OpenAI
+
+Factory -> Core: new SemanticCore(...)
+Core --> Factory: core instance
+
+Factory --> Client: SemanticCore
+deactivate Factory
+
+Client -> Core: ingest(document)
+Client -> Core: search(query)
+
+@enduml

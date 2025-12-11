@@ -1,0 +1,45 @@
+@startuml search_pipeline
+title Search Pipeline: Vector / FTS / Hybrid
+
+start
+
+:Receive query;
+
+switch (search_type?)
+case (vector)
+    :Embed query;
+    :sqlite-vec search;
+    
+case (fts)
+    :FTS5 search;
+    
+case (hybrid)
+    fork
+        :Embed query;
+        :sqlite-vec search;
+    fork again
+        :FTS5 search;
+    end fork
+    
+    :Reciprocal Rank Fusion;
+    :Merge results;
+endswitch
+
+:Apply limit;
+:Return results;
+
+stop
+
+note right of "Reciprocal Rank Fusion"
+RRF formula:
+score = sum(1/(k + rank))
+k = 60 (default)
+end note
+
+legend right
+vector: semantic similarity
+fts: keyword matching
+hybrid: both with RRF
+endlegend
+
+@enduml

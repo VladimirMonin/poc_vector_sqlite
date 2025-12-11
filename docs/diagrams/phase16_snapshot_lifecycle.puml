@@ -1,0 +1,37 @@
+@startuml phase16_snapshot_lifecycle
+title Snapshot Lifecycle
+
+state "Create Session" as Create
+state "Execute Operation" as Execute
+state "Capture Data" as Capture
+state "Save Snapshot" as Save
+state "Load Snapshot" as Load
+state "Compare Snapshots" as Compare
+
+[*] --> Create
+Create --> Execute : start operation
+Execute --> Capture : collect metadata
+Capture --> Save : write to disk
+Save --> [*]
+
+[*] --> Load : load existing
+Load --> Compare : diff analysis
+Compare --> [*]
+
+note right of Create
+session_id = UUID
+output_dir = artifacts/
+end note
+
+note right of Save
+Format: JSON
+Path: session_id/snapshot_N.json
+end note
+
+note right of Compare
+Diff engine
+Multi-provider comparison
+Golden file testing
+end note
+
+@enduml

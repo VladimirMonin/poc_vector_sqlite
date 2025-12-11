@@ -1,0 +1,55 @@
+@startuml phase16_observatory_classes
+title Debug Observatory Classes
+
+package "semantic_core.core.observatory" {
+    class ProviderInspector {
+        +core: SemanticCore
+        +snapshot_mgr: SnapshotManager
+        +ingest_with_inspection(doc)
+        +search_with_inspection(query)
+        -_extract_provider_metadata()
+    }
+    
+    class SnapshotManager {
+        +session_id: str
+        +output_dir: Path
+        +save_snapshot(snapshot)
+        +load_snapshot(session_id)
+        +create_session_folder()
+    }
+    
+    class InspectionSnapshot {
+        +session_id: str
+        +timestamp: datetime
+        +operation: str
+        +provider_metadata: dict
+        +input_data: dict
+        +output_data: dict
+        +duration_ms: float
+    }
+}
+
+class SemanticCore {
+    +embedder: BaseEmbedder
+    +llm: BaseLLMProvider
+    +ingest(document)
+    +search(query)
+}
+
+ProviderInspector o-- SemanticCore
+ProviderInspector o-- SnapshotManager
+SnapshotManager ..> InspectionSnapshot
+
+note right of ProviderInspector
+Wraps SemanticCore
+Captures pipeline states
+Provider-agnostic
+end note
+
+note right of SnapshotManager
+Saves to JSON
+Manages sessions
+Comparison engine
+end note
+
+@enduml

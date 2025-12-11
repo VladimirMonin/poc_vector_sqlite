@@ -1,0 +1,77 @@
+@startuml phase15_component_factory_class
+title ComponentFactory - Provider DI Container
+
+class ComponentFactory {
+    {static} +create_embedder(config): BaseEmbedder
+    {static} +create_llm(config): BaseLLMProvider
+    {static} +create_transcriber(config): ITranscriber
+    {static} +create_vision_analyzer(config): IVisionAnalyzer
+    {static} +create_semantic_core(config): SemanticCore
+}
+
+class SemanticConfig {
+    +defaults: DefaultsConfig
+    +providers_gemini: GeminiProviderConfig
+    +providers_openai: OpenAIProviderConfig
+    +providers_local: LocalProviderConfig
+}
+
+class DefaultsConfig {
+    +embedding_provider: str
+    +llm_provider: str
+}
+
+interface BaseEmbedder {
+    +embed_documents(texts)
+    +embed_query(text)
+}
+
+interface BaseLLMProvider {
+    +generate(prompt)
+}
+
+interface ITranscriber {
+    +transcribe(audio_path)
+}
+
+interface IVisionAnalyzer {
+    +analyze(image_path)
+}
+
+class GeminiEmbedder
+class LocalEmbedder
+class GeminiLLMProvider
+class OpenAILLMProvider
+class WhisperTranscriber
+class GeminiImageAnalyzer
+
+class SemanticCore {
+    +embedder: BaseEmbedder
+    +llm: BaseLLMProvider
+    +ingest(document)
+    +search(query)
+}
+
+ComponentFactory ..> BaseEmbedder
+ComponentFactory ..> BaseLLMProvider
+ComponentFactory ..> SemanticCore
+ComponentFactory --> SemanticConfig
+
+SemanticConfig *-- DefaultsConfig
+
+BaseEmbedder <|.. GeminiEmbedder
+BaseEmbedder <|.. LocalEmbedder
+BaseLLMProvider <|.. GeminiLLMProvider
+BaseLLMProvider <|.. OpenAILLMProvider
+ITranscriber <|.. WhisperTranscriber
+IVisionAnalyzer <|.. GeminiImageAnalyzer
+
+SemanticCore o-- BaseEmbedder
+SemanticCore o-- BaseLLMProvider
+
+note right of ComponentFactory
+Creates providers by config
+Supports: Gemini, OpenAI, Local
+end note
+
+@enduml
