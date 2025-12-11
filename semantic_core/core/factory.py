@@ -95,6 +95,7 @@ class ComponentFactory:
             return LocalEmbedder(
                 model=config.providers_local.embedding_model,
                 device=config.providers_local.device,
+                max_tokens_override=config.providers_local.max_tokens,
             )
 
         elif provider == "openai":

@@ -250,12 +250,17 @@ class LocalProviderConfig(BaseModel):
 
     Attributes:
         embedding_model: Ключ модели из LocalEmbedder.MODELS.
+        max_tokens: Максимальная длина embeddings (override дефолта модели).
         whisper_model: Ключ модели Whisper.
         device: Устройство для выполнения (auto/mlx/cuda/mps/cpu).
     """
 
     embedding_model: str = Field(
         default="all-minilm", description="Модель для локальных эмбеддингов"
+    )
+    max_tokens: Optional[int] = Field(
+        default=None,
+        description="Максимальная длина токенов (override дефолта модели)",
     )
     whisper_model: str = Field(
         default="base", description="Модель Whisper для транскрипции"
@@ -579,11 +584,18 @@ class SemanticConfig(BaseSettings):
         Сначала ищем semantic.toml, загружаем из него значения,
         затем env variables и переданные аргументы переопределяют их.
         """
+        # Извлекаем config_file из kwargs если передан
+        config_file = data.pop("config_file", None)
+        
         # Ищем TOML файл
-        toml_path = find_config_file()
+        if config_file:
+            toml_path = Path(config_file)
+        else:
+            toml_path = find_config_file()
+        
         toml_data: dict = {}
 
-        if toml_path:
+        if toml_path and toml_path.exists():
             toml_data = self._load_toml(toml_path)
             logger.debug("Loaded config from TOML", path=str(toml_path))
 

@@ -48,12 +48,14 @@ class LocalEmbedder(BaseEmbedder):
         self,
         model: str = "all-minilm",
         device: Optional[str] = None,
+        max_tokens_override: Optional[int] = None,
     ):
         """Инициализация LocalEmbedder.
 
         Args:
             model: Ключ из MODELS или кастомный путь HuggingFace.
             device: Устройство для вычислений (не используется в MLX).
+            max_tokens_override: Override для max_tokens модели (если нужно больше/меньше).
 
         Raises:
             ValueError: Если модель неизвестна.
@@ -63,6 +65,11 @@ class LocalEmbedder(BaseEmbedder):
             >>> embedder = LocalEmbedder("all-minilm")
             >>> embedder.dimension
             384
+            
+            >>> # Override max_tokens для Qwen3
+            >>> embedder = LocalEmbedder("qwen3-embedding", max_tokens_override=4000)
+            >>> embedder.max_tokens
+            4000
         """
         if model not in MODELS:
             raise ValueError(
@@ -71,6 +78,12 @@ class LocalEmbedder(BaseEmbedder):
             )
 
         self._config: ModelConfig = MODELS[model]
+        
+        # Override max_tokens если указано
+        if max_tokens_override is not None:
+            from dataclasses import replace
+            self._config = replace(self._config, max_tokens=max_tokens_override)
+        
         self._model: Optional[Any] = None
         self._tokenizer: Optional[Any] = None
         self._device = device  # Для совместимости, MLX не требует явного device
