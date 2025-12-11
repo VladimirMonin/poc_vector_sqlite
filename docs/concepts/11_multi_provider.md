@@ -127,8 +127,8 @@ embedding_model = "text-embedding-004"
 llm_model = "gemini-2.0-flash"
 
 [providers.local]
-device = "mps"                   # mps (Apple), cuda, cpu
-embedding_model = "all-MiniLM-L6-v2"
+device = "mps"                   # mps (Apple Silicon), cpu
+embedding_model = "qwen3-embedding"  # or "all-minilm", "bge-small"
 whisper_model = "base"
 ```
 
@@ -171,7 +171,7 @@ vision_provider = "local"
 
 [providers.local]
 device = "mps"                    # Apple Silicon
-embedding_model = "all-MiniLM-L6-v2"
+embedding_model = "qwen3-embedding"  # 1024D, multilingual, best quality
 whisper_model = "base"
 vision_model = "Qwen/Qwen2.5-VL-4B"
 
@@ -208,7 +208,7 @@ vision_model = "gemini-2.0-flash"
 
 [providers.local]
 device = "mps"
-embedding_model = "all-MiniLM-L6-v2"  # 384D, быстро
+embedding_model = "qwen3-embedding"  # 1024D, высокое качество, оффлайн
 whisper_model = "base"
 ```
 
@@ -224,11 +224,18 @@ whisper_model = "base"
 
 ### Embeddings
 
-| Провайдер | Модель | Размерность | Скорость | Качество | Стоимость |
-|-----------|--------|-------------|----------|----------|-----------|
-| Gemini | `text-embedding-004` | 768 | ⚡⚡⚡ | ⭐⭐⭐⭐⭐ | $0.00001/1K tokens |
-| Local | `all-MiniLM-L6-v2` | 384 | ⚡⚡⚡⚡ | ⭐⭐⭐ | FREE |
-| Local | `bge-small-en` | 384 | ⚡⚡⚡⚡ | ⭐⭐⭐⭐ | FREE |
+| Провайдер | Модель | Размерность | Скорость | Качество | Стоимость | Языки |
+|-----------|--------|-------------|----------|----------|-----------|-------|
+| Gemini | `text-embedding-004` | 768 | ⚡⚡⚡ | ⭐⭐⭐⭐⭐ | $0.00001/1K tokens | Multi |
+| OpenAI | `text-embedding-3-small` | 1536 | ⚡⚡⚡ | ⭐⭐⭐⭐⭐ | $0.02/1M tokens | Multi |
+| Local | `qwen3-embedding` | 1024 | ⚡⚡ | ⭐⭐⭐⭐ | FREE | Multi |
+| Local | `bge-small-en` | 384 | ⚡⚡⚡⚡ | ⭐⭐⭐⭐ | FREE | EN |
+| Local | `all-MiniLM-L6-v2` | 384 | ⚡⚡⚡⚡ | ⭐⭐⭐ | FREE | EN |
+
+**Заметки:**
+- **Qwen3-embedding** — лучший локальный выбор: высокое качество ≈ Gemini, многоязычность (EN/RU/ZH/...), MRL support
+- **Hardware:** Local провайдеры требуют macOS с Apple Silicon (M1+). Windows/Linux используют sentence-transformers
+- **Подробнее:** См. [13_local_embeddings.md](13_local_embeddings.md), [local-models.md](../reference/local-models.md)
 
 ### LLM
 

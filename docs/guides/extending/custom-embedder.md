@@ -149,6 +149,111 @@ core = SemanticCore(
 
 ---
 
+## Windows/Linux: Qwen3 через sentence-transformers 🪟🐧
+
+**Проблема:** LocalEmbedder использует MLX Framework (macOS only).
+
+**Решение:** Используйте sentence-transformers с PyTorch на Windows/Linux.
+
+```python
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from semantic_core.interfaces import BaseEmbedder
+
+class Qwen3Embedder(BaseEmbedder):
+    """Qwen3-Embedding для Windows/Linux (PyTorch backend)."""
+    
+    def __init__(
+        self,
+        model_name: str = "Qwen/Qwen3-Embedding-0.6B",
+        device: str = "cuda",  # "cuda" для GPU, "cpu" для CPU
+        target_dimension: int = 1024,  # Или 768, 512 для MRL
+    ):
+        """
+        Args:
+            model_name: HuggingFace model ID
+            device: "cuda", "cpu", или "cuda:0" для конкретной GPU
+            target_dimension: Целевая размерность (MRL truncation)
+        """
+        self.model = SentenceTransformer(model_name, device=device)
+        self.target_dimension = target_dimension
+        
+        # Оригинальная размерность модели
+        self._native_dimension = self.model.get_sentence_embedding_dimension()
+    
+    def _truncate_mrl(self, vector: np.ndarray) -> np.ndarray:
+        """MRL truncation с ре-нормализацией."""
+        if self.target_dimension >= self._native_dimension:
+            return vector
+        
+        # Усечение
+        truncated = vector[:self.target_dimension]
+        
+        # КРИТИЧНО: Ре-нормализация для косинусного расстояния
+        norm = np.linalg.norm(truncated)
+        return truncated / norm if norm > 0 else truncated
+    
+    def embed_documents(self, texts: list[str]) -> list[np.ndarray]:
+        """Embeddings для индексации документов."""
+        # Qwen3 поддерживает prompt_name для asymmetric search
+        embeddings = self.model.encode(
+            texts,
+            convert_to_numpy=True,
+            prompt_name="document",  # Для документов
+            show_progress_bar=False,
+        )
+        
+        # MRL truncation если нужно
+        if self.target_dimension < self._native_dimension:
+            embeddings = [self._truncate_mrl(e) for e in embeddings]
+        
+        return [e.astype(np.float32) for e in embeddings]
+    
+    def embed_query(self, text: str) -> np.ndarray:
+        """Embedding для поискового запроса."""
+        # Asymmetric search: prompt_name="query"
+        embedding = self.model.encode(
+            text,
+            convert_to_numpy=True,
+            prompt_name="query",  # Для запросов
+            show_progress_bar=False,
+        )
+        
+        # MRL truncation если нужно
+        if self.target_dimension < self._native_dimension:
+            embedding = self._truncate_mrl(embedding)
+        
+        return embedding.astype(np.float32)
+    
+    @property
+    def dimension(self) -> int:
+        return self.target_dimension
+
+# Использование
+embedder = Qwen3Embedder(device="cuda", target_dimension=1024)
+
+# Или с MRL truncation для экономии RAM
+embedder = Qwen3Embedder(device="cuda", target_dimension=768)
+
+from semantic_core import SemanticCore
+core = SemanticCore(embedder=embedder)
+```
+
+**Преимущества:**
+- ✅ Работает на Windows/Linux
+- ✅ GPU acceleration через CUDA
+- ✅ Asymmetric search (prompt_name="query")
+- ✅ MRL truncation встроен
+
+**Установка:**
+```bash
+pip install sentence-transformers torch
+# Для GPU (CUDA)
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+```
+
+---
+
 ## Важно: Размерность ⚠️
 
 **Все документы в одной БД должны иметь одинаковую размерность!**
@@ -163,6 +268,13 @@ core = SemanticCore(
 ```
 
 При смене модели — переиндексируйте всё.
+
+**MRL Truncation:**
+Если используете MRL (Qwen3, OpenAI text-embedding-3), можете усекать векторы:
+- 1024D → 768D: потеря <1.5%
+- 768D → 512D: потеря ~2-3%
+
+Но **ре-нормализация обязательна** (см. код выше)!
 
 ---
 
