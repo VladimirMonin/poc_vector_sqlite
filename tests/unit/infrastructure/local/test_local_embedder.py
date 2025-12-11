@@ -268,7 +268,9 @@ class TestLocalEmbedderErrorHandling:
 
         embedder = LocalEmbedder("all-minilm")
 
-        with pytest.raises(ImportError, match=r"MLX dependencies not installed|No module named"):
+        with pytest.raises(
+            ImportError, match=r"MLX dependencies not installed|No module named"
+        ):
             embedder.embed_query("test")
 
     @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
@@ -290,7 +292,9 @@ class TestLocalEmbedderErrorHandling:
         mock_load_model.return_value = (mock_model, mock_tokenizer)
 
         # Mock ошибки при генерации
-        mock_tokenizer.batch_encode_plus.side_effect = RuntimeError("Tokenization failed")
+        mock_tokenizer.batch_encode_plus.side_effect = RuntimeError(
+            "Tokenization failed"
+        )
 
         embedder = LocalEmbedder("all-minilm")
 
@@ -335,7 +339,7 @@ class TestLocalEmbedderDifferentModels:
         mock_load_model.assert_called_once()
         config = mock_load_model.call_args[0][0]
         assert config.backend == "mlx-lm"
-        
+
         # Проверяем что embed_with_model вызван с правильным backend
         mock_embed_with_model.assert_called_once()
         assert mock_embed_with_model.call_args[1]["backend"] == "mlx-lm"

@@ -214,24 +214,28 @@ OPENAI_API_KEY=your-openai-key  # опционально
 ### ⚠️ Частые проблемы
 
 **Проблема:** `ModuleNotFoundError: No module named 'numpy'`
+
 ```bash
 # Решение: запускай через venv
 .venv/bin/python -m pytest tests/
 ```
 
 **Проблема:** Тесты падают с `GEMINI_API_KEY not configured`
+
 ```bash
 # Решение: создай .env файл в корне
 echo "GEMINI_API_KEY=your-key" > .env
 ```
 
 **Проблема:** Падают MLX тесты на Linux
+
 ```bash
 # Решение: пропусти MLX тесты
 pytest tests/unit/ -m "not mlx"
 ```
 
 **Проблема:** Падают CUDA тесты на Mac
+
 ```bash
 # Решение: пропусти CUDA тесты
 pytest tests/unit/ -m "not cuda"

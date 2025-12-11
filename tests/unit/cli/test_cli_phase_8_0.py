@@ -229,7 +229,10 @@ class TestSearchCommand:
         result = runner.invoke(app, ["search"])
         assert result.exit_code != 0
         # CLI выводит кастомное русское сообщение вместо стандартного Typer
-        assert "Укажите поисковый запрос" in result.stdout or "Missing argument" in result.stdout
+        assert (
+            "Укажите поисковый запрос" in result.stdout
+            or "Missing argument" in result.stdout
+        )
 
     def test_search_invalid_type(self):
         """Неверный тип поиска даёт ошибку."""

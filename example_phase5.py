@@ -40,13 +40,14 @@ def main():
 
     # SmartSplitter требует parser и правильные имена параметров
     from semantic_core.processing.parsers import MarkdownNodeParser
+
     parser = MarkdownNodeParser()
 
     splitter = SmartSplitter(
         parser=parser,
-        chunk_size=500,        # Размер текстового чанка в символах
+        chunk_size=500,  # Размер текстового чанка в символах
         code_chunk_size=1000,  # Размер чанка кода в символах
-        preserve_code=True,    # Изолировать блоки кода
+        preserve_code=True,  # Изолировать блоки кода
     )
 
     context_strategy = HierarchicalContextStrategy()
