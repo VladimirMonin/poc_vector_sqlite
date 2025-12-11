@@ -5,9 +5,10 @@
 **Коммиты:**
 - `591f972` — Phase 16.0 feat: Реализован Debug Observatory (Inspector Core)
 - `aced5f8` — bugfix: Исправлена sanitization FTS5 запросов со спецсимволами
+- `9cc8a70` — Phase 16.0 feat: Add local-vision-mlx support with Qwen3-VL-4B
 
 **Зависимости:** Phase 15 (Provider-Agnostic Architecture)  
-**Статус:** ✅ Phase 16.0 Complete (Inspector Core)
+**Статус:** ✅ Phase 16.0 Complete (Inspector Core + Local Vision MLX)
 
 ---
 
@@ -563,10 +564,7 @@ pytest tests/integration/search/test_fts_chunk_level.py -v
 ## 📚 Содержание серии
 
 1. **[README.md](README.md)** — этот файл, обзор фазы
-2. **[01_bugfix_fts_sanitization.md](01_bugfix_fts_sanitization.md)** — критический баг FTS5
-3. **[02_inspector_core.md](02_inspector_core.md)** — ProviderInspector и SnapshotManager
-4. **[03_reporters.md](03_reporters.md)** — форматы экспорта
-5. **[04_cli_inspect.md](04_cli_inspect.md)** — CLI команда
+2. **[16_01_local_vision_mlx_integration.md](16_01_local_vision_mlx_integration.md)** — Qwen3-VL-4B и Optional Dependencies
 
 ---
 
