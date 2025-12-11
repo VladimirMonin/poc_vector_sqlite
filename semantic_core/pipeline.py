@@ -16,8 +16,6 @@ from semantic_core.interfaces import (
     BaseVectorStore,
     BaseSplitter,
     BaseContextStrategy,
-    ITranscriber,
-    IVisionAnalyzer,
 )
 from semantic_core.domain import (
     Document,
@@ -96,43 +94,30 @@ class SemanticCore:
         store: BaseVectorStore,
         splitter: BaseSplitter,
         context_strategy: BaseContextStrategy,
-        vision_analyzer: Optional[IVisionAnalyzer] = None,
-        transcriber: Optional[ITranscriber] = None,
-        video_analyzer: Optional[
-            "GeminiVideoAnalyzer"
-        ] = None,  # TODO: Phase 15.6 - IVideoAnalyzer
+        image_analyzer: Optional["GeminiImageAnalyzer"] = None,
+        audio_analyzer: Optional["GeminiAudioAnalyzer"] = None,
+        video_analyzer: Optional["GeminiVideoAnalyzer"] = None,
         media_config: Optional[MediaConfig] = None,
         config: Optional[SemanticConfig] = None,
         log_level: Optional[str] = None,
         log_file: Optional[str | Path] = None,
         logging_config: Optional[LoggingConfig] = None,
-        # Legacy compatibility (deprecated)
-        image_analyzer: Optional[IVisionAnalyzer] = None,
-        audio_analyzer: Optional[ITranscriber] = None,
     ):
         """Инициализация оркестратора.
 
         Args:
-            embedder: Генератор эмбеддингов (BaseEmbedder).
-            store: Хранилище векторов (BaseVectorStore).
-            splitter: Сплиттер документов (BaseSplitter).
-            context_strategy: Стратегия формирования контекста (BaseContextStrategy).
-            vision_analyzer: Анализатор изображений (IVisionAnalyzer) - Gemini/Local VLM.
-            transcriber: Транскрибер аудио (ITranscriber) - Gemini Audio/Whisper.
-            video_analyzer: Анализатор видео (опционально, будет заменён на интерфейс).
+            embedder: Генератор эмбеддингов.
+            store: Хранилище векторов.
+            splitter: Сплиттер документов.
+            context_strategy: Стратегия формирования контекста.
+            image_analyzer: Анализатор изображений (опционально).
+            audio_analyzer: Анализатор аудио (опционально).
+            video_analyzer: Анализатор видео (опционально).
             media_config: Конфигурация обработки медиа (legacy, используйте config).
             config: Полная конфигурация SemanticCore (приоритет над media_config).
             log_level: Уровень логирования (DEBUG/INFO/WARNING/ERROR).
             log_file: Путь к файлу логов.
             logging_config: Полная конфигурация логирования (приоритет над log_level/log_file).
-            image_analyzer: DEPRECATED. Используйте vision_analyzer.
-            audio_analyzer: DEPRECATED. Используйте transcriber.
-
-        Note:
-            Phase 15.0 вводит provider-agnostic интерфейсы:
-            - IVisionAnalyzer заменяет GeminiImageAnalyzer
-            - ITranscriber заменяет GeminiAudioAnalyzer
-            Старые параметры image_analyzer/audio_analyzer поддерживаются для совместимости.
         """
         # === Настройка логирования ===
         if logging_config:
@@ -151,16 +136,9 @@ class SemanticCore:
         self.store = store
         self.splitter = splitter
         self.context_strategy = context_strategy
-
-        # Phase 15.0: Provider-agnostic interfaces
-        # Legacy compatibility: используем новые параметры, fallback на старые
-        self.vision_analyzer = vision_analyzer or image_analyzer
-        self.transcriber = transcriber or audio_analyzer
+        self.image_analyzer = image_analyzer
+        self.audio_analyzer = audio_analyzer
         self.video_analyzer = video_analyzer
-
-        # Deprecated aliases для обратной совместимости
-        self.image_analyzer = self.vision_analyzer
-        self.audio_analyzer = self.transcriber
 
         # Phase 14.3: Поддержка полного SemanticConfig для chunk_sizes
         if config is not None:

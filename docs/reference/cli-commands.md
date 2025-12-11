@@ -31,6 +31,7 @@ tags: ["reference", "cli", "commands"]
 | `ingest` | Индексация документов |
 | `search` | Поиск по базе |
 | `chat` | Интерактивный RAG-чат |
+| `inspect` | Инспекция pipeline (Phase 16) |
 | `docs` | Встроенная документация |
 | `config` | Управление конфигурацией |
 | `doctor` | Диагностика системы |
@@ -114,6 +115,35 @@ semantic chat
 semantic chat --model gemini-2.5-pro -c 10
 semantic chat --no-history --search vector
 ```
+
+---
+
+## inspect 🔬
+
+**Синтаксис**: `semantic inspect [OPTIONS] PATH`
+
+Инспекция pipeline: чанки, embeddings, метаданные провайдеров.
+
+| Флаг | Описание |
+|------|----------|
+| `--save` | Сохранить артефакты |
+| `--artifacts-dir` | Путь для артефактов |
+| `--format` | Формат: console/markdown/json |
+| `--output` | Файл для вывода |
+| `--search` | Выполнить поиск |
+| `--search-mode` | vector/fts/hybrid |
+| `--limit` | Лимит результатов |
+| `--config` | Кастомный конфиг |
+
+```bash
+semantic inspect docs/example.md
+semantic inspect example.md --save
+semantic inspect example.md --format markdown --output report.md
+semantic inspect example.md --search "query" --limit 5
+semantic inspect audio.mp3 --config alt.toml
+```
+
+**См. также:** [Inspect Command Guide](../guides/core/inspect-command.md)
 
 ---
 

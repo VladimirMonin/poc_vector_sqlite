@@ -24,20 +24,29 @@ Production-ready библиотека для локального семанти
 
 **ВАЖНО:** Используй **Context7 ID** для поиска документации при сомнениях.
 
-| Пакет            | Назначение                        | Context7 ID                       |
-| :--------------- | :-------------------------------- | :-------------------------------- |
-| `peewee`         | ORM, адаптеры, расширения SQLite  | `/coleifer/peewee`                |
-| `sqlite-vec`     | Векторный движок (C-extension)    | `/asg017/sqlite-vec`              |
-| `google-genai`   | SDK для Embeddings, Vision, Batch | `/googleapis/python-genai`        |
-| `pydantic`       | Валидация DTO и настроек          | `/pydantic/pydantic`              |
-| `markdown-it-py` | AST-парсинг Markdown              | `/executablebooks/markdown-it-py` |
-| `Pillow`         | Обработка изображений             | `/python-pillow/pillow`           |
-| `pydub`          | Извлечение/оптимизация аудио      | `/jiaaro/pydub`                   |
-| `imageio[pyav]`  | Извлечение кадров из видео        | `/imageio/imageio`                |
-| `rich`           | Console logging с цветами         | `/textualize/rich`                |
-| `typer`          | CLI framework для команд          | `/fastapi/typer`                  |
-| `pytest`         | Тестирование и фикстуры           | `/pytest-dev/pytest`              |
-| `python-dotenv`  | Загрузка .env переменных          | `/theskumar/python-dotenv`        |
+| Пакет                  | Назначение                                    | Context7 ID                         |
+| :--------------------- | :-------------------------------------------- | :---------------------------------- |
+| `peewee`               | ORM, адаптеры, расширения SQLite              | `/coleifer/peewee`                  |
+| `sqlite-vec`           | Векторный движок (C-extension)                | `/asg017/sqlite-vec`                |
+| `google-genai`         | Gemini: Embeddings, Vision, Audio, Batch API  | `/googleapis/python-genai`          |
+| `openai`               | OpenAI API (embeddings, GPT)                  | `/openai/openai-python`             |
+| `ollama-python`        | Ollama локальные LLM                          | `/ollama/ollama-python`             |
+| `mlx-lm`               | Local LLM (Apple Silicon)                     | `/ml-explore/mlx-lm`                |
+| `mlx-vlm`              | Local Vision-Language (Qwen3-VL)              | `/blaizzy/mlx-vlm`                  |
+| `sentence-transformers`| Local embeddings (CPU/GPU)                    | `/huggingface/sentence-transformers`|
+| `transformers`         | HuggingFace модели (Whisper, etc)             | `/huggingface/transformers`         |
+| `torchvision`          | **Standalone** (без PyTorch) для mlx-vlm      | *Built-in*                          |
+| `pydantic`             | Валидация DTO и настроек                      | `/pydantic/pydantic`                |
+| `markdown-it-py`       | AST-парсинг Markdown                          | `/executablebooks/markdown-it-py`   |
+| `Pillow`               | Обработка изображений                         | `/python-pillow/pillow`             |
+| `pydub`                | Извлечение/оптимизация аудио                  | `/jiaaro/pydub`                     |
+| `imageio[pyav]`        | Извлечение кадров из видео                    | `/imageio/imageio`                  |
+| `rich`                 | Console logging с цветами                     | `/textualize/rich`                  |
+| `typer`                | CLI framework для команд                      | `/fastapi/typer`                    |
+| `pytest`               | Тестирование и фикстуры                       | `/pytest-dev/pytest`                |
+| `python-dotenv`        | Загрузка .env переменных                      | `/theskumar/python-dotenv`          |
+
+> 🔬 **torchvision standalone:** `torchvision>=0.24` поддерживает работу БЕЗ PyTorch (~2MB вместо 500MB). Используется только для HF `AutoVideoProcessor` в `mlx-vlm`.
 
 ### 🗺 Дорожная Карта
 
@@ -55,15 +64,13 @@ Production-ready библиотека для локального семанти
   - **12.1:** Search Query Cache — {CURRENT}
   - **12.2-12.5:** Search UI, Ingest, Chat, Polish — {TODO}
 - **Phase 13:** Total Visual Check & Audit Tools — {DONE}
-- **Phase 14:** Media Content Crisis — {DONE}
-- **Phase 15:** Optional Dependencies & Modular Extras — {DONE}
-- **Phase 16:** Debug Observatory & Multi-Provider Inspection — {IN PROGRESS}
-  - **16.0:** Inspector Core — {CURRENT}
-  - **16.1:** CLI Inspect Command
-  - **16.2:** Multi-Provider Snapshots
-  - **16.3:** Comparison & Diff Engine
-  - **16.4:** Interactive Mode
-  - **16.5:** Golden Files Testing
+- **Phase 14:** Media Content Crisis (Smart Splitter) — {DONE}
+- **Phase 15:** Multi-Provider Architecture — {DONE}
+  - Gemini, OpenAI, Ollama, Local (MLX/PyTorch)
+  - ComponentFactory, Optional Dependencies
+- **Phase 16:** Debug Observatory — {PHASE 16.0 DONE}
+  - **16.0:** Inspector Core + Local Vision MLX — {DONE}
+  - **16.1-16.5:** CLI Compare, Snapshots, Interactive — {PLANNED}
 
 ### 🌐 Flask App (`examples/flask_app/`)
 
@@ -115,7 +122,7 @@ semantic_core/
 ├── utils/                    # Утилиты
 │   └── logger/               # Semantic logging (TRACE, эмодзи, bind, secrets)
 ├── infrastructure/
-│   ├── gemini/               # Gemini интеграции
+│   ├── gemini/               # Gemini провайдер
 │   │   ├── embedder.py       # Embeddings API (gemini-embedding-001)
 │   │   ├── image_analyzer.py # Vision API
 │   │   ├── audio_analyzer.py # Audio API
@@ -123,8 +130,17 @@ semantic_core/
 │   │   ├── rate_limiter.py   # Token Bucket RPM control
 │   │   ├── resilience.py     # Retry, backoff, error classification
 │   │   └── batching.py       # Batch API client (50% экономия)
-│   ├── llm/                  # LLM провайдеры
-│   │   └── gemini_llm.py     # GeminiLLMProvider для RAG
+│   ├── openai/               # OpenAI провайдер (Phase 15)
+│   │   ├── embedder.py       # OpenAI Embeddings
+│   │   └── llm.py            # OpenAI LLM
+│   ├── ollama/               # Ollama провайдер (Phase 15)
+│   │   └── llm.py            # Ollama LLM
+│   ├── local/                # Local провайдеры (Phase 15)
+│   │   ├── embeddings/       # MLX/sentence-transformers embeddings
+│   │   ├── whisper/          # MLX/transformers Whisper
+│   │   └── vision/           # MLX Vision-Language (Qwen3-VL)
+│   ├── llm/                  # LLM базовый интерфейс
+│   │   └── gemini_llm.py     # GeminiLLMProvider
 │   ├── media/utils/          # Утилиты обработки медиа
 │   │   ├── images.py         # Pillow: resize, optimize
 │   │   ├── audio.py          # pydub: extract, compress
@@ -170,11 +186,11 @@ docs/                         # Документация проекта
 
 **📖 Точки входа в документацию:**
 
-| Ресурс                     | Путь                                                               | Описание                         |
-| -------------------------- | ------------------------------------------------------------------ | -------------------------------- |
-| **Публичная документация** | [docs/README.md](docs/README.md)                                   | Гайды, концепции, справочники    |
-| **Архитектурный сериал**   | [doc/architecture/00_overview.md](doc/architecture/00_overview.md) | 74 статьи, организованы по фазам |
-| **Планы и отчёты**         | [doc/ideas/](doc/ideas/)                                           | Технические отчёты по фазам      |
+| Ресурс                     | Путь                                                               | Описание                          |
+| -------------------------- | ------------------------------------------------------------------ | --------------------------------- |
+| **Публичная документация** | [docs/README.md](docs/README.md)                                   | Гайды, концепции, справочники     |
+| **Архитектурный сериал**   | [doc/architecture/00_overview.md](doc/architecture/00_overview.md) | **115 статей**, Phase 0-16        |
+| **Планы и отчёты**         | [doc/ideas/](doc/ideas/)                                           | Технические отчёты по фазам       |
 
 > 📂 **Новая структура:** Архитектурный сериал реорганизован в папки по фазам (`phase_0_legacy/`, `phase_1_solid/`, ..., `phase_14_media_crisis/`). Каждая фаза имеет README с описанием и ссылками на статьи.
 
@@ -187,6 +203,7 @@ docs/                         # Документация проекта
 semantic ingest <path>          # Загрузить документы
 semantic search "query"         # Поиск по базе
 semantic chat                   # Интерактивный RAG-чат
+semantic inspect <file>         # 🆕 Инспекция pipeline (Phase 16)
 
 # Slash-команды в чате
 /search query    # Поиск без LLM

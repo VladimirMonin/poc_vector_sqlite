@@ -1,0 +1,59 @@
+@startuml llm_provider_class
+title LLM Provider Abstraction
+
+interface BaseLLMProvider {
+    +generate(prompt, system_prompt, temperature, max_tokens, history)
+    +generate_stream(prompt, ...)
+    +model_name: str
+}
+
+class GenerationResult {
+    +text: str
+    +model: str
+    +input_tokens: int
+    +output_tokens: int
+    +finish_reason: str
+    +total_tokens: int
+}
+
+class GeminiLLMProvider {
+    -client: genai.Client
+    -model: str
+    +generate(...)
+    +model_name: str
+}
+
+class OpenAILLMProvider {
+    -client: OpenAI
+    -provider: ProviderPreset
+    -model: str
+    -base_url: str
+    +generate(...)
+    +generate_stream(...)
+    +model_name: str
+}
+
+enum ProviderPreset {
+    OPENAI
+    OLLAMA
+    OPENROUTER
+    VLLM
+    LM_STUDIO
+}
+
+BaseLLMProvider <|.. GeminiLLMProvider
+BaseLLMProvider <|.. OpenAILLMProvider
+OpenAILLMProvider --> ProviderPreset
+BaseLLMProvider ..> GenerationResult
+
+note right of GeminiLLMProvider
+Uses Gemini API
+Models: gemini-2.0-flash, pro
+end note
+
+note right of OpenAILLMProvider
+Unified OpenAI SDK
+Supports: OpenAI, Ollama, vLLM
+end note
+
+@enduml

@@ -66,7 +66,8 @@ class LocalEmbedder(BaseEmbedder):
         """
         if model not in MODELS:
             raise ValueError(
-                f"Unknown model: {model}. Available models: {list(MODELS.keys())}"
+                f"Unknown model: {model}. "
+                f"Available models: {list(MODELS.keys())}"
             )
 
         self._config: ModelConfig = MODELS[model]

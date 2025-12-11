@@ -74,7 +74,9 @@ class ComponentFactory:
         """
         provider = config.defaults.embedding_provider
 
-        logger.info(f"🏭 Создание embedder", emoji="🏭", provider=provider)
+        logger.info(
+            f"🏭 Создание embedder", emoji="🏭", provider=provider
+        )
 
         if provider == "gemini":
             require_provider("google", "Gemini embeddings")
@@ -106,7 +108,8 @@ class ComponentFactory:
             )
 
         raise ValueError(
-            f"Unknown embedding provider: {provider}. Supported: gemini, local, openai"
+            f"Unknown embedding provider: {provider}. "
+            f"Supported: gemini, local, openai"
         )
 
     @staticmethod
@@ -129,7 +132,9 @@ class ComponentFactory:
         """
         provider = config.defaults.llm_provider
 
-        logger.info(f"🏭 Создание LLM provider", emoji="🏭", provider=provider)
+        logger.info(
+            f"🏭 Создание LLM provider", emoji="🏭", provider=provider
+        )
 
         if provider == "gemini":
             require_provider("google", "Gemini LLM")
@@ -169,7 +174,8 @@ class ComponentFactory:
             )
 
         raise ValueError(
-            f"Unknown LLM provider: {provider}. Supported: gemini, openai, ollama"
+            f"Unknown LLM provider: {provider}. "
+            f"Supported: gemini, openai, ollama"
         )
 
     @staticmethod
@@ -198,7 +204,9 @@ class ComponentFactory:
 
         provider = config.defaults.transcription_provider
 
-        logger.info(f"🏭 Создание transcriber", emoji="🏭", provider=provider)
+        logger.info(
+            f"🏭 Создание transcriber", emoji="🏭", provider=provider
+        )
 
         if provider == "gemini":
             # Gemini Audio Analyzer уже реализует нужные методы
@@ -223,7 +231,8 @@ class ComponentFactory:
             )
 
         raise ValueError(
-            f"Unknown transcription provider: {provider}. Supported: gemini, whisper"
+            f"Unknown transcription provider: {provider}. "
+            f"Supported: gemini, whisper"
         )
 
     @staticmethod
@@ -251,7 +260,9 @@ class ComponentFactory:
 
         provider = config.defaults.vision_provider
 
-        logger.info(f"🏭 Создание vision analyzer", emoji="🏭", provider=provider)
+        logger.info(
+            f"🏭 Создание vision analyzer", emoji="🏭", provider=provider
+        )
 
         if provider == "gemini":
             # Gemini Image Analyzer уже реализует нужные методы
@@ -262,7 +273,10 @@ class ComponentFactory:
             )
             return None
 
-        raise ValueError(f"Unknown vision provider: {provider}. Supported: gemini")
+        raise ValueError(
+            f"Unknown vision provider: {provider}. "
+            f"Supported: gemini"
+        )
 
     @staticmethod
     def create_semantic_core(config: SemanticConfig):

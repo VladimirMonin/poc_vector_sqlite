@@ -75,7 +75,6 @@ class LightweightCore:
 | Qwen3-Embedding | 1024 | 8192 |
 
 **Последствия:**
-
 - Нельзя смешивать векторы разных моделей в одной БД
 - `SmartSplitter` должен знать `max_tokens` модели
 

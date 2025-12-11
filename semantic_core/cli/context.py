@@ -148,14 +148,13 @@ class CLIContext:
 
         # Parser для SmartSplitter
         from semantic_core.processing.parsers.markdown_parser import MarkdownNodeParser
-
         parser = MarkdownNodeParser()
 
         # Splitter
         splitter = SmartSplitter(
             parser=parser,
             chunk_size=config.chunk_size,
-            code_chunk_size=config.code_chunk_size,
+            code_chunk_size=config.code_chunk_size
         )
 
         # Context Strategy

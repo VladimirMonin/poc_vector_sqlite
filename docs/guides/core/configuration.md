@@ -50,25 +50,43 @@ prerequisites: ["quickstart"]
 # === База данных ===
 db_path = "semantic.db"
 
-# === Gemini API ===
-[gemini]
-api_key = "AIza..."              # Лучше через .env!
-batch_key = "AIza..."            # Отдельный ключ для Batch API
+# === Провайдеры по умолчанию (Phase 15) ===
+[defaults]
+embedding_provider = "gemini"        # gemini | local | openai
+llm_provider = "gemini"              # gemini | openai | ollama
+transcription_provider = "none"      # gemini | whisper | none
+vision_provider = "none"             # gemini | local | none
 
-# === Модели ===
-[embedding]
-model = "models/gemini-embedding-001"
-dimension = 768                  # MRL: 768 / 1536 / 3072
+# === Gemini Providers ===
+[providers.gemini]
+api_key = "${GEMINI_API_KEY}"        # Лучше через .env!
+embedding_model = "text-embedding-004"
+llm_model = "gemini-2.0-flash"
+batch_key = ""                       # Отдельный ключ для Batch API
+
+# === Local Providers (MLX/CPU) ===
+[providers.local]
+device = "mps"                       # mps (Apple) | cuda | cpu
+embedding_model = "all-MiniLM-L6-v2"
+whisper_model = "base"
+vision_model = "Qwen/Qwen2.5-VL-4B"
+
+# === OpenAI Providers ===
+[providers.openai]
+api_key = "${OPENAI_API_KEY}"
+llm_preset = "openai"                # openai | ollama | openrouter
+llm_model = "gpt-4o"
+embedding_model = "text-embedding-3-large"  # Not implemented yet
+
+# === Ollama Providers ===
+[providers.ollama]
+base_url = "http://localhost:11434"
+model = "llama3.2:3b"
 
 # === Обработка ===
 [processing]
 splitter = "smart"               # simple | smart
 context_strategy = "hierarchical" # basic | hierarchical
-
-# === Медиа ===
-[media]
-enabled = true
-rpm_limit = 15                   # Rate limit Vision API
 
 # === Поиск ===
 [search]
@@ -136,23 +154,90 @@ $env:SEMANTIC_LOG_LEVEL = "DEBUG"
 
 ---
 
+## Multi-Provider Configuration (Phase 15) 🔌
+
+С Phase 15 SemanticCore поддерживает разные AI провайдеры. Настройки разделены на:
+
+1. **`[defaults]`** — какие провайдеры использовать
+2. **`[providers.*]`** — настройки конкретных провайдеров
+
+### Пример: Гибридная конфигурация
+
+```toml
+[defaults]
+embedding_provider = "local"      # Локальные embeddings (экономия)
+llm_provider = "gemini"           # Облачный LLM (качество)
+transcription_provider = "whisper" # Локальная транскрипция (privacy)
+
+[providers.local]
+device = "mps"
+embedding_model = "all-MiniLM-L6-v2"
+whisper_model = "base"
+
+[providers.gemini]
+api_key = "${GEMINI_API_KEY}"
+llm_model = "gemini-2.0-flash"
+```
+
+**См. также:** [Multi-Provider Architecture](../../concepts/11_multi_provider.md)
+
+---
+
 ## Все опции (таблица) 📋
+
+### Общие настройки
 
 | Опция | Тип | Default | Описание |
 |-------|-----|---------|----------|
 | `db_path` | Path | `semantic.db` | Путь к SQLite |
-| `gemini.api_key` | str | - | API ключ Gemini |
-| `gemini.batch_key` | str | null | Отдельный ключ для Batch |
-| `embedding.model` | str | `gemini-embedding-001` | Модель эмбеддингов |
-| `embedding.dimension` | int | 768 | Размерность векторов |
 | `processing.splitter` | str | `smart` | Тип сплиттера |
 | `processing.context_strategy` | str | `hierarchical` | Стратегия контекста |
-| `media.enabled` | bool | true | Обработка медиа |
-| `media.rpm_limit` | int | 15 | Rate limit Vision API |
 | `search.limit` | int | 10 | Результатов по умолчанию |
 | `search.type` | str | `hybrid` | Тип поиска |
 | `logging.level` | str | `INFO` | Уровень логов |
 | `logging.file` | Path | null | Файл логов |
+
+### Defaults (Phase 15)
+
+| Опция | Тип | Default | Варианты |
+|-------|-----|---------|----------|
+| `defaults.embedding_provider` | str | `gemini` | gemini, local, openai |
+| `defaults.llm_provider` | str | `gemini` | gemini, openai, ollama |
+| `defaults.transcription_provider` | str | `none` | gemini, whisper, none |
+| `defaults.vision_provider` | str | `none` | gemini, local, none |
+
+### Gemini Provider
+
+| Опция | Тип | Default | Описание |
+|-------|-----|---------|----------|
+| `providers.gemini.api_key` | str | - | API ключ |
+| `providers.gemini.embedding_model` | str | `text-embedding-004` | Модель embeddings |
+| `providers.gemini.llm_model` | str | `gemini-2.0-flash` | LLM модель |
+| `providers.gemini.batch_key` | str | null | Ключ для Batch API |
+
+### Local Provider (MLX/CPU)
+
+| Опция | Тип | Default | Описание |
+|-------|-----|---------|----------|
+| `providers.local.device` | str | `mps` | mps, cuda, cpu |
+| `providers.local.embedding_model` | str | `all-MiniLM-L6-v2` | SentenceTransformers модель |
+| `providers.local.whisper_model` | str | `base` | tiny, base, small, medium, large-v3-turbo |
+| `providers.local.vision_model` | str | `Qwen/Qwen2.5-VL-4B` | HuggingFace model ID |
+
+### OpenAI Provider
+
+| Опция | Тип | Default | Описание |
+|-------|-----|---------|----------|
+| `providers.openai.api_key` | str | - | API ключ |
+| `providers.openai.llm_preset` | str | `openai` | openai, ollama, openrouter, vllm |
+| `providers.openai.llm_model` | str | `gpt-4o` | Модель |
+
+### Ollama Provider
+
+| Опция | Тип | Default | Описание |
+|-------|-----|---------|----------|
+| `providers.ollama.base_url` | str | `http://localhost:11434` | Ollama endpoint |
+| `providers.ollama.model` | str | `llama3.2:3b` | Модель |
 
 ---
 

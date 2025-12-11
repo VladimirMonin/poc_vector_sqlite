@@ -28,7 +28,7 @@ class TestCheckProviders:
         """Google SDK доступен."""
         # Предполагаем что в тестовом окружении Google SDK установлен
         is_available, error = check_google_available()
-
+        
         # Если установлен → должно быть True
         # Если нет → тест пропускаем (зависит от окружения)
         if is_available:
@@ -39,7 +39,7 @@ class TestCheckProviders:
     def test_check_openai_available(self):
         """OpenAI SDK может быть или не быть установлен."""
         is_available, error = check_openai_available()
-
+        
         # Проверяем только что возвращает правильный тип
         assert isinstance(is_available, bool)
         if not is_available:
@@ -48,7 +48,7 @@ class TestCheckProviders:
     def test_check_media_available(self):
         """Media libs могут быть или не быть установлены."""
         is_available, error = check_media_available()
-
+        
         assert isinstance(is_available, bool)
         if not is_available:
             assert isinstance(error, str)
@@ -60,14 +60,14 @@ class TestGetProviders:
     def test_get_available_providers(self):
         """Возвращает dict с всеми провайдерами."""
         providers = get_available_providers()
-
+        
         assert isinstance(providers, dict)
         assert "google" in providers
         assert "openai" in providers
         assert "local_embeddings" in providers
         assert "local_whisper" in providers
         assert "media" in providers
-
+        
         # Все значения должны быть bool
         for value in providers.values():
             assert isinstance(value, bool)
@@ -75,7 +75,7 @@ class TestGetProviders:
     def test_get_missing_providers(self):
         """Возвращает список отсутствующих провайдеров."""
         missing = get_missing_providers()
-
+        
         assert isinstance(missing, list)
         # Может быть пустым если все установлены
         for provider in missing:
@@ -88,14 +88,14 @@ class TestInstallHints:
     def test_get_install_hint_google(self):
         """Google hint."""
         hint = get_install_hint("google")
-
+        
         assert "pip install" in hint
         assert "google" in hint
 
     def test_get_install_hint_openai(self):
         """OpenAI hint."""
         hint = get_install_hint("openai")
-
+        
         assert "pip install" in hint
         assert "openai" in hint
 
@@ -103,7 +103,7 @@ class TestInstallHints:
     def test_get_install_hint_local_embeddings_mlx(self, mock_is_apple):
         """Local embeddings на Apple Silicon → MLX."""
         hint = get_install_hint("local_embeddings")
-
+        
         assert "pip install" in hint
         assert "local-embeddings-mlx" in hint
 
@@ -111,14 +111,14 @@ class TestInstallHints:
     def test_get_install_hint_local_embeddings_cpu(self, mock_is_apple):
         """Local embeddings на CPU → sentence-transformers."""
         hint = get_install_hint("local_embeddings")
-
+        
         assert "pip install" in hint
         assert "local-embeddings]" in hint
 
     def test_get_install_hint_unknown(self):
         """Неизвестный провайдер → generic hint."""
         hint = get_install_hint("unknown")
-
+        
         assert "pip install" in hint
         assert "unknown" in hint
 
@@ -157,7 +157,7 @@ class TestPlatformDetection:
     def test_is_apple_silicon(self):
         """Определение Apple Silicon."""
         result = _is_apple_silicon()
-
+        
         assert isinstance(result, bool)
         # На реальном Apple Silicon должно быть True
         # На других платформах — False

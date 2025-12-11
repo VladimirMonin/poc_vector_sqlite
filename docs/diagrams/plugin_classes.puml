@@ -1,0 +1,69 @@
+@startuml plugin_classes
+title Plugin System Interfaces and Implementations
+
+interface BaseEmbedder {
+    +embed_text(text): ndarray
+    +embed_batch(texts): list
+    +dimension: int
+}
+
+interface BaseVectorStore {
+    +add(doc, chunks)
+    +search(query, limit)
+    +get_by_id(id)
+    +delete(id)
+}
+
+interface BaseSplitter {
+    +split(content): list
+}
+
+interface BaseContextStrategy {
+    +enrich(chunk): str
+}
+
+interface DocumentParser {
+    +parse(content): list
+}
+
+interface BaseLLMProvider {
+    +generate(prompt)
+    +model_name: str
+}
+
+interface BaseChatHistoryStrategy {
+    +should_trim(messages): bool
+    +trim(messages): list
+}
+
+class GeminiEmbedder
+class LocalEmbedder
+class PeeweeVectorStore
+class SmartSplitter
+class HierarchicalContextStrategy
+class MarkdownNodeParser
+class GeminiLLMProvider
+class OpenAILLMProvider
+class ContextWindowStrategy
+
+BaseEmbedder <|.. GeminiEmbedder
+BaseEmbedder <|.. LocalEmbedder
+BaseVectorStore <|.. PeeweeVectorStore
+BaseSplitter <|.. SmartSplitter
+BaseContextStrategy <|.. HierarchicalContextStrategy
+DocumentParser <|.. MarkdownNodeParser
+BaseLLMProvider <|.. GeminiLLMProvider
+BaseLLMProvider <|.. OpenAILLMProvider
+BaseChatHistoryStrategy <|.. ContextWindowStrategy
+
+note right of BaseEmbedder
+Core interface for embeddings
+Implemented by Gemini and Local
+end note
+
+note right of BaseLLMProvider
+LLM abstraction
+Multi-provider support
+end note
+
+@enduml

@@ -68,12 +68,10 @@ class BaseEmbedder(ABC):
 ### Мотивация
 
 Сейчас `GeminiAudioAnalyzer` возвращает `MediaAnalysisResult` с полями:
-
 - `transcription: str` — сырой текст
 - `description: str` — summary
 
 Whisper возвращает другую структуру:
-
 - `text: str` — текст
 - `segments: list[Segment]` — с таймкодами!
 
@@ -165,7 +163,6 @@ class ITranscriber(ABC):
 ### Текущее состояние
 
 `GeminiImageAnalyzer` возвращает `MediaAnalysisResult`:
-
 - `description: str`
 - `alt_text: str`
 - `keywords: list[str]`

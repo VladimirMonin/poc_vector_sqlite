@@ -8,10 +8,7 @@
 
 | Подфаза | Статья | Описание | Статус |
 |---------|--------|----------|--------|
-| **15.0** | [80_phase_overview.md](./80_phase_overview.md) | Обзор фазы, roadmap, технический долг | ✅ Done |
-| **15.1** | [82_vision_audio_analysis.md](./82_vision_audio_analysis.md) | Gemini Vision & Audio — интерфейсы, адаптеры | ✅ Done |
-| **15.2** | [83_whisper_local_transcription.md](./83_whisper_local_transcription.md) | Local Whisper транскрипция — MLX/CUDA/CPU | ✅ Done |
-| **15.3** | [84_openai_llm_provider.md](./84_openai_llm_provider.md) | OpenAI & Ollama LLM — unified provider API | ✅ Done |
+| **15.0** | [80_phase_overview.md](./80_phase_overview.md) | Обзор фазы, ключевые паттерны, статистика | ✅ Done |
 | **15.4** | [85_configuration_factory.md](./85_configuration_factory.md) | Configuration & Factory — Pydantic + DI | ✅ Done |
 | **15.5** | [86_optional_dependencies.md](./86_optional_dependencies.md) | Optional Dependencies & Error Handling | ✅ Done |
 

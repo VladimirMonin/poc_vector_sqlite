@@ -15,14 +15,13 @@ def _is_apple_silicon() -> bool:
 
 def check_google_available() -> tuple[bool, Optional[str]]:
     """Проверяет доступность Google SDK.
-
+    
     Returns:
         (available, error_message): True если доступен, иначе (False, error).
     """
     try:
         import google.generativeai  # noqa
         import google.genai  # noqa
-
         return True, None
     except ImportError as e:
         return False, str(e)
@@ -30,13 +29,12 @@ def check_google_available() -> tuple[bool, Optional[str]]:
 
 def check_openai_available() -> tuple[bool, Optional[str]]:
     """Проверяет доступность OpenAI SDK.
-
+    
     Returns:
         (available, error_message): True если доступен, иначе (False, error).
     """
     try:
         import openai  # noqa
-
         return True, None
     except ImportError as e:
         return False, str(e)
@@ -44,7 +42,7 @@ def check_openai_available() -> tuple[bool, Optional[str]]:
 
 def check_local_embeddings_available() -> tuple[bool, Optional[str]]:
     """Проверяет доступность local embeddings.
-
+    
     Returns:
         (available, error_message): True если доступен, иначе (False, error).
     """
@@ -61,7 +59,7 @@ def check_local_embeddings_available() -> tuple[bool, Optional[str]]:
 
 def check_local_whisper_available() -> tuple[bool, Optional[str]]:
     """Проверяет доступность Whisper.
-
+    
     Returns:
         (available, error_message): True если доступен, иначе (False, error).
     """
@@ -77,7 +75,7 @@ def check_local_whisper_available() -> tuple[bool, Optional[str]]:
 
 def check_media_available() -> tuple[bool, Optional[str]]:
     """Проверяет доступность media processing libs.
-
+    
     Returns:
         (available, error_message): True если доступен, иначе (False, error).
     """
@@ -85,7 +83,6 @@ def check_media_available() -> tuple[bool, Optional[str]]:
         import PIL  # noqa
         import pydub  # noqa
         import imageio  # noqa
-
         return True, None
     except ImportError as e:
         return False, str(e)
@@ -93,7 +90,7 @@ def check_media_available() -> tuple[bool, Optional[str]]:
 
 def get_available_providers() -> Dict[str, bool]:
     """Возвращает dict с доступностью всех провайдеров.
-
+    
     Returns:
         Dict с ключами: google, openai, local_embeddings, local_whisper, media
     """
@@ -108,7 +105,7 @@ def get_available_providers() -> Dict[str, bool]:
 
 def get_missing_providers() -> List[str]:
     """Возвращает список отсутствующих провайдеров.
-
+    
     Returns:
         List имён провайдеров которые не установлены.
     """
@@ -118,10 +115,10 @@ def get_missing_providers() -> List[str]:
 
 def get_install_hint(provider: str) -> str:
     """Возвращает hint для установки провайдера.
-
+    
     Args:
         provider: Имя провайдера (google, openai, local_embeddings, etc).
-
+    
     Returns:
         Строка с командой установки.
     """
@@ -145,14 +142,14 @@ def get_install_hint(provider: str) -> str:
 
 def require_provider(provider: str, feature: str = "") -> None:
     """Проверяет наличие провайдера, иначе выбрасывает ImportError.
-
+    
     Args:
         provider: Имя провайдера.
         feature: Название фичи для более понятного сообщения.
-
+    
     Raises:
         ImportError: Если провайдер не установлен.
-
+    
     Example:
         >>> require_provider("google", "Gemini embeddings")
         Traceback (most recent call last):
@@ -165,11 +162,11 @@ def require_provider(provider: str, feature: str = "") -> None:
         "local_whisper": check_local_whisper_available,
         "media": check_media_available,
     }
-
+    
     check_func = check_funcs.get(provider)
     if not check_func:
         raise ValueError(f"Unknown provider: {provider}")
-
+    
     is_available, error = check_func()
     if not is_available:
         feature_msg = f" for {feature}" if feature else ""

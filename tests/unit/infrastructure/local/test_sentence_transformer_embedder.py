@@ -39,18 +39,14 @@ class TestSentenceTransformerEmbedderInit:
 class TestSentenceTransformerEmbedderLazyLoading:
     """Тесты ленивой загрузки модели."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_model_not_loaded_on_init(self, mock_st):
         """Проверка что модель НЕ загружается при инициализации."""
         embedder = SentenceTransformerEmbedder()
         assert embedder._model is None
         mock_st.assert_not_called()
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_model_loaded_on_first_use(self, mock_st):
         """Проверка что модель загружается при первом использовании."""
         # Mock модели
@@ -67,9 +63,7 @@ class TestSentenceTransformerEmbedderLazyLoading:
             "all-MiniLM-L6-v2", device="cpu", cache_folder=None
         )
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_model_loading_caching(self, mock_st):
         """Проверка что модель загружается один раз."""
         # Mock модели
@@ -92,9 +86,7 @@ class TestSentenceTransformerEmbedderLazyLoading:
 class TestSentenceTransformerEmbedderEmbed:
     """Тесты метода embed (одиночный текст)."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_embed_single_text(self, mock_st):
         """Проверка эмбеддинга одного текста."""
         # Mock модели
@@ -112,9 +104,7 @@ class TestSentenceTransformerEmbedderEmbed:
         assert len(embedding) == 384
         assert all(isinstance(x, float) for x in embedding)
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_empty_text_handling(self, mock_st):
         """Проверка обработки пустого текста."""
         # Mock модели
@@ -134,9 +124,7 @@ class TestSentenceTransformerEmbedderEmbed:
 class TestSentenceTransformerEmbedderEmbedBatch:
     """Тесты метода embed_batch."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_embed_batch_texts(self, mock_st):
         """Проверка батчинга."""
         # Mock модели
@@ -153,9 +141,7 @@ class TestSentenceTransformerEmbedderEmbedBatch:
         assert len(embeddings) == 3
         assert all(len(emb) == embedder.dimension for emb in embeddings)
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_batch_vs_single_consistency(self, mock_st):
         """Проверка что batch даёт те же результаты что и single."""
         # Mock модели
@@ -196,9 +182,7 @@ class TestSentenceTransformerEmbedderEmbedBatch:
 class TestSentenceTransformerEmbedderProperties:
     """Тесты свойств dimension и max_tokens."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_dimension_property_matches_model(self, mock_st):
         """Проверка что dimension совпадает с реальной размерностью."""
         # Mock модели
@@ -217,9 +201,7 @@ class TestSentenceTransformerEmbedderProperties:
         embedding = embedder.embed("test")
         assert len(embedding) == embedder.dimension
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_max_tokens_property(self, mock_st):
         """Проверка свойства max_tokens."""
         # Mock модели
@@ -233,9 +215,7 @@ class TestSentenceTransformerEmbedderProperties:
         assert embedder.max_tokens == 256
         assert isinstance(embedder.max_tokens, int)
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_different_models(self, mock_st):
         """Проверка загрузки разных моделей."""
         models_config = [
@@ -258,9 +238,7 @@ class TestSentenceTransformerEmbedderProperties:
 class TestSentenceTransformerEmbedderNormalization:
     """Тесты нормализации векторов."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_normalize_embeddings(self, mock_st):
         """Проверка нормализации векторов."""
         # Mock модели
@@ -288,9 +266,7 @@ class TestSentenceTransformerEmbedderNormalization:
         norm = np.linalg.norm(embedding)
         assert abs(norm - 1.0) < 0.01  # Допуск на погрешность
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_no_normalize(self, mock_st):
         """Проверка что без нормализации векторы не нормализованы."""
         # Mock модели
@@ -313,9 +289,7 @@ class TestSentenceTransformerEmbedderNormalization:
 class TestSentenceTransformerEmbedderDeviceSelection:
     """Тесты выбора устройства."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_device_selection_cpu(self, mock_st):
         """Проверка работы на CPU."""
         # Mock модели
@@ -331,9 +305,7 @@ class TestSentenceTransformerEmbedderDeviceSelection:
         assert len(embedding) == embedder.dimension
         mock_st.assert_called_with("all-MiniLM-L6-v2", device="cpu", cache_folder=None)
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_device_selection_cuda(self, mock_st):
         """Проверка инициализации с device='cuda'."""
         # Mock модели
@@ -367,9 +339,7 @@ class TestSentenceTransformerEmbedderInterfaceCompliance:
 class TestSentenceTransformerEmbedderBaseEmbedderMethods:
     """Тесты методов из BaseEmbedder (embed_documents, embed_query)."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_embed_documents_returns_numpy_arrays(self, mock_st):
         """Тест что embed_documents возвращает numpy arrays."""
         # Mock модели
@@ -388,9 +358,7 @@ class TestSentenceTransformerEmbedderBaseEmbedderMethods:
         assert all(isinstance(v, np.ndarray) for v in result)
         assert all(v.shape == (384,) for v in result)
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_embed_documents_empty_list_raises_error(self, mock_st):
         """Тест ошибки при пустом списке."""
         embedder = SentenceTransformerEmbedder()
@@ -398,9 +366,7 @@ class TestSentenceTransformerEmbedderBaseEmbedderMethods:
         with pytest.raises(ValueError, match="texts list cannot be empty"):
             embedder.embed_documents([])
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_embed_query_returns_numpy_array(self, mock_st):
         """Тест что embed_query возвращает numpy array."""
         # Mock модели
@@ -416,9 +382,7 @@ class TestSentenceTransformerEmbedderBaseEmbedderMethods:
         assert isinstance(result, np.ndarray)
         assert result.shape == (384,)
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_embed_query_empty_text_raises_error(self, mock_st):
         """Тест ошибки при пустом тексте."""
         embedder = SentenceTransformerEmbedder()
@@ -430,9 +394,7 @@ class TestSentenceTransformerEmbedderBaseEmbedderMethods:
 class TestSentenceTransformerEmbedderErrorHandling:
     """Тесты обработки ошибок."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_import_error_on_missing_library(self, mock_st):
         """Тест ImportError при отсутствии sentence-transformers."""
         # Симулируем отсутствие библиотеки
@@ -442,14 +404,10 @@ class TestSentenceTransformerEmbedderErrorHandling:
         ):
             embedder = SentenceTransformerEmbedder()
 
-            with pytest.raises(
-                ImportError, match="sentence-transformers not installed"
-            ):
+            with pytest.raises(ImportError, match="sentence-transformers not installed"):
                 embedder.embed("test")
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_runtime_error_on_model_load_failure(self, mock_st):
         """Тест RuntimeError при ошибке загрузки модели."""
         mock_st.side_effect = RuntimeError("Failed to load model")
@@ -459,9 +417,7 @@ class TestSentenceTransformerEmbedderErrorHandling:
         with pytest.raises(RuntimeError, match="Failed to load model"):
             embedder.embed("test")
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_runtime_error_on_encoding_failure(self, mock_st):
         """Тест RuntimeError при ошибке encoding."""
         # Mock модели
@@ -480,9 +436,7 @@ class TestSentenceTransformerEmbedderErrorHandling:
 class TestSentenceTransformerEmbedderConsistency:
     """Тесты консистентности embeddings."""
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_embedding_consistency(self, mock_st):
         """Проверка что одинаковый текст даёт одинаковый эмбеддинг."""
         # Mock модели
@@ -503,9 +457,7 @@ class TestSentenceTransformerEmbedderConsistency:
         # Должны быть идентичны
         assert np.allclose(emb1, emb2, rtol=1e-5)
 
-    @patch(
-        "semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer"
-    )
+    @patch("semantic_core.infrastructure.local.sentence_transformer_embedder.SentenceTransformer")
     def test_long_text_truncation(self, mock_st):
         """Проверка что длинный текст обрезается до max_tokens."""
         # Mock модели

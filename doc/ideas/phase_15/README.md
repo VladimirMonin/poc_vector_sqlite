@@ -23,12 +23,12 @@
 
 | Подфаза | Название | Статус | Описание |
 |---------|----------|--------|----------|
-| [15.0](phase_15.0.md) | Interface Contracts | ✅ Done | Расширение `BaseEmbedder`, создание `ITranscriber`, `IVisionAnalyzer` |
-| [15.1](phase_15.1.md) | Local Whisper Adapter | ✅ Done | Интеграция кода из `examples/Whisper-Voice-Machine` |
-| [15.2](phase_15.2.md) | Local Embeddings | ✅ Done | MLX embeddings из `examples/poc_apple_local_llm` |
-| [15.3](phase_15.3.md) | OpenAI-Compatible LLM | ✅ Done | Универсальный адаптер через `base_url` |
-| [15.4](phase_15.4.md) | Configuration & Factory | ✅ Done | Multi-provider конфиг + ComponentFactory |
-| [15.5](phase_15.5.md) | Optional Dependencies | ✅ Done | `pip install semantic-core[local]` — легковесное ядро |
+| [15.0](phase_15.0.md) | Interface Contracts | 🔲 Planning | Расширение `BaseEmbedder`, создание `ITranscriber`, `IVisionAnalyzer` |
+| [15.1](phase_15.1.md) | Local Whisper Adapter | 🔲 Planning | Интеграция кода из `examples/Whisper-Voice-Machine` |
+| [15.2](phase_15.2.md) | Local Embeddings | 🔲 Planning | MLX embeddings из `examples/poc_apple_local_llm` |
+| [15.3](phase_15.3.md) | OpenAI-Compatible LLM | 🔲 Planning | Универсальный адаптер через `base_url` |
+| [15.4](phase_15.4.md) | Configuration & Factory | 🔲 Planning | Multi-provider конфиг + ComponentFactory |
+| [15.5](phase_15.5.md) | Optional Dependencies | 🔲 Planning | `pip install semantic-core[local]` |
 
 ---
 

@@ -105,9 +105,9 @@ class SentenceTransformerEmbedder(BaseEmbedder):
         self._dimension: Optional[int] = None
         self._max_tokens: Optional[int] = None
 
-        logger.bind(model_name=model_name, device=device, normalize=normalize).info(
-            "🧠 SentenceTransformerEmbedder initialized"
-        )
+        logger.bind(
+            model_name=model_name, device=device, normalize=normalize
+        ).info("🧠 SentenceTransformerEmbedder initialized")
 
     def _ensure_loaded(self) -> None:
         """Ленивая загрузка модели при первом использовании.
@@ -144,9 +144,9 @@ class SentenceTransformerEmbedder(BaseEmbedder):
             self._dimension = self._model.get_sentence_embedding_dimension()
             self._max_tokens = self._model.max_seq_length
 
-            logger.bind(dimension=self._dimension, max_tokens=self._max_tokens).info(
-                f"✅ Model {self.model_name} loaded successfully"
-            )
+            logger.bind(
+                dimension=self._dimension, max_tokens=self._max_tokens
+            ).info(f"✅ Model {self.model_name} loaded successfully")
 
         except Exception as e:
             logger.bind(error=str(e)).error(
