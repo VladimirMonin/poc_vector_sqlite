@@ -12,6 +12,8 @@ import pytest
 from semantic_core.infrastructure.local import SentenceTransformerEmbedder
 from semantic_core.interfaces.embedder import BaseEmbedder
 
+pytestmark = [pytest.mark.cuda, pytest.mark.requires_sentence_transformers]
+
 
 class TestSentenceTransformerEmbedderInit:
     """Тесты инициализации SentenceTransformerEmbedder."""

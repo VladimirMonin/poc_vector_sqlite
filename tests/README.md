@@ -1,6 +1,6 @@
 # 🧪 Тесты Semantic Core
 
-> 470+ тестов, покрывающих от unit-логики до E2E с реальными API.
+> 980+ тестов, покрывающих от unit-логики до E2E с реальными API.
 
 ---
 
@@ -91,35 +91,91 @@ tests/
 
 ## 🏃 Запуск тестов
 
+**ВАЖНО:** Тесты ВСЕГДА запускать через виртуальное окружение:
+
 ```bash
+# Активация окружения
+source .venv/bin/activate
+
+# ИЛИ напрямую через python из venv
+.venv/bin/python -m pytest tests/
+
 # Все тесты
-poetry run pytest tests/
+pytest tests/
 
 # Только unit
-poetry run pytest tests/unit/
+pytest tests/unit/
 
 # Только integration
-poetry run pytest tests/integration/
+pytest tests/integration/
 
 # С покрытием
-poetry run pytest tests/ --cov=semantic_core --cov-report=html
+pytest tests/ --cov=semantic_core --cov-report=html
 
 # Конкретный модуль
-poetry run pytest tests/unit/processing/parsers/ -v
+pytest tests/unit/processing/parsers/ -v
 
 # По маркеру (пропустить реальные API)
-poetry run pytest tests/ -m "not real_api"
+pytest tests/ -m "not real_api"
+```
+
+### 🖥️ Запуск на разных машинах
+
+```bash
+# MacBook (Apple Silicon) — пропустить CUDA тесты
+pytest tests/unit/ -m "not cuda"
+
+# RTX 3080 (NVIDIA GPU) — пропустить MLX тесты
+pytest tests/unit/ -m "not mlx"
+
+# Только MLX тесты (локальные модели на Mac)
+pytest tests/unit/ -m "mlx"
+
+# Только CPU тесты (универсальные)
+pytest tests/unit/ -m "cpu"
 ```
 
 ---
 
-## 🏷️ Маркеры
+## 🏷️ Маркеры (pytest markers)
 
-| Маркер | Описание |
-|--------|----------|
-| `@pytest.mark.real_api` | Тесты с реальными API-вызовами (медленные, платные) |
+| Маркер | Описание | Когда использовать |
+|--------|----------|-------------------|
+| `@pytest.mark.mlx` | Тесты для Apple Silicon MLX backend | Локальные embeddings/whisper на Mac |
+| `@pytest.mark.cuda` | Тесты для NVIDIA CUDA backend | sentence-transformers, PyTorch GPU |
+| `@pytest.mark.cpu` | Универсальные CPU тесты | Везде |
+| `@pytest.mark.requires_sentence_transformers` | Требует sentence-transformers | CUDA тесты |
+| `@pytest.mark.requires_torch` | Требует PyTorch | GPU/CPU тесты |
+| `@pytest.mark.real_api` | Реальные API-вызовы (медленные, платные) | E2E тесты |
 
-Тесты с маркером `real_api` находятся в `tests/e2e/` и требуют `GEMINI_API_KEY`.
+**Примеры:**
+
+```python
+# Unit-тесты для MLX локальных моделей
+pytestmark = pytest.mark.mlx
+
+# CUDA тесты (sentence-transformers)
+pytestmark = [pytest.mark.cuda, pytest.mark.requires_sentence_transformers]
+
+# E2E тесты с реальным Gemini API
+@pytest.mark.real_api
+def test_gemini_vision_real():
+    ...
+```
+
+### 🔑 API ключи для тестов
+
+Тесты читают API ключи из **`.env` файла** в корне проекта:
+
+```bash
+# .env (не коммитится)
+GEMINI_API_KEY=your-api-key-here
+OPENAI_API_KEY=your-openai-key  # опционально
+```
+
+**Unit-тесты** изолируют себя от реальных ключей через фикстуру `isolate_env_for_config_tests` (см. `tests/unit/cli/conftest.py`).
+
+**E2E тесты** (`tests/e2e/`) требуют реальный `GEMINI_API_KEY` и помечены маркером `@pytest.mark.real_api`.
 
 ---
 
@@ -133,6 +189,14 @@ poetry run pytest tests/ -m "not real_api"
 | Phase 4 | Smart Parsing | `processing/parsers/`, `processing/context/` |
 | Phase 5 | Async Batching | `unit/core/`, `integration/batching/` |
 | Phase 6 | Multimodal | `infrastructure/media/`, `integration/media/` |
+| Phase 7 | Observability | `unit/utils/logger/` |
+| Phase 8 | CLI & Configuration | `unit/cli/` |
+| Phase 9 | RAG | `unit/core/test_rag.py` |
+| Phase 10 | Batch API Real | `unit/infrastructure/batching/` |
+| Phase 13 | Audit Tools | `e2e/audit/` |
+| Phase 14 | Media Crisis | `integration/media/` |
+| Phase 15 | Multi-Provider | `unit/core/test_factory.py`, `unit/infrastructure/local/` |
+| Phase 16 | Observatory | `unit/core/observatory/` |
 
 ---
 
@@ -142,7 +206,36 @@ poetry run pytest tests/ -m "not real_api"
 2. **Mock-first** — для API-зависимостей используем MagicMock/AsyncMock
 3. **Fixtures в conftest.py** — все общие фикстуры централизованы
 4. **Генерируемые файлы** — картинки создаются фикстурами через Pillow
-5. **Skip при отсутствии** — `pytest.skip()` если файл/зависимость недоступны
+5. **Skip при отсутствии** — `pytest.skip()` или маркеры если зависимость недоступна
+6. **Запуск через venv** — **ВСЕГДА** используй `.venv/bin/python -m pytest`
+7. **Платформо-зависимые тесты** — используй маркеры `mlx`/`cuda` для изоляции
+8. **API ключи из .env** — unit тесты изолируют себя, e2e требуют реальные ключи
+
+### ⚠️ Частые проблемы
+
+**Проблема:** `ModuleNotFoundError: No module named 'numpy'`
+```bash
+# Решение: запускай через venv
+.venv/bin/python -m pytest tests/
+```
+
+**Проблема:** Тесты падают с `GEMINI_API_KEY not configured`
+```bash
+# Решение: создай .env файл в корне
+echo "GEMINI_API_KEY=your-key" > .env
+```
+
+**Проблема:** Падают MLX тесты на Linux
+```bash
+# Решение: пропусти MLX тесты
+pytest tests/unit/ -m "not mlx"
+```
+
+**Проблема:** Падают CUDA тесты на Mac
+```bash
+# Решение: пропусти CUDA тесты
+pytest tests/unit/ -m "not cuda"
+```
 
 ---
 

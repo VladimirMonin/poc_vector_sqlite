@@ -218,8 +218,6 @@ class ProviderInspector:
 
         return snapshot
 
-        return saved, snapshot
-
     def search_with_inspection(
         self,
         query: str,

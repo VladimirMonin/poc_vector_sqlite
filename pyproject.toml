@@ -98,6 +98,13 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "mlx: Tests for Apple Silicon MLX backend (skip on non-Mac)",
+    "cuda: Tests for NVIDIA CUDA backend (skip on Mac)",
+    "cpu: Tests for CPU-only backends (run everywhere)",
+    "requires_sentence_transformers: Tests requiring sentence-transformers",
+    "requires_torch: Tests requiring PyTorch",
+]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

@@ -10,9 +10,10 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
 
 
 class ChunkType(str, Enum):
@@ -71,7 +72,7 @@ class Chunk:
     chunk_index: int
     chunk_type: ChunkType = ChunkType.TEXT
     language: Optional[str] = None
-    embedding: Optional[np.ndarray] = None
+    embedding: Optional["np.ndarray"] = None  # type: ignore[name-defined]
     parent_doc_id: Optional[int] = None
     metadata: dict[str, Any] = field(default_factory=dict)
     id: Optional[int] = None

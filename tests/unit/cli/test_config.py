@@ -216,9 +216,10 @@ class TestSemanticConfigEnvVars:
                 reset_config()
 
     def test_direct_override_gemini_api_key(self):
-        """gemini_api_key можно передать напрямую."""
+        """gemini_api_key можно передать напрямую через validation_alias."""
         with patch("semantic_core.config.find_config_file", return_value=None):
-            config = SemanticConfig(gemini_api_key="direct-key")
+            # Используем validation_alias (GEMINI_API_KEY) для передачи значения
+            config = SemanticConfig(GEMINI_API_KEY="direct-key")
             assert config.gemini_api_key == "direct-key"
 
 
@@ -338,12 +339,14 @@ class TestConfigValidators:
 
     def test_api_key_whitespace_stripped(self):
         """Пробелы убираются из API ключа."""
-        config = SemanticConfig(gemini_api_key="  my-key  ")
+        # Используем validation_alias (GEMINI_API_KEY)
+        config = SemanticConfig(GEMINI_API_KEY="  my-key  ")
         assert config.gemini_api_key == "my-key"
 
     def test_empty_api_key_becomes_none(self):
         """Пустая строка API ключа становится None."""
-        config = SemanticConfig(gemini_api_key="")
+        # Используем validation_alias (GEMINI_API_KEY)
+        config = SemanticConfig(GEMINI_API_KEY="")
         assert config.gemini_api_key is None
 
     def test_require_api_key_raises_without_key(self):
@@ -354,12 +357,14 @@ class TestConfigValidators:
 
     def test_require_api_key_returns_key(self):
         """require_api_key() возвращает ключ если он есть."""
-        config = SemanticConfig(gemini_api_key="my-key")
+        # Используем validation_alias (GEMINI_API_KEY)
+        config = SemanticConfig(GEMINI_API_KEY="my-key")
         assert config.require_api_key() == "my-key"
 
     def test_to_toml_dict_excludes_secrets(self):
         """to_toml_dict() не включает API ключи."""
-        config = SemanticConfig(gemini_api_key="secret-key")
+        # Используем validation_alias (GEMINI_API_KEY)
+        config = SemanticConfig(GEMINI_API_KEY="secret-key")
         toml_dict = config.to_toml_dict()
 
         # api_key не должен быть в gemini секции

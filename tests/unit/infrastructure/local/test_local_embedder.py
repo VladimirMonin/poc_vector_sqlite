@@ -14,6 +14,8 @@ import pytest
 
 from semantic_core.infrastructure.local.embeddings import MODELS, LocalEmbedder
 
+pytestmark = pytest.mark.mlx
+
 
 class TestLocalEmbedderInit:
     """Тесты инициализации LocalEmbedder."""
@@ -70,7 +72,7 @@ class TestLocalEmbedderProperties:
 class TestLocalEmbedderLazyLoading:
     """Тесты ленивой загрузки модели."""
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_model_not_loaded_on_init(self, mock_load_model):
         """Тест что модель не загружается при инициализации."""
         embedder = LocalEmbedder("all-minilm")
@@ -78,7 +80,7 @@ class TestLocalEmbedderLazyLoading:
         assert embedder._model is None
         mock_load_model.assert_not_called()
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_model_loaded_on_first_use(self, mock_load_model):
         """Тест что модель загружается при первом использовании."""
         # Mock модели
@@ -100,7 +102,7 @@ class TestLocalEmbedderLazyLoading:
         assert embedder._model is mock_model
         assert embedder._tokenizer is mock_tokenizer
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_model_loaded_only_once(self, mock_load_model):
         """Тест что модель загружается только один раз."""
         # Mock модели
@@ -128,7 +130,7 @@ class TestLocalEmbedderLazyLoading:
 class TestLocalEmbedderEmbedQuery:
     """Тесты метода embed_query."""
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_embed_query_returns_numpy_array(self, mock_load_model):
         """Тест что embed_query возвращает numpy array."""
         # Mock модели
@@ -151,7 +153,7 @@ class TestLocalEmbedderEmbedQuery:
         assert result.shape == (384,)
         np.testing.assert_array_equal(result, expected_vector)
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_embed_query_with_empty_text_raises_error(self, mock_load_model):
         """Тест ошибки при пустом тексте."""
         embedder = LocalEmbedder("all-minilm")
@@ -159,7 +161,7 @@ class TestLocalEmbedderEmbedQuery:
         with pytest.raises(ValueError, match="text cannot be empty"):
             embedder.embed_query("")
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_embed_query_adds_prefix_when_needed(self, mock_load_model):
         """Тест добавления префикса 'query:' для моделей, которым это нужно."""
         # Mock модели
@@ -187,7 +189,7 @@ class TestLocalEmbedderEmbedQuery:
 class TestLocalEmbedderEmbedDocuments:
     """Тесты метода embed_documents."""
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_embed_documents_returns_list_of_arrays(self, mock_load_model):
         """Тест что embed_documents возвращает список numpy arrays."""
         # Mock модели
@@ -216,7 +218,7 @@ class TestLocalEmbedderEmbedDocuments:
         assert all(isinstance(v, np.ndarray) for v in result)
         assert all(v.shape == (384,) for v in result)
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_embed_documents_with_empty_list_raises_error(self, mock_load_model):
         """Тест ошибки при пустом списке."""
         embedder = LocalEmbedder("all-minilm")
@@ -224,7 +226,7 @@ class TestLocalEmbedderEmbedDocuments:
         with pytest.raises(ValueError, match="texts list cannot be empty"):
             embedder.embed_documents([])
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_embed_documents_processes_each_text(self, mock_load_model):
         """Тест что каждый текст обрабатывается отдельно."""
         # Mock модели
@@ -259,7 +261,7 @@ class TestLocalEmbedderEmbedDocuments:
 class TestLocalEmbedderErrorHandling:
     """Тесты обработки ошибок."""
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_import_error_on_missing_mlx(self, mock_load_model):
         """Тест ImportError при отсутствии MLX."""
         mock_load_model.side_effect = ImportError("No module named 'mlx_embeddings'")
@@ -269,7 +271,7 @@ class TestLocalEmbedderErrorHandling:
         with pytest.raises(ImportError, match="MLX dependencies not installed"):
             embedder.embed_query("test")
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_runtime_error_on_model_load_failure(self, mock_load_model):
         """Тест RuntimeError при ошибке загрузки модели."""
         mock_load_model.side_effect = RuntimeError("Failed to load model")
@@ -279,7 +281,7 @@ class TestLocalEmbedderErrorHandling:
         with pytest.raises(RuntimeError, match="Failed to load model"):
             embedder.embed_query("test")
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_runtime_error_on_embedding_generation_failure(self, mock_load_model):
         """Тест RuntimeError при ошибке генерации embedding."""
         # Mock модели
@@ -314,7 +316,7 @@ class TestLocalEmbedderDifferentModels:
         assert embedder.dimension == expected_dim
         assert embedder.max_tokens == expected_max_tokens
 
-    @patch("semantic_core.infrastructure.local.embeddings.models.load_model")
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
     def test_qwen3_uses_mlx_lm_backend(self, mock_load_model):
         """Тест что Qwen3 использует mlx-lm backend."""
         # Mock модели

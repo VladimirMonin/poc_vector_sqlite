@@ -117,7 +117,8 @@ PlantUML диаграммы архитектуры в [diagrams/](diagrams/).
 | Документ | Описание |
 |----------|----------|
 | [doc/ideas/](../doc/ideas/) | Планы фаз и технические отчёты |
-| [tests/README.md](../tests/README.md) | Как запускать и писать тесты |
+| [tests/README.md](../tests/README.md) | 🧪 **Как запускать тесты**, маркеры, окружение |
+| [doc/architecture/](../doc/architecture/) | Архитектурный сериал (115 статей) |
 
 ---
 
@@ -147,4 +148,26 @@ PlantUML диаграммы архитектуры в [diagrams/](diagrams/).
 
 ---
 
-**Версия документации**: Phase 11 | **Последнее обновление**: Декабрь 2025
+## 🧪 Тестирование
+
+**980+ тестов** покрывают все компоненты:
+- **Unit** — изолированная логика с моками
+- **Integration** — реальная БД (in-memory)
+- **E2E** — реальные API (требуют ключ)
+
+```bash
+# Запуск через venv (обязательно!)
+.venv/bin/python -m pytest tests/
+
+# На MacBook (Apple Silicon) — пропустить CUDA
+pytest tests/unit/ -m "not cuda"
+
+# На Linux/Windows с GPU — пропустить MLX
+pytest tests/unit/ -m "not mlx"
+```
+
+**→ [Полный гайд по тестам](../tests/README.md)**
+
+---
+
+**Версия документации**: Phase 16 | **Последнее обновление**: Декабрь 2025

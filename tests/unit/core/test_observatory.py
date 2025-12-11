@@ -270,11 +270,10 @@ def test_provider_inspector_ingest(tmp_path):
     # Документ
     doc = Document(content="Test content", metadata={"source": "test.txt"})
 
-    # Инспектируем
-    saved, snapshot = inspector.ingest_with_inspection(doc, mode="sync")
+    # Инспектируем (используем именованный аргумент document=)
+    snapshot = inspector.ingest_with_inspection(document=doc, mode="sync")
 
     # Проверки
-    assert saved.id == 1
     assert snapshot.file_path == "test.txt"
     assert len(snapshot.chunks) == 1
     assert len(snapshot.steps) >= 3  # splitting, context, embedding, save

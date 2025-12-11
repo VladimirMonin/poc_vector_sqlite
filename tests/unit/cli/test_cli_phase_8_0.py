@@ -51,7 +51,8 @@ class TestIngestCommand:
         """Без path показывает ошибку."""
         result = runner.invoke(app, ["ingest"])
         assert result.exit_code != 0
-        assert "Missing argument" in result.stdout or "PATH" in result.stdout
+        # CLI выводит кастомное русское сообщение вместо стандартного Typer
+        assert "Укажите путь" in result.stdout or "Missing argument" in result.stdout
 
     def test_ingest_nonexistent_path(self, tmp_path: Path):
         """Несуществующий путь даёт ошибку."""
@@ -227,7 +228,8 @@ class TestSearchCommand:
         """Без query показывает ошибку."""
         result = runner.invoke(app, ["search"])
         assert result.exit_code != 0
-        assert "Missing argument" in result.stdout or "QUERY" in result.stdout
+        # CLI выводит кастомное русское сообщение вместо стандартного Typer
+        assert "Укажите поисковый запрос" in result.stdout or "Missing argument" in result.stdout
 
     def test_search_invalid_type(self):
         """Неверный тип поиска даёт ошибку."""

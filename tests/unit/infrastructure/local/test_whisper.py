@@ -22,6 +22,14 @@ from semantic_core.interfaces.transcriber import (
 )
 
 
+# Проверяем наличие lightning_whisper_mlx для MLX тестов
+try:
+    import lightning_whisper_mlx
+    HAS_LIGHTNING_MLX = True
+except ImportError:
+    HAS_LIGHTNING_MLX = False
+
+
 # ============================================================================
 # Tests: device.py
 # ============================================================================
@@ -30,95 +38,95 @@ from semantic_core.interfaces.transcriber import (
 class TestDeviceDetection:
     """Тесты для device.py - определение оптимального устройства."""
 
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
     def test_is_apple_silicon_m_series(self):
         """Тест: is_apple_silicon() на Apple Silicon M-серии."""
-        from semantic_core.infrastructure.local.whisper.device import is_apple_silicon
+        with patch("platform.system", return_value="Darwin"):
+            with patch("platform.machine", return_value="arm64"):
+                from semantic_core.infrastructure.local.whisper.device import is_apple_silicon
 
-        assert is_apple_silicon() is True
+                assert is_apple_silicon() is True
 
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="x86_64")
     def test_is_apple_silicon_intel_mac(self):
         """Тест: is_apple_silicon() на Intel Mac."""
-        from semantic_core.infrastructure.local.whisper.device import is_apple_silicon
+        with patch("platform.system", return_value="Darwin"):
+            with patch("platform.machine", return_value="x86_64"):
+                from semantic_core.infrastructure.local.whisper.device import is_apple_silicon
 
-        assert is_apple_silicon() is False
+                assert is_apple_silicon() is False
 
-    @patch("platform.system", return_value="Linux")
     def test_is_apple_silicon_linux(self):
         """Тест: is_apple_silicon() на Linux."""
-        from semantic_core.infrastructure.local.whisper.device import is_apple_silicon
+        with patch("platform.system", return_value="Linux"):
+            from semantic_core.infrastructure.local.whisper.device import is_apple_silicon
 
-        assert is_apple_silicon() is False
+            assert is_apple_silicon() is False
 
-    @patch("platform.system", return_value="Windows")
     def test_is_apple_silicon_windows(self):
         """Тест: is_apple_silicon() на Windows."""
-        from semantic_core.infrastructure.local.whisper.device import is_apple_silicon
+        with patch("platform.system", return_value="Windows"):
+            from semantic_core.infrastructure.local.whisper.device import is_apple_silicon
 
-        assert is_apple_silicon() is False
+            assert is_apple_silicon() is False
 
-    @patch.dict("os.environ", {"WHISPER_BACKEND": "mlx"})
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
     def test_get_device_info_forced_mlx(self):
         """Тест: get_device_info() с принудительным MLX."""
-        from semantic_core.infrastructure.local.whisper.device import get_device_info
+        with patch.dict("os.environ", {"WHISPER_BACKEND": "mlx"}):
+            with patch("platform.system", return_value="Darwin"):
+                with patch("platform.machine", return_value="arm64"):
+                    from semantic_core.infrastructure.local.whisper.device import get_device_info
 
-        device_type, device_name = get_device_info()
-        assert device_type == "mlx"
-        assert "FORCED" in device_name
+                    device_type, device_name = get_device_info()
+                    assert device_type == "mlx"
+                    assert "FORCED" in device_name
 
-    @patch.dict("os.environ", {"WHISPER_BACKEND": "pytorch"})
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
     def test_get_device_info_forced_pytorch_on_apple_silicon(self):
         """Тест: get_device_info() с принудительным PyTorch на Apple Silicon."""
-        from semantic_core.infrastructure.local.whisper.device import get_device_info
+        with patch.dict("os.environ", {"WHISPER_BACKEND": "pytorch"}):
+            with patch("platform.system", return_value="Darwin"):
+                with patch("platform.machine", return_value="arm64"):
+                    from semantic_core.infrastructure.local.whisper.device import get_device_info
 
-        with patch("torch.cuda.is_available", return_value=False):
-            with patch("torch.backends.mps.is_available", return_value=True):
-                device_type, device_name = get_device_info()
-                assert device_type == "mps"
-                assert "FORCED" in device_name
+                    with patch("torch.cuda.is_available", return_value=False):
+                        with patch("torch.backends.mps.is_available", return_value=True):
+                            device_type, device_name = get_device_info()
+                            assert device_type == "mps"
+                            assert "FORCED" in device_name
 
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
     def test_get_device_info_auto_mlx(self):
         """Тест: get_device_info() auto-detection MLX."""
-        from semantic_core.infrastructure.local.whisper.device import get_device_info
+        with patch("platform.system", return_value="Darwin"):
+            with patch("platform.machine", return_value="arm64"):
+                from semantic_core.infrastructure.local.whisper.device import get_device_info
 
-        # Mock lightning_whisper_mlx успешно импортируется
-        with patch.dict("sys.modules", {"lightning_whisper_mlx": MagicMock()}):
-            device_type, device_name = get_device_info()
-            assert device_type == "mlx"
-            assert "MLX" in device_name
+                # Mock lightning_whisper_mlx успешно импортируется
+                with patch.dict("sys.modules", {"lightning_whisper_mlx": MagicMock()}):
+                    device_type, device_name = get_device_info()
+                    assert device_type == "mlx"
+                    assert "MLX" in device_name
 
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
+    @pytest.mark.skipif(HAS_LIGHTNING_MLX, reason="Test requires MLX NOT installed for fallback behavior")
     def test_get_device_info_auto_mps_fallback(self):
         """Тест: get_device_info() fallback на MPS если MLX не установлен."""
-        from semantic_core.infrastructure.local.whisper.device import get_device_info
+        with patch("platform.system", return_value="Darwin"):
+            with patch("platform.machine", return_value="arm64"):
+                from semantic_core.infrastructure.local.whisper.device import get_device_info
 
-        # Mock lightning_whisper_mlx НЕ импортируется, но torch.mps доступен
-        with patch("builtins.__import__", side_effect=ImportError):
-            with patch("torch.backends.mps.is_available", return_value=True):
-                device_type, device_name = get_device_info()
-                assert device_type == "mps"
-                assert "speedup" in device_name.lower()
+                # MLX not installed, fallback to MPS
+                with patch("torch.backends.mps.is_available", return_value=True):
+                    device_type, device_name = get_device_info()
+                    assert device_type == "mps"
+                    assert "speedup" in device_name.lower()
 
-    @patch("platform.system", return_value="Linux")
     def test_get_device_info_cuda(self):
         """Тест: get_device_info() на Linux с CUDA."""
-        from semantic_core.infrastructure.local.whisper.device import get_device_info
+        with patch("platform.system", return_value="Linux"):
+            from semantic_core.infrastructure.local.whisper.device import get_device_info
 
-        with patch("torch.cuda.is_available", return_value=True):
-            with patch("torch.cuda.get_device_name", return_value="NVIDIA RTX 4090"):
-                device_type, device_name = get_device_info()
-                assert device_type == "cuda"
-                assert "4090" in device_name
+            with patch("torch.cuda.is_available", return_value=True):
+                with patch("torch.cuda.get_device_name", return_value="NVIDIA RTX 4090"):
+                    device_type, device_name = get_device_info()
+                    assert device_type == "cuda"
+                    assert "4090" in device_name
 
 
 # ============================================================================
@@ -126,69 +134,69 @@ class TestDeviceDetection:
 # ============================================================================
 
 
+@pytest.mark.mlx
+@pytest.mark.skipif(not HAS_LIGHTNING_MLX, reason="lightning-whisper-mlx not installed")
 class TestWhisperModelMLX:
     """Тесты для WhisperModelMLX."""
 
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
     def test_init_valid_model(self):
         """Тест: инициализация с валидной моделью."""
-        from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
-
-        model = WhisperModelMLX(model_size="large-v3", batch_size=12)
-        assert model.model_size == "large-v3"
-        assert model.batch_size == 12
-        assert model.whisper is None  # Lazy load
-
-    @patch("platform.system", return_value="Linux")
-    def test_init_raises_on_non_apple_silicon(self):
-        """Тест: RuntimeError на не-Apple Silicon."""
-        from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
-
-        with pytest.raises(RuntimeError, match="requires Apple Silicon"):
-            WhisperModelMLX(model_size="large-v3")
-
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
-    def test_init_invalid_model_raises(self):
-        """Тест: ValueError при невалидной модели."""
-        from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
-
-        with pytest.raises(ValueError, match="not available"):
-            WhisperModelMLX(model_size="invalid-model")
-
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
-    def test_load_model_lightning(self):
-        """Тест: загрузка Lightning Whisper MLX модели."""
-        from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
-
-        mock_lightning = MagicMock()
-        with patch.dict("sys.modules", {"lightning_whisper_mlx": mock_lightning}):
-            model = WhisperModelMLX(model_size="large-v3")
-            model.load_model()
-
-            assert model.whisper is not None
-            assert model.is_loaded() is True
-
-    @patch("platform.system", return_value="Darwin")
-    @patch("platform.machine", return_value="arm64")
-    def test_transcribe_returns_segments(self):
-        """Тест: transcribe() возвращает segments с таймкодами."""
-        from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
-
-        mock_whisper = MagicMock()
-        mock_whisper.transcribe.return_value = {
-            "text": "Hello world",
-            "segments": [
-                {"start": 0.0, "end": 2.5, "text": "Hello"},
-                {"start": 2.5, "end": 5.0, "text": "world"},
-            ],
-            "language": "en",
-        }
-
         with patch("platform.system", return_value="Darwin"):
             with patch("platform.machine", return_value="arm64"):
+                from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
+
+                model = WhisperModelMLX(model_size="large-v3", batch_size=12)
+                assert model.model_size == "large-v3"
+                assert model.batch_size == 12
+                assert model.whisper is None  # Lazy load
+
+    def test_init_raises_on_non_apple_silicon(self):
+        """Тест: RuntimeError на не-Apple Silicon."""
+        with patch("platform.system", return_value="Linux"):
+            from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
+
+            with pytest.raises(RuntimeError, match="requires Apple Silicon"):
+                WhisperModelMLX(model_size="large-v3")
+
+    def test_init_invalid_model_raises(self):
+        """Тест: ValueError при невалидной модели."""
+        with patch("platform.system", return_value="Darwin"):
+            with patch("platform.machine", return_value="arm64"):
+                from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
+
+                with pytest.raises(ValueError, match="not available"):
+                    WhisperModelMLX(model_size="invalid-model")
+
+    def test_load_model_lightning(self):
+        """Тест: загрузка Lightning Whisper MLX модели."""
+        with patch("platform.system", return_value="Darwin"):
+            with patch("platform.machine", return_value="arm64"):
+                from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
+
+                mock_lightning = MagicMock()
+                with patch.dict("sys.modules", {"lightning_whisper_mlx": mock_lightning}):
+                    model = WhisperModelMLX(model_size="large-v3")
+                    model.load_model()
+
+                    assert model.whisper is not None
+                    assert model.is_loaded() is True
+
+    def test_transcribe_returns_segments(self):
+        """Тест: transcribe() возвращает segments с таймкодами."""
+        with patch("platform.system", return_value="Darwin"):
+            with patch("platform.machine", return_value="arm64"):
+                from semantic_core.infrastructure.local.whisper.models import WhisperModelMLX
+
+                mock_whisper = MagicMock()
+                mock_whisper.transcribe.return_value = {
+                    "text": "Hello world",
+                    "segments": [
+                        {"start": 0.0, "end": 2.5, "text": "Hello"},
+                        {"start": 2.5, "end": 5.0, "text": "world"},
+                    ],
+                    "language": "en",
+                }
+
                 model = WhisperModelMLX(model_size="large-v3")
                 model.whisper = mock_whisper
 
@@ -244,6 +252,8 @@ class TestWhisperModel:
 
     def test_transcribe_returns_chunks(self):
         """Тест: transcribe() возвращает chunks с таймкодами."""
+        librosa = pytest.importorskip("librosa")
+        
         from semantic_core.infrastructure.local.whisper.models import WhisperModel
 
         mock_pipe = MagicMock()

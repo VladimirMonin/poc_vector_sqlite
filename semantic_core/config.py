@@ -663,10 +663,12 @@ class SemanticConfig(BaseSettings):
             return {}
 
         # Маппинг секций TOML -> полей конфига
+        # Примечание: gemini ключи используют validation_alias (GEMINI_API_KEY),
+        # поэтому передаём их через alias, а не имя поля
         mapping = {
             ("database", "path"): "db_path",
-            ("gemini", "api_key"): "gemini_api_key",
-            ("gemini", "batch_key"): "gemini_batch_key",
+            ("gemini", "api_key"): "GEMINI_API_KEY",  # validation_alias
+            ("gemini", "batch_key"): "GEMINI_BATCH_KEY",  # validation_alias
             ("gemini", "model"): "embedding_model",
             ("gemini", "embedding_dimension"): "embedding_dimension",
             ("processing", "splitter"): "splitter",
