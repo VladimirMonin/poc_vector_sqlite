@@ -11,12 +11,14 @@
 ## 🎯 Цель
 
 Создать **Settings page** в Flask App для:
+
 - Просмотра текущего провайдера (Gemini/Local/OpenAI)
 - Переключения между провайдерами через UI
 - Предупреждения о dimension mismatch
 - Отображения статуса провайдера (работает/ошибка)
 
 **UX Flow:**
+
 ```
 User открывает /settings
   ↓
@@ -36,12 +38,14 @@ User открывает /settings
 ### 1. Route: /settings
 
 **Что делаем:**
+
 - Создать новый blueprint `app/routes/settings.py`
 - GET `/settings` — страница с текущим провайдером и списком доступных
 - POST `/settings/switch` — переключение провайдера (обновляет semantic.toml)
 - POST `/settings/check-dimension` — AJAX проверка dimension compatibility
 
 **Данные на странице:**
+
 - Current Provider: name, dimension, status (✅ работает / ❌ ошибка)
 - DB Dimension: dimension из БД
 - Dimension Match Status: compatible / mismatch с предупреждением
@@ -51,6 +55,7 @@ User открывает /settings
   - Badge "Active" / "Coming Soon" / "Requires API Key"
 
 **Логика:**
+
 - При switch → обновить semantic.toml секцию `[defaults]`
 - Показать flash message "✅ Switched, перезапусти Flask"
 - Если dimension mismatch → показать JS confirmation с инструкциями
@@ -60,6 +65,7 @@ User открывает /settings
 ### 2. Template: settings.html
 
 **Что делаем:**
+
 - Создать `templates/settings.html` с Bootstrap 5 cards
 - Current Provider Card:
   - Provider name badge (info color)
@@ -83,6 +89,7 @@ User открывает /settings
 ### 3. Navigation Link
 
 **Что делаем:**
+
 - Обновить `templates/base.html` navbar
 - Добавить `<a href="{{ url_for('settings.index') }}">⚙️ Settings</a>`
 - Разместить после Chat, перед возможным About/Help
@@ -92,6 +99,7 @@ User открывает /settings
 ### 4. Blueprint Registration
 
 **Что делаем:**
+
 - Обновить `app/__init__.py` в `create_app()`
 - Добавить `from app.routes import settings`
 - Добавить `app.register_blueprint(settings.bp)`
@@ -101,6 +109,7 @@ User открывает /settings
 ## 🎨 UI/UX Features
 
 **Interactive Elements:**
+
 1. **Provider Cards:**
    - Current provider выделен border-primary
    - Показывает badge "Active"
@@ -167,6 +176,7 @@ User открывает /settings
 ## 🧪 Тестирование
 
 **Manual:**
+
 - Открыть `/settings` → должен показать Gemini (768D) как current
 - Кликнуть "Switch to Local" → должен показать warning о dimension mismatch
 - Подтвердить → должен обновить semantic.toml
@@ -175,6 +185,7 @@ User открывает /settings
 - Settings должен показать Local как Active
 
 **E2E:**
+
 - `test_settings_page_loads()` — страница загружается
 - `test_switch_provider()` — переключение провайдера
 - `test_dimension_mismatch_warning()` — показывается warning
@@ -184,6 +195,7 @@ User открывает /settings
 ## 🎯 Результат
 
 **Должно работать:**
+
 - Settings page доступна по `/settings`
 - Показывает текущий провайдер и dimension
 - Кнопки "Switch to X" работают
@@ -193,6 +205,7 @@ User открывает /settings
 - Links на документацию кликабельны
 
 **UX:**
+
 - Интуитивный интерфейс выбора провайдера
 - Предупреждения о последствиях переключения
 - Инструкции по миграции БД
