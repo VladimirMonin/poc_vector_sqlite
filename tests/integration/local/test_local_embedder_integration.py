@@ -22,10 +22,9 @@ except ImportError:
     MLX_AVAILABLE = False
 
 # Проверка Apple Silicon
-IS_APPLE_SILICON = (
-    sys.platform == "darwin"
-    and "arm" in str(getattr(sys, "implementation", "")).lower()
-)
+IS_APPLE_SILICON = sys.platform == "darwin" and "arm" in str(
+    getattr(sys, "implementation", "")
+).lower()
 
 from semantic_core.infrastructure.local.embeddings import LocalEmbedder
 

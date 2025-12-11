@@ -25,7 +25,6 @@ python -c "import mlx; import mlx_embeddings; print('✅ MLX ready')"
 ```
 
 **Требования:**
-
 - macOS с Apple Silicon (M1/M2/M3)
 - Python >=3.13
 - ~500MB свободного места для моделей
@@ -65,19 +64,16 @@ vectors = embedder.embed_documents([
 ### Рекомендации
 
 **Для быстрого POC:**
-
 ```python
 embedder = LocalEmbedder("all-minilm")  # Легковесная, универсальная
 ```
 
 **Для production с длинными документами:**
-
 ```python
 embedder = LocalEmbedder("qwen3-embedding")  # Высокая размерность, длинный контекст
 ```
 
 **Для английских текстов:**
-
 ```python
 embedder = LocalEmbedder("bge-small")  # Самая маленькая модель
 ```

@@ -35,9 +35,9 @@ from semantic_core.processing.splitters.smart_splitter import SmartSplitter
 def get_chunks_for_document(doc_id: int) -> list:
     """Получить Chunk domain objects для документа из БД."""
     from semantic_core.domain import Chunk, ChunkType
-
+    
     db_chunks = list(ChunkModel.select().where(ChunkModel.document == doc_id))
-
+    
     chunks = []
     for db_chunk in db_chunks:
         chunk = Chunk(
@@ -51,7 +51,7 @@ def get_chunks_for_document(doc_id: int) -> list:
             embedding=None,  # не загружаем embedding
         )
         chunks.append(chunk)
-
+    
     return chunks
 
 
@@ -73,7 +73,7 @@ def test_db(tmp_path: Path) -> Generator:
 def mock_embedder() -> MagicMock:
     """Mock embedder с детерминированными эмбеддингами."""
     embedder = MagicMock(spec=GeminiEmbedder)
-
+    
     def embed_documents(texts: list[str]) -> list[np.ndarray]:
         result = []
         for text in texts:
@@ -81,16 +81,16 @@ def mock_embedder() -> MagicMock:
             rng = np.random.default_rng(seed)
             result.append(rng.random(768).astype(np.float32))
         return result
-
+    
     def embed_query(text: str) -> np.ndarray:
         seed = hash(text) % 10000
         rng = np.random.default_rng(seed)
         return rng.random(768).astype(np.float32)
-
+    
     embedder.embed_documents = embed_documents
     embedder.embed_query = embed_query
     embedder.dimension = 768
-
+    
     return embedder
 
 
@@ -137,18 +137,18 @@ def semantic_core(
 ) -> SemanticCore:
     """SemanticCore с временной БД и моками."""
     from semantic_core.config import SemanticConfig
-
+    
     parser = MarkdownNodeParser()
     splitter = SmartSplitter(parser=parser, chunk_size=500)
     context = HierarchicalContextStrategy(include_doc_title=True)
     store = PeeweeVectorStore(test_db)
-
+    
     # Создаём конфиг с правильной структурой
     config = SemanticConfig(
         db_path=str(tmp_path / "test.db"),
         gemini_api_key="fake-key-for-tests",
     )
-
+    
     return SemanticCore(
         embedder=mock_embedder,
         store=store,
@@ -183,7 +183,7 @@ def test_audio_with_timecodes(
     mock_audio_resource: MediaResource,
 ):
     """E2E: Audio транскрипция с таймкодами → metadata['start_seconds']."""
-
+    
     # Переопределяем mock analyzer для этого теста
     # ВАЖНО: Делаем транскрипцию ДЛИННОЙ чтобы splitter разбил на 3+ чанка
     mock_audio_analyzer.analyze.return_value = MediaAnalysisResult(
@@ -212,29 +212,32 @@ def test_audio_with_timecodes(
         duration_seconds=90,  # 1.5 минуты
         tokens_used=100,
     )
-
+    
     # Ingest audio
     doc_id = semantic_core.ingest_audio(mock_audio_resource.path)
-
+    
     # Получаем chunks через helper
     chunks = get_chunks_for_document(doc_id)
     assert len(chunks) >= 2  # Summary + минимум 1 transcript
-
+    
     # Фильтруем transcript chunks (не summary)
-    transcript_chunks = [c for c in chunks if c.metadata.get("role") == "transcript"]
-
+    transcript_chunks = [
+        c for c in chunks
+        if c.metadata.get("role") == "transcript"
+    ]
+    
     assert len(transcript_chunks) >= 1  # Минимум 1 transcript chunk
-
+    
     # ВАЖНО: Проверяем что ПЕРВЫЙ таймкод [00:05] распарсился
     # Он может быть в первом чанке (splitter объединил все параграфы)
     first_chunk = transcript_chunks[0]
     assert "start_seconds" in first_chunk.metadata
     assert first_chunk.metadata["start_seconds"] == 5  # [00:05]
-
+    
     # Проверяем что есть timecode_original
     assert "timecode_original" in first_chunk.metadata
     assert first_chunk.metadata["timecode_original"] == "[00:05]"
-
+    
     # Если splitter создал несколько чанков (зависит от chunk_size):
     # - Второй чанк должен иметь [00:30] ИЛИ унаследованный 5
     # - Третий чанк должен иметь [01:15] ИЛИ унаследованный
@@ -252,7 +255,7 @@ def test_timecode_inheritance(
     mock_audio_resource: MediaResource,
 ):
     """E2E: Чанк без таймкода наследует от предыдущего через inherit_timecode()."""
-
+    
     # Переопределяем mock analyzer для этого теста
     # ВАЖНО: ДЛИННАЯ транскрипция с 1 таймкодом → splitter разобьёт на 2+ чанка
     mock_audio_analyzer.analyze.return_value = MediaAnalysisResult(
@@ -274,22 +277,25 @@ def test_timecode_inheritance(
         duration_seconds=60,  # 1 минута
         tokens_used=100,
     )
-
+    
     # Ingest audio
     doc_id = semantic_core.ingest_audio(mock_audio_resource.path)
     chunks = get_chunks_for_document(doc_id)
-
+    
     # Фильтруем transcript chunks
-    transcript_chunks = [c for c in chunks if c.metadata.get("role") == "transcript"]
-
+    transcript_chunks = [
+        c for c in chunks
+        if c.metadata.get("role") == "transcript"
+    ]
+    
     # Минимум 1 transcript chunk
     assert len(transcript_chunks) >= 1
-
+    
     # Первый chunk: [00:10] → start_seconds=10 (может быть внутри большого чанка)
     first_chunk = transcript_chunks[0]
     assert first_chunk.metadata["start_seconds"] == 10
     assert first_chunk.metadata.get("timecode_original") == "[00:10]"
-
+    
     # Все чанки должны иметь start_seconds (либо явный, либо унаследованный)
     for chunk in transcript_chunks:
         assert "start_seconds" in chunk.metadata
@@ -301,7 +307,7 @@ def test_first_chunk_without_timecode_is_zero(
     mock_audio_resource: MediaResource,
 ):
     """E2E: Если первый чанк без таймкода → start_seconds=0."""
-
+    
     # Переопределяем mock analyzer для этого теста
     mock_audio_analyzer.analyze.return_value = MediaAnalysisResult(
         description="Test no timecodes",
@@ -315,16 +321,19 @@ def test_first_chunk_without_timecode_is_zero(
         duration_seconds=30,
         tokens_used=50,
     )
-
+    
     # Ingest audio
     doc_id = semantic_core.ingest_audio(mock_audio_resource.path)
     chunks = get_chunks_for_document(doc_id)
-
+    
     # Фильтруем transcript chunks
-    transcript_chunks = [c for c in chunks if c.metadata.get("role") == "transcript"]
-
+    transcript_chunks = [
+        c for c in chunks
+        if c.metadata.get("role") == "transcript"
+    ]
+    
     assert len(transcript_chunks) >= 1
-
+    
     # Первый chunk без таймкода → start_seconds=0
     first_chunk = transcript_chunks[0]
     assert first_chunk.metadata["start_seconds"] == 0
@@ -342,9 +351,9 @@ def test_user_prompt_injection_audio(
     mock_audio_resource: MediaResource,
 ):
     """E2E: user_prompt передаётся в analyzer через MediaRequest."""
-
+    
     custom_prompt = "Focus on technical terminology"
-
+    
     # Переопределяем mock analyzer
     mock_audio_analyzer.analyze.return_value = MediaAnalysisResult(
         description="Audio with user prompt",
@@ -355,18 +364,18 @@ def test_user_prompt_injection_audio(
         duration_seconds=10,
         tokens_used=50,
     )
-
+    
     # Ingest с custom prompt
     doc_id = semantic_core.ingest_audio(
         mock_audio_resource.path,
         user_prompt=custom_prompt,
     )
-
+    
     # Проверяем что analyzer.analyze() был вызван с правильным MediaRequest
     assert mock_audio_analyzer.analyze.called
     call_args = mock_audio_analyzer.analyze.call_args
     media_request = call_args[0][0]  # Первый позиционный аргумент
-
+    
     # user_prompt должен быть в MediaRequest
     assert media_request.user_prompt == custom_prompt
 
@@ -377,7 +386,7 @@ def test_user_prompt_injection_video(
     tmp_path: Path,
 ):
     """E2E: user_prompt для video также передаётся в analyzer."""
-
+    
     # Mock video file
     video_path = tmp_path / "test_video.mp4"
     video_path.write_bytes(b"fake video content")
@@ -386,9 +395,9 @@ def test_user_prompt_injection_video(
         media_type="video",
         mime_type="video/mp4",
     )
-
+    
     custom_prompt = "Identify all code snippets on screen"
-
+    
     # Переопределяем mock analyzer
     mock_video_analyzer.analyze.return_value = MediaAnalysisResult(
         description="Video with user prompt",
@@ -400,18 +409,18 @@ def test_user_prompt_injection_video(
         duration_seconds=30,
         tokens_used=100,
     )
-
+    
     # Ingest с custom prompt
     doc_id = semantic_core.ingest_video(
         video_resource.path,
         user_prompt=custom_prompt,
     )
-
+    
     # Проверяем что analyzer.analyze() был вызван с user_prompt
     assert mock_video_analyzer.analyze.called
     call_args = mock_video_analyzer.analyze.call_args
     media_request = call_args[0][0]
-
+    
     assert media_request.user_prompt == custom_prompt
 
 
@@ -426,7 +435,7 @@ def test_timecode_validation_max_duration(
     mock_audio_resource: MediaResource,
 ):
     """E2E: Таймкод больше duration → отбрасывается."""
-
+    
     # Переопределяем mock analyzer
     mock_audio_analyzer.analyze.return_value = MediaAnalysisResult(
         description="Test invalid timecode",
@@ -440,21 +449,25 @@ def test_timecode_validation_max_duration(
         duration_seconds=60,  # Файл всего 1 минута
         tokens_used=50,
     )
-
+    
     # Ingest audio
     doc_id = semantic_core.ingest_audio(mock_audio_resource.path)
     chunks = get_chunks_for_document(doc_id)
-
+    
     # Фильтруем transcript chunks
-    transcript_chunks = [c for c in chunks if c.metadata.get("role") == "transcript"]
-
+    transcript_chunks = [
+        c for c in chunks
+        if c.metadata.get("role") == "transcript"
+    ]
+    
     # Первый chunk: валидный [00:05]
     first_chunk = transcript_chunks[0]
     assert first_chunk.metadata["start_seconds"] == 5
-
+    
     # Второй chunk: [10:00] должен быть отброшен, используется inheritance
     if len(transcript_chunks) > 1:
         second_chunk = transcript_chunks[1]
         # Должен наследовать от first_chunk, а не иметь 600 секунд
         assert second_chunk.metadata["start_seconds"] < 600
         assert "timecode_original" not in second_chunk.metadata  # Не распарсен
+

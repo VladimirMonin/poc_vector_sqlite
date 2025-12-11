@@ -126,24 +126,24 @@ def embed_with_model(
         if backend == "mlx-lm":
             # Qwen3-Embedding: прямой проход через слои (БЕЗ attention_mask!)
             import mlx.core as mx
-
+            
             # Токенизируем
             tokens = tokenizer.encode(text)
             input_ids = mx.array([tokens])
-
+            
             # Получаем hidden states (прямой доступ к слоям MLX)
             h = model.model.embed_tokens(input_ids)
             for layer in model.model.layers:
                 h = layer(h, mask=None, cache=None)
             h = model.model.norm(h)
-
+            
             # Mean pooling
             pooled = mx.mean(h, axis=1)  # [1, dimension]
             mx.eval(pooled)  # Форсируем вычисление
-
+            
             # Конвертация: MLX float16 → float32 → numpy (обходим dtype несовместимость)
             return np.array(pooled[0].astype(mx.float32))
-
+        
         else:
             # mlx-embeddings: all-MiniLM, BGE-small (требуют attention_mask)
             inputs = tokenizer.batch_encode_plus(
@@ -153,13 +153,11 @@ def embed_with_model(
                 truncation=True,
                 max_length=max_length,
             )
-
-            outputs = model(
-                inputs["input_ids"], attention_mask=inputs["attention_mask"]
-            )
+            
+            outputs = model(inputs["input_ids"], attention_mask=inputs["attention_mask"])
             embeddings = outputs.text_embeds
-
+            
             return np.array(embeddings[0])
-
+    
     except Exception as e:
         raise RuntimeError(f"Failed to generate embedding: {e}") from e

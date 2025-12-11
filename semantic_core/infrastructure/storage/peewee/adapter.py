@@ -1210,7 +1210,7 @@ class PeeweeVectorStore(BaseVectorStore):
         # Формируем WHERE условия для фильтров
         where_conditions = []
         where_params = []
-
+        
         # Фильтры по метаданным документа
         if filters:
             for key, value in filters.items():

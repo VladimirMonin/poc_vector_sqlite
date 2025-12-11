@@ -53,7 +53,7 @@ class TestQwen3ExtendedPipeline:
     def test_qwen3_4000_tokens_embeddings(self, tmp_path):
         """
         E2E: Qwen3 с max_tokens=4000 (вместо 512).
-
+        
         Модель поддерживает до 8192 токенов, проверяем что можем
         использовать большие чанки для документов.
         """
@@ -95,7 +95,7 @@ max_tokens = 4000
     def test_qwen3_vision_local_analysis(self, tmp_path):
         """
         E2E: Локальная Qwen3-VL-4B для анализа изображений.
-
+        
         Проверяет что можем использовать локальную VLM модель
         вместо облачного Gemini Vision.
         """
@@ -113,7 +113,7 @@ max_tokens = 4000
             / "poc_apple_local_llm"
             / "test_images"
         )
-
+        
         if ref_images.exists():
             images = list(ref_images.glob("*.png")) + list(ref_images.glob("*.jpg"))
             if images:
@@ -289,7 +289,9 @@ transformers and diffusion models.
         print(f"\n🔍 STEP 2: Search inspection...")
         search_query = "neural networks and deep learning"
 
-        search_snapshot = inspector.search_with_inspection(query=search_query, top_k=3)
+        search_snapshot = inspector.search_with_inspection(
+            query=search_query, top_k=3
+        )
 
         assert len(search_snapshot.searches) > 0
         search_result = search_snapshot.searches[0]
@@ -302,7 +304,9 @@ transformers and diffusion models.
         for idx, result in enumerate(search_result.results[:3], 1):
             similarity = result.get("similarity", 0.0)
             content = result.get("content", "")[:100]
-            print(f"  {idx}. Similarity: {similarity:.4f} | Content: {content}...")
+            print(
+                f"  {idx}. Similarity: {similarity:.4f} | Content: {content}..."
+            )
             assert similarity > 0, "Similarity должна быть > 0"
 
         # STEP 3: Сохраняем artifacts
@@ -346,7 +350,7 @@ transformers and diffusion models.
     def test_qwen3_multimodal_document_inspection(self, tmp_path):
         """
         E2E: Инспекция документа с текстом и изображениями.
-
+        
         Проверяет полный multimodal pipeline:
         - Текст -> Qwen3 embeddings (4000 tokens)
         - Изображения -> Qwen3-VL анализ
@@ -433,10 +437,7 @@ Convolutional Neural Networks (CNNs) have revolutionized image processing.
         session_folder.mkdir(parents=True, exist_ok=True)
 
         snapshot_path = inspector.snapshot_manager.save_snapshot(
-            snapshot,
-            session_path=session_folder,
-            file_prefix="multimodal",
-            compress=False,
+            snapshot, session_path=session_folder, file_prefix="multimodal", compress=False
         )
 
         input_copy_path = session_folder / f"input_{test_file.name}"

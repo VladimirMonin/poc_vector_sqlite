@@ -190,8 +190,12 @@ class TestOpenAILLMProviderStreaming:
 
         # Mock streaming response
         mock_chunks = [
-            Mock(choices=[Mock(delta=Mock(content="Hello"), finish_reason=None)]),
-            Mock(choices=[Mock(delta=Mock(content=" world"), finish_reason=None)]),
+            Mock(
+                choices=[Mock(delta=Mock(content="Hello"), finish_reason=None)]
+            ),
+            Mock(
+                choices=[Mock(delta=Mock(content=" world"), finish_reason=None)]
+            ),
             Mock(choices=[Mock(delta=Mock(content="!"), finish_reason="stop")]),
         ]
 
@@ -213,7 +217,11 @@ class TestOpenAILLMProviderStreaming:
         mock_openai_class.return_value = mock_client
 
         provider = OpenAILLMProvider(api_key="test-key")
-        list(provider.generate_stream("Test", system_prompt="You are helpful"))
+        list(
+            provider.generate_stream(
+                "Test", system_prompt="You are helpful"
+            )
+        )
 
         call_args = mock_client.chat.completions.create.call_args
         messages = call_args.kwargs["messages"]
@@ -245,7 +253,9 @@ class TestOpenAILLMProviderTokens:
     def test_token_counting_different_models(self, mock_openai_class):
         """Проверка что tiktoken использует правильный encoding для модели."""
         provider_gpt4 = OpenAILLMProvider(model="gpt-4o", api_key="test-key")
-        provider_gpt35 = OpenAILLMProvider(model="gpt-3.5-turbo", api_key="test-key")
+        provider_gpt35 = OpenAILLMProvider(
+            model="gpt-3.5-turbo", api_key="test-key"
+        )
 
         text = "Test tokenization"
 
@@ -328,7 +338,9 @@ class TestOpenAILLMProviderErrors:
     def test_error_handling_unexpected(self, mock_openai_class):
         """Проверка обработки неожиданных ошибок."""
         mock_client = Mock()
-        mock_client.chat.completions.create.side_effect = Exception("Unexpected error")
+        mock_client.chat.completions.create.side_effect = Exception(
+            "Unexpected error"
+        )
         mock_openai_class.return_value = mock_client
 
         provider = OpenAILLMProvider(api_key="test-key")
@@ -390,7 +402,9 @@ class TestOpenAILLMProviderHistory:
         history = [{"role": "user", "content": "Hi"}]
 
         provider = OpenAILLMProvider(api_key="test-key")
-        provider.generate("Test", system_prompt="You are helpful", history=history)
+        provider.generate(
+            "Test", system_prompt="You are helpful", history=history
+        )
 
         call_args = mock_client.chat.completions.create.call_args
         messages = call_args.kwargs["messages"]

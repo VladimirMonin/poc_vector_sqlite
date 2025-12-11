@@ -100,7 +100,7 @@ class TestComponentFactoryEmbedder:
 
     def test_create_embedder_local(self, local_config):
         """Создание Local embedder.
-
+        
         NOTE: Патч внутри функции с lazy import не работает в unit-тестах.
         Нужен integration test. Пропускаем пока.
         """
@@ -136,14 +136,14 @@ class TestComponentFactoryLLM:
 
     def test_create_llm_openai(self, gemini_config):
         """Создание OpenAI LLM.
-
+        
         NOTE: Требует integration test из-за lazy imports. Пропускаем.
         """
         pytest.skip("Requires integration test - lazy imports inside factory")
 
     def test_create_llm_ollama(self, ollama_config):
         """Создание Ollama LLM (через OpenAI adapter).
-
+        
         NOTE: Требует integration test из-за lazy imports. Пропускаем.
         """
         pytest.skip("Requires integration test - lazy imports inside factory")
@@ -175,14 +175,14 @@ class TestComponentFactoryTranscriber:
 
     def test_create_transcriber_whisper(self, local_config):
         """Создание Whisper transcriber.
-
+        
         NOTE: Требует integration test из-за lazy imports. Пропускаем.
         """
         pytest.skip("Requires integration test - lazy imports inside factory")
 
     def test_create_transcriber_whisper_import_error(self, local_config):
         """Whisper не установлен → падает при реальном импорте.
-
+        
         NOTE: Этот тест должен быть в integration тестах, где можно
         реально проверить отсутствие зависимостей. Пропускаем пока.
         """
@@ -300,7 +300,7 @@ class TestGracefulDegradation:
 
     def test_local_embedder_missing_dependencies(self, local_config):
         """Local embedder без зависимостей → должен выброс импортировать ошибку.
-
+        
         NOTE: Этот тест требует реальной изоляции импортов и должен быть
         в integration тестах, а не unit. Пропускаем пока.
         """
@@ -308,7 +308,7 @@ class TestGracefulDegradation:
 
     def test_openai_llm_missing_dependencies(self, gemini_config):
         """OpenAI LLM без зависимостей → должен выбросить import error.
-
+        
         NOTE: Этот тест требует реальной изоляции импортов и должен быть
         в integration тестах, а не unit. Пропускаем пока.
         """
