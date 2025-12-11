@@ -133,9 +133,11 @@ semantic inspect docs/complex.md --format markdown --output chunking_report.md
 **Headers:** `['Overview']`
 **Content:**
 ```
+
 # Complex Document
 
 This document contains various types of content...
+
 ```
 
 ### Chunk #2: Code Block
@@ -145,6 +147,7 @@ This document contains various types of content...
 def hello():
     print("Hello, World!")
 ```
+
 ```
 
 ### Пример 2: Сравнение провайдеров (Gemini vs Local)
@@ -168,6 +171,7 @@ diff snapshots/gemini/example_md_inspection.json \
 ```
 
 **Что искать в diff:**
+
 - `embedder_metadata.provider_type`: `GeminiEmbedder` vs `LocalEmbedder`
 - `embedder_metadata.dimension`: `768` vs `384` (разные размерности!)
 - `chunks[].embedding_preview`: разные векторы (нормально)
@@ -197,17 +201,23 @@ semantic inspect docs/python_guide.md \
 **Headers:** `['Type System', 'Type Hints']`
 **Content Preview:**
 ```
+
 Type hints in Python allow you to annotate...
+
 ```
 
 **Query Embedding:**
 ```
+
 [0.234, -0.567, 0.123, ...]
+
 ```
 
 **Chunk Embedding:**
 ```
+
 [0.221, -0.534, 0.118, ...]
+
 ```
 
 **Cosine Similarity:** 0.547
@@ -331,6 +341,7 @@ for chunk in snapshot.chunks:
 ### Overhead инспекции
 
 Инспекция добавляет ~5-10% overhead:
+
 - Копирование данных
 - Сохранение промежуточных состояний
 - Подсчёт времени
@@ -340,9 +351,10 @@ for chunk in snapshot.chunks:
 ### Размер артефактов
 
 Snapshot может быть большим, если много чанков:
+
 - ~5 KB на чанк (с embedding preview)
 - ~100 чанков → ~500 KB
-- + копия входного файла
+- - копия входного файла
 
 **Рекомендация:** Используйте `--artifacts-dir` на диске с достаточным местом.
 
@@ -453,6 +465,7 @@ def compute_embedding_drift(old_snapshot_path, new_snapshot_path):
 ## 🔜 Что дальше?
 
 В Phase 16.1-16.5 появятся:
+
 - `semantic compare` — сравнение snapshots
 - `semantic golden create` — создание golden-файлов
 - `semantic golden test` — автотесты с golden-файлами

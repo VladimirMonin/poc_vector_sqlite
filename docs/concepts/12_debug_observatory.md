@@ -97,6 +97,7 @@ class InspectionSnapshot:
 **Зачем `file_content`?**
 
 Критически важно сохранять копию входного файла! Это позволяет:
+
 - Воспроизвести инспекцию позже
 - Сравнивать конфигурации на одном контенте
 - Создавать golden-file тесты
@@ -188,12 +189,16 @@ reporter.display_snapshot(snapshot)
 ### Chunk #1
 **Content Preview:**
 ```
+
 # Introduction to Python
+
 ```
 
 **Embedding:**
 ```
+
 [0.123, -0.456, 0.789, ...]
+
 ```
 ```
 
@@ -292,6 +297,7 @@ semantic inspect docs/python_guide.md \
 ```
 
 **В отчёте увидим:**
+
 - Какой текст отправился в embedder (с контекстом заголовков)
 - Какие embeddings вернулись
 - Similarity между запросом и каждым чанком
@@ -306,6 +312,7 @@ semantic inspect complex_doc.md --format markdown
 ```
 
 **В отчёте увидим:**
+
 - Границы чанков
 - Иерархию заголовков для каждого чанка
 - Context text (что пойдёт в embedder)
@@ -379,6 +386,7 @@ def _extract_provider_metadata(self, provider) -> ProviderMetadata:
 ```
 
 **Преимущества:**
+
 - ✅ Работает с любыми провайдерами
 - ✅ Не требует изменений в провайдерах
 - ✅ Graceful degradation (если атрибута нет → None)
@@ -386,6 +394,7 @@ def _extract_provider_metadata(self, provider) -> ProviderMetadata:
 ### Overhead
 
 Инспекция добавляет ~5-10% overhead:
+
 - Копирование данных для snapshot
 - Сохранение промежуточных состояний
 - Подсчёт времени выполнения
