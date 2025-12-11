@@ -1,53 +1,86 @@
-# Phase 17: Documentation Overhaul
+# Phase 17: Local Embeddings & Flask Multi-Provider
 
-> Масштабное обновление пользовательской документации после Phase 15-16
-
----
-
-## 📦 Подфазы
-
-| Подфаза | Название | Статус | Приоритет | Документ |
-|---------|----------|--------|-----------|----------|
-| **17.0** | Documentation Audit | ✅ Done | 🔥 Critical | [phase_17.0.md](phase_17.0.md) |
-| **17.1** | Local Embeddings Docs | 📝 Planned | 🔥 Critical | [phase_17.1_local_embeddings_docs.md](phase_17.1_local_embeddings_docs.md) |
-| **17.2** | Flask Integration Guide | 📝 Planned | 🔥 Critical | [phase_17.2_flask_integration.md](phase_17.2_flask_integration.md) |
-| **17.3** | API Reference Updates | 📝 Planned | ⚠️ Important | [phase_17.3_api_reference_updates.md](phase_17.3_api_reference_updates.md) |
-| **17.4** | Django Integration | 📌 Placeholder | 📌 Low | [phase_17.4_django_integration_placeholder.md](phase_17.4_django_integration_placeholder.md) |
+> Документация локальных embeddings и интеграция Multi-Provider архитектуры в Flask App
 
 ---
 
-## 🎯 Миссия фазы
+## 📦 Каталог подфаз
+
+### 📚 Документация (17.1-17.4)
+
+| Подфаза | Название | Статус | Файлы в docs/ |
+|---------|----------|--------|---------------|
+| **17.1** | Local Embeddings Documentation | ✅ **DONE** | `concepts/13_local_embeddings.md`<br>`guides/core/local-embeddings.md`<br>`reference/local-models.md` |
+| **17.2** | Flask Integration Guide | 📝 TODO | `guides/frameworks/flask.md` |
+| **17.3** | API Reference Updates | 📝 TODO | `reference/interfaces.md`<br>`reference/factory.md` |
+| **17.4** | Django Integration Pattern | 📌 Placeholder | `guides/frameworks/django.md` (future) |
+
+### 🔧 Реализация (17.5-17.7)
+
+| Подфаза | Название | Статус | Код |
+|---------|----------|--------|-----|
+| **17.5** | Flask Multi-Provider Integration | 📋 Planned | `examples/flask_app/app/extensions.py`<br>`examples/flask_app/semantic.toml` |
+| **17.6** | Settings UI (Provider Switcher) | 📋 Planned | `examples/flask_app/app/routes/settings.py`<br>`examples/flask_app/app/templates/settings.html` |
+| **17.7** | Testing & Demo Stand | 📋 Planned | `tests/test_extensions.py`<br>`examples/flask_app/DEMO.md` |
+
+---
+
+## 🎯 Цель Phase 17
 
 **Проблема:**
+1. LocalEmbedder реализован (Phase 15.0), но **не задокументирован** — пользователи не знают про Qwen3
+2. Flask App использует hardcoded Gemini — **не поддерживает Local embeddings**
+3. Нет демо стенда для проверки всей функциональности библиотеки
 
-После завершения Phase 15 (Multi-Provider Architecture) и Phase 16 (Debug Observatory) пользовательская документация (`docs/`) **критически устарела**.
-
-**Разрыв между кодом и документацией:**
-
-1. ❌ **ComponentFactory** не задокументирован (ключевой компонент Phase 15)
-2. ❌ **LocalEmbedder** не упомянут в гайдах (Qwen3, BGE, MiniLM)
-3. ❌ **Multi-provider конфигурация** поверхностно описана
-4. ❌ **Flask integration** паттерн не задокументирован
-5. ❌ **Debug Observatory** (`semantic inspect`) не попал в справочники
-6. ❌ **Диаграммы** не отражают Phase 15-16 архитектуру
-
-**Последствия:**
-
-- Новые пользователи не знают про локальные модели (лучшая фича Phase 15)
-- Невозможно интегрировать в веб-фреймворки без изучения кода
-- Документация вводит в заблуждение (описывает старую архитектуру)
+**Решение:**
+- ✅ **17.1:** Создать полную документацию Local Embeddings (Qwen3, MRL, hardware)
+- 📝 **17.2-17.3:** Дописать документацию интеграций и API reference
+- 📋 **17.5-17.7:** Интегрировать ComponentFactory в Flask App + Settings UI + Demo Stand
 
 ---
 
-## 💡 Решение
+## 📝 Прогресс
 
-### Phase 17.0: Documentation Audit ✅
+### ✅ Phase 17.1 — Local Embeddings Documentation (DONE)
 
-**Завершено:** Детальный аудит 908 строк с выявлением:
+**Commit:** `d092405` — "phase 17.1 feat: Добавлена документация локальных embeddings"
 
-- 14+ отсутствующих диаграмм (ComponentFactory, Observatory, multi-provider)
-- Несоответствие кода и доков (OpenAI реализован, но помечен "potential")
-- Устаревшие описания архитектуры
+**Созданные файлы:**
+- `docs/concepts/13_local_embeddings.md` (~700 строк) — теория MRL, backends, сравнение с cloud
+- `docs/guides/core/local-embeddings.md` (~850 строк) — Quick Start, миграция, troubleshooting
+- `docs/reference/local-models.md` (~550 строк) — таблицы моделей, config, API reference
+
+**Обновлённые файлы:**
+- `docs/concepts/11_multi_provider.md` — добавлен Qwen3 в сравнительную таблицу
+- `docs/guides/extending/custom-embedder.md` — Windows/Linux альтернатива (sentence-transformers)
+
+**Ключевые концепции:**
+- **Matryoshka Representation Learning (MRL)** — vec[:N] + ре-нормализация
+- **Два backend:** mlx-embeddings (BERT-like) vs mlx-lm (LLM-based для Qwen3)
+- **Hardware:** MLX = macOS only (Apple Silicon M1+)
+- **Qwen3-Embedding-0.6B** — лучшая локальная модель (1024D, multilingual, MRL 32-1024)
+
+---
+
+## 📋 Следующие шаги
+
+### TODO: Phase 17.2 — Flask Integration Guide
+
+Написать `docs/guides/frameworks/flask.md` с:
+- Application Factory паттерн
+- ComponentFactory интеграция
+- DI через app.extensions
+- Graceful degradation
+- Примеры кода
+
+### TODO: Phase 17.3 — API Reference Updates
+
+Обновить `docs/reference/interfaces.md` с:
+- Полные сигнатуры методов
+- Properties (dimension, max_tokens)
+- Raises (какие исключения)
+- Примеры использования
+- ComponentFactory API
 
 **Результат:** Техническое задание для Phase 17.1-17.4
 
@@ -64,107 +97,26 @@
    - Выбор модели по hardware (Apple/CUDA/CPU)
    - MRL и dimension truncation
 
-2. **`docs/guides/core/local-embeddings.md`** — практический гайд
-   - Установка зависимостей
-   - Конфигурация semantic.toml
-   - Решение dimension mismatch (1024 vs 768)
-
-3. **`docs/reference/local-models.md`** — справочник моделей
-   - qwen3-embedding (1024D, 8K tokens)
-   - all-minilm (384D, 512 tokens)
-   - bge-small (384D, 512 tokens)
-   - Comparison matrix (speed, quality, memory)
-
-**Обновления:**
-
-- `docs/concepts/11_multi_provider.md` — добавить Qwen3 в таблицы
-- `docs/guides/extending/custom-embedder.md` — пример LocalEmbedder
-
-**Критерий успеха:** Qwen3 упомянут в 5+ местах, новый пользователь может выбрать модель за 5 минут.
-
 ---
 
-### Phase 17.2: Flask Integration Guide 🔥
+## 📚 Детальные планы
 
-**Цель:** Документировать интеграцию SemanticCore в Flask приложения.
+### Документация
 
-**Workflow:**
-1. **СНАЧАЛА:** Мигрировать код Flask app на Phase 15 архитектуру
-2. **ПОТОМ:** Написать документацию
+- 📄 [phase_17.1_local_embeddings_docs.md](phase_17.1_local_embeddings_docs.md) — план + результаты Phase 17.1
+- 📄 [phase_17.2_flask_integration.md](phase_17.2_flask_integration.md) — план Flask интеграции
+- 📄 [phase_17.3_api_reference_updates.md](phase_17.3_api_reference_updates.md) — план API reference
+- 📄 [phase_17.4_django_integration_placeholder.md](phase_17.4_django_integration_placeholder.md) — заглушка для Django
 
-**Что будет обновлено в коде:**
+### Реализация
 
-1. `examples/flask_app/app/extensions.py` — ComponentFactory вместо hardcoded Gemini
-2. `examples/flask_app/app/config.py` — интеграция SemanticConfig
-3. `examples/flask_app/semantic.toml` — конфигурация с локальными моделями
+- 📄 [phase_17.5_flask_multi_provider.md](phase_17.5_flask_multi_provider.md) — рефакторинг Flask App (ComponentFactory)
+- 📄 [phase_17.6_settings_ui.md](phase_17.6_settings_ui.md) — Settings UI для переключения провайдеров
+- 📄 [phase_17.7_testing_demo.md](phase_17.7_testing_demo.md) — тестирование и демо стенд
 
-**Что будет создано в docs:**
+### Notes
 
-1. **`docs/guides/integrations/flask.md`** — полный гайд
-   - Application Factory pattern
-   - DI через app.extensions
-   - Routes примеры (search, ingest, chat)
-   - Production checklist
-
-2. **Обновить `docs/guides/integrations/architecture.md`** — Flask паттерн
-3. **Обновить `docs/guides/integrations/sync-nature.md`** — Flask sync/async
-
-**Критерий успеха:** Flask app работает с локальными моделями, новый пользователь может интегрировать за 30 минут.
-
----
-
-### Phase 17.3: API Reference Updates ⚠️
-
-**Цель:** Детализировать справочную документацию.
-
-**Что будет обновлено:**
-
-1. **`docs/reference/interfaces.md`** — детальный API
-   - Каждый метод: Parameters, Returns, Raises, Example
-   - Конструкторы реализаций (GeminiEmbedder, LocalEmbedder)
-   - Properties (dimension, max_tokens)
-
-2. **`docs/reference/component-factory.md`** (NEW) — ComponentFactory API
-   - create_embedder(), create_llm(), create_transcriber()
-   - Graceful degradation
-   - Convenience функция create_core()
-
-3. **`docs/reference/configuration-options.md`** — детали providers.local
-   - Все параметры LocalEmbedder
-   - Примеры TOML конфигурации
-
-**Критерий успеха:** Можно создать любой компонент без чтения исходного кода.
-
----
-
-### Phase 17.4: Django Integration Placeholder 📌
-
-**Статус:** Placeholder для будущего (Phase 18+)
-
-**Цель:** Подготовить структуру для Django интеграции.
-
-**Что будет создано:**
-
-- Placeholder документ с draft планом
-- Описание Django AppConfig pattern
-- Сравнение Flask vs Django DI
-
-**Когда начать:** После запроса на Django или Phase 18+
-
----
-
-## 📊 Метрики успеха
-
-### Полнота документации
-
-- ✅ Qwen3-Embedding упомянут в concepts, guides, reference
-- ✅ ComponentFactory полностью задокументирован
-- ✅ Flask integration имеет рабочий пример + гайд
-- ✅ API Reference детальный (конструкторы, параметры, raises)
-
-### Актуальность
-
-- ✅ Документация == код (нет разрыва)
+- 📄 [phase_17_notes.md](phase_17_notes.md) — исследования MRL, backends, hardware
 - ✅ Все таблицы провайдеров актуальны
 - ✅ Примеры кода протестированы
 

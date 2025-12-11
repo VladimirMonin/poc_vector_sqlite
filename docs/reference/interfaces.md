@@ -26,14 +26,75 @@ tags: ["reference", "interfaces", "api"]
 
 ## BaseEmbedder 🧠
 
-| Метод | Сигнатура | Описание |
-|-------|-----------|----------|
-| `embed_documents` | `(texts: list[str]) → list[np.ndarray]` | Векторизация документов |
-| `embed_query` | `(text: str) → np.ndarray` | Векторизация запроса |
+**Модуль:** `semantic_core.interfaces.embedder`
 
-**Реализации**: `GeminiEmbedder`
+Интерфейс для генерации векторных представлений текста.
 
-**Гайд**: [Custom Embedder](../guides/extending/custom-embedder.md)
+### Properties
+
+| Property | Type | Описание |
+|----------|------|----------|
+| `dimension` | `int` | Размерность векторов (384, 768, 1024, 1536) |
+| `max_tokens` | `int` | Максимальное количество токенов |
+| `model_name` | `str` | Название модели |
+
+### Methods
+
+#### `embed_documents(texts: list[str]) → list[np.ndarray]`
+
+Генерирует embeddings для batch документов.
+
+**Parameters:**
+- `texts` — список текстов для векторизации
+
+**Returns:**
+- Список numpy arrays с векторами (shape: `[len(texts), dimension]`)
+
+**Raises:**
+- `ValueError` — если texts пустой
+- `RuntimeError` — если API/model недоступны
+
+**Example:**
+```python
+embedder = GeminiEmbedder(api_key="key", dimension=768)
+vectors = embedder.embed_documents([
+    "First document",
+    "Second document"
+])
+# vectors: [array([...]), array([...])]
+```
+
+#### `embed_query(text: str) → np.ndarray`
+
+Генерирует embedding для одного запроса.
+
+**Parameters:**
+- `text` — текст запроса
+
+**Returns:**
+- Numpy array с вектором (shape: `[dimension,]`)
+
+**Raises:**
+- `ValueError` — если text пустой
+- `RuntimeError` — если API/model недоступны
+
+**Example:**
+```python
+vector = embedder.embed_query("What is semantic search?")
+# vector: array([0.1, 0.2, ..., 0.9])  # 768 elements
+```
+
+### Реализации
+
+| Класс | Provider | Dimension | Max Tokens |
+|-------|----------|-----------|------------|
+| `GeminiEmbedder` | Google Gemini | 768 | 2048 |
+| `LocalEmbedder` | MLX (macOS) | 384-1024 | 512-8192 |
+| `OpenAIEmbedder` | OpenAI | 1536 | 8191 |
+
+**См. также:**
+- [Custom Embedder Guide](../guides/extending/custom-embedder.md)
+- [Local Embeddings Guide](../guides/core/local-embeddings.md)
 
 ---
 
@@ -56,16 +117,69 @@ tags: ["reference", "interfaces", "api"]
 
 ## BaseLLMProvider 🤖
 
-| Метод | Сигнатура | Описание |
-|-------|-----------|----------|
-| `generate` | `(prompt, system_prompt, temperature, max_tokens, history) → GenerationResult` | Генерация ответа |
-| `model_name` | `@property → str` | Название модели |
+**Модуль:** `semantic_core.interfaces.llm`
 
-**DTO**: `GenerationResult(text, model, input_tokens, output_tokens, finish_reason)`
+Интерфейс для генерации текста через Large Language Models.
 
-**Реализации**: `GeminiLLMProvider`
+### Properties
 
-**Гайд**: [Custom LLM Provider](../guides/extending/custom-llm-provider.md)
+| Property | Type | Описание |
+|----------|------|----------|
+| `model_name` | `str` | Название модели (например, "gemini-2.0-flash") |
+
+### Methods
+
+#### `generate(prompt: str, *, system_prompt: str | None = None, temperature: float = 0.7, max_tokens: int = 1024, history: list[dict] | None = None) → GenerationResult`
+
+Генерирует ответ на промпт.
+
+**Parameters:**
+- `prompt` — текст запроса
+- `system_prompt` — системный промпт (опционально)
+- `temperature` — креативность (0.0-2.0), default 0.7
+- `max_tokens` — максимальная длина ответа
+- `history` — история диалога в формате `[{"role": "user", "content": "..."}, ...]`
+
+**Returns:**
+- `GenerationResult` с полями:
+  - `text: str` — сгенерированный текст
+  - `model: str` — использованная модель
+  - `input_tokens: int` — количество токенов в промпте
+  - `output_tokens: int` — количество токенов в ответе
+  - `finish_reason: str` — причина остановки ("stop", "length", "error")
+
+**Raises:**
+- `ValueError` — если prompt пустой
+- `RuntimeError` — если API недоступен
+
+**Example:**
+```python
+from semantic_core.infrastructure.llm import GeminiLLMProvider
+
+llm = GeminiLLMProvider(api_key="key", model="gemini-2.0-flash")
+
+result = llm.generate(
+    prompt="Что такое семантический поиск?",
+    system_prompt="Ты эксперт по поисковым системам",
+    temperature=0.7,
+    max_tokens=500
+)
+
+print(result.text)  # Ответ модели
+print(f"Tokens: {result.input_tokens} in, {result.output_tokens} out")
+```
+
+### Реализации
+
+| Класс | Provider | Models | Context Window |
+|-------|----------|--------|----------------|
+| `GeminiLLMProvider` | Google Gemini | `gemini-2.0-flash-exp`, `gemini-1.5-pro` | 1M tokens |
+| `OpenAILLMProvider` | OpenAI | `gpt-4o`, `gpt-4o-mini` | 128K tokens |
+| `OllamaLLMProvider` | Ollama (local) | `llama3`, `mistral`, etc. | Varies |
+
+**См. также:**
+- [Custom LLM Provider Guide](../guides/extending/custom-llm-provider.md)
+- [RAG Engine](../concepts/09_rag.md)
 
 ---
 
