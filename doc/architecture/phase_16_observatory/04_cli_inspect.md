@@ -25,7 +25,6 @@
 **Назначение:** Инспекция ingest pipeline для файла.
 
 **Синтаксис:**
-
 ```bash
 semantic inspect <file_path> [OPTIONS]
 ```
@@ -65,7 +64,6 @@ semantic inspect docs/example.md --save-artifacts --session-name experiment_1
 **Назначение:** Сравнение двух inspection snapshots.
 
 **Синтаксис:**
-
 ```bash
 semantic compare <old_snapshot> <new_snapshot> [OPTIONS]
 ```
@@ -205,19 +203,16 @@ def inspect(
 **Ключевые моменты:**
 
 **1. Создание SemanticCore:**
-
 ```python
 core = create_core()  # Используем фабрику из config
 ```
 
 Автоматически загружаются настройки из `semantic.toml`:
-
 - Embedder (Gemini)
 - Vision analyzer
 - Storage (SQLite)
 
 **2. ProviderInspector с artifacts_root:**
-
 ```python
 inspector = ProviderInspector(
     core=core,
@@ -228,7 +223,6 @@ inspector = ProviderInspector(
 Если `--artifacts-root` не указан → используется дефолтный путь из SnapshotManager.
 
 **3. Условное сохранение:**
-
 ```python
 if save_artifacts:
     session = inspector.snapshot_manager.create_session_folder(session_name)
@@ -238,7 +232,6 @@ if save_artifacts:
 Сохраняем только если пользователь явно указал `--save-artifacts`.
 
 **4. Динамический выбор reporter:**
-
 ```python
 if format == "console":
     reporter = ConsoleReporter()
@@ -329,7 +322,6 @@ def compare(
 **Ключевые моменты:**
 
 **1. Загрузка snapshots:**
-
 ```python
 manager = SnapshotManager()
 old = manager.load_snapshot(old_path)
@@ -339,7 +331,6 @@ new = manager.load_snapshot(new_path)
 SnapshotManager умеет загружать как `.json`, так и `.json.gz`.
 
 **2. DiffReporter:**
-
 ```python
 diff_reporter = DiffReporter()
 output = diff_reporter.compare(old, new)
@@ -348,7 +339,6 @@ output = diff_reporter.compare(old, new)
 Markdown diff для удобного чтения.
 
 **3. JSON diff (структурированный):**
-
 ```python
 diff_data = {
     "old_timestamp": old.processing_timestamp,
@@ -486,7 +476,6 @@ def ingest(
 ```
 
 **Использование:**
-
 ```bash
 # Обычный ingest
 semantic ingest docs/example.md
@@ -534,7 +523,6 @@ def search(
 **Проблема:** Embeddings кажутся некорректными.
 
 **Решение:**
-
 ```bash
 # 1. Инспектируем файл
 semantic inspect docs/example.md --save-artifacts --session-name debug_embeddings
@@ -551,7 +539,6 @@ cat snapshots/debug_embeddings/example_md_inspection.json | jq '.chunks[] | {id:
 **Проблема:** Хотим сравнить Gemini vs MLX embeddings.
 
 **Решение:**
-
 ```bash
 # 1. Инспектируем с Gemini
 semantic inspect docs/example.md --save-artifacts --session-name gemini_run
@@ -575,7 +562,6 @@ semantic compare snapshots/gemini_run/example_md_inspection.json snapshots/mlx_r
 **Проблема:** После апдейта библиотеки embeddings изменились.
 
 **Решение:**
-
 ```bash
 # 1. Сохраняем golden snapshot ДО апдейта
 semantic inspect docs/example.md --save-artifacts --session-name golden_v1.0
@@ -599,7 +585,6 @@ semantic compare snapshots/golden_v1.0/example_md_inspection.json snapshots/afte
 **Решение:**
 
 `.github/workflows/test_embeddings.yml`:
-
 ```yaml
 name: Test Embeddings Quality
 

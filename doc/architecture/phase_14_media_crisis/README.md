@@ -151,7 +151,6 @@ MediaConfig models (4 Pydantic classes) + Template Injection pattern для ка
 **Статус:** ✅ ЗАВЕРШЕНО (Phase 14.3.4)
 
 CLI команда для повторного анализа медиа-файлов. Флаги: `--prompt`, `--show-details`, `--force`. Интерактивное подтверждение, Rich UI, полное error handling. **11 unit-тестов, commit `8acfc89`.**
-
 ### 85. Phase 14 Final Integration & Testing
 
 **Файл:** [85_phase_14_final_integration.md](85_phase_14_final_integration.md)  
@@ -201,7 +200,6 @@ CLI команда для повторного анализа медиа-фай�
 ---
 
 ## 🔗 Связанные фазы
-
 ---
 
 ## 🔗 Связанные фазы

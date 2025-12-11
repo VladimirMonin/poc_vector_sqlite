@@ -57,7 +57,6 @@ test_cases = [
 ```
 
 **Проблемные символы:**
-
 - `()` — круглые скобки (группировка в FTS5)
 - `?` — вопросительный знак (неизвестный оператор)
 - Другие пунктуационные знаки
@@ -68,13 +67,12 @@ test_cases = [
 
 > FTS5 special operators: `()` for grouping, `*` for prefix match, `-` for NOT, `"..."` for phrase match
 
-**Из StackOverflow** (<https://stackoverflow.com/questions/65612489/>):
+**Из StackOverflow** (https://stackoverflow.com/questions/65612489/):
 
 > You can't have parameters in string literals; there's no interpolation.  
 > If you want to match a phrase with special chars, **wrap it in double quotes**.
 
 **FTS5 escaping rules:**
-
 - Внутренние кавычки экранируются как `""`
 - Круглые скобки работают только внутри phrase match `"..."`
 - Вопросительные знаки должны быть в phrase match
@@ -118,7 +116,6 @@ def _sanitize_fts_query(query: str) -> str:
 **Проблемы:**
 
 ❌ **НЕ обрабатывает круглые скобки `()`**
-
 ```python
 _sanitize_fts_query("Python (language)")
 # Вернёт: "Python (language)"
@@ -126,7 +123,6 @@ _sanitize_fts_query("Python (language)")
 ```
 
 ❌ **НЕ обрабатывает вопросительные знаки `?`**
-
 ```python
 _sanitize_fts_query("What is Python?")
 # Вернёт: "What is Python?"
@@ -134,7 +130,6 @@ _sanitize_fts_query("What is Python?")
 ```
 
 ✅ **Обрабатывает дефисы** (это работало)
-
 ```python
 _sanitize_fts_query("machine-learning")
 # Вернёт: '"machine-learning"' ✅
@@ -201,7 +196,6 @@ def _sanitize_fts_query(query: str) -> str:
 **Ключевые улучшения:**
 
 ✅ **Обрабатывает круглые скобки**
-
 ```python
 _sanitize_fts_query("Python (language)")
 # Вернёт: '"Python (language)"' ✅
@@ -209,7 +203,6 @@ _sanitize_fts_query("Python (language)")
 ```
 
 ✅ **Обрабатывает вопросительные знаки**
-
 ```python
 _sanitize_fts_query("What is Python?")
 # Вернёт: '"What is Python?"' ✅
@@ -217,7 +210,6 @@ _sanitize_fts_query("What is Python?")
 ```
 
 ✅ **Сохраняет логические операторы**
-
 ```python
 _sanitize_fts_query("Python OR language")
 # Вернёт: 'Python OR language' ✅
@@ -225,7 +217,6 @@ _sanitize_fts_query("Python OR language")
 ```
 
 ✅ **Экранирует внутренние кавычки**
-
 ```python
 _sanitize_fts_query('Quote (in text): "hello"')
 # Вернёт: '"Quote (in text): ""hello"""' ✅
@@ -272,7 +263,6 @@ class TestSanitizeFtsQuery:
 ```
 
 **Результаты:**
-
 ```bash
 pytest tests/unit/infrastructure/storage/test_fts_sanitization.py -v
 # ======================== 22 passed, 1 warning in 0.02s =========================
@@ -308,7 +298,6 @@ for query in test_cases:
 ```
 
 **Результат:**
-
 ```
 ✅ Python                         → Python
 ✅ Python (language)              → "Python (language)"
@@ -342,7 +331,6 @@ pytest tests/e2e/audit/test_inspector_gemini.py::test_inspector_search_with_gemi
 ### 1. Тесты использовали простые запросы
 
 **Существующие тесты Phase 2:**
-
 ```python
 def test_fts_search_basic(self, store_with_data):
     results = store_with_data.search(
@@ -352,7 +340,6 @@ def test_fts_search_basic(self, store_with_data):
 ```
 
 **Никто не тестировал:**
-
 - Запросы с круглыми скобками
 - Запросы с вопросительными знаками
 - Естественные вопросы пользователей
@@ -360,13 +347,11 @@ def test_fts_search_basic(self, store_with_data):
 ### 2. Ручное тестирование не покрывало edge cases
 
 **Типичные ручные запросы:**
-
 - `"machine learning"` ✅ Работало (дефис экранировался)
 - `"Python programming"` ✅ Работало (простые слова)
 - `"vector search"` ✅ Работало
 
 **Не тестировали:**
-
 - `"What is Python?"` ❌
 - `"Python (programming language)"` ❌
 - `"How to use arrays[0]?"` ❌
@@ -398,14 +383,12 @@ E2E тесты Observatory были **первыми**, кто использо�
 ### Lessons Learned
 
 **✅ DO:**
-
 - Тестировать edge cases (спецсимволы, пунктуация)
 - Писать E2E тесты с реальными сценариями
 - Не skip'ать integration тесты (даже если они "сложные")
 - Документировать проблемные области (FTS5 syntax)
 
 **❌ DON'T:**
-
 - Полагаться только на простые unit-тесты
 - Skip'ать тесты "на потом"
 - Игнорировать edge cases в пользовательских запросах
