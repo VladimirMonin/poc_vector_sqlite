@@ -185,6 +185,143 @@ class MediaConfig(BaseModel):
     processing: MediaProcessingConfig = Field(default_factory=MediaProcessingConfig)
 
 
+# === Provider Configuration Models ===
+
+
+class GeminiProviderConfig(BaseModel):
+    """Конфигурация Google Gemini провайдера.
+
+    Attributes:
+        api_key: API ключ для Gemini.
+        batch_key: Отдельный ключ для Batch API (опционально).
+        embedding_model: Модель для эмбеддингов.
+        llm_model: Модель для RAG и чата.
+        dimension: Размерность векторов.
+        max_tokens: Максимальная длина входа в токенах.
+    """
+
+    api_key: Optional[str] = Field(
+        default=None, description="API ключ для Google Gemini"
+    )
+    batch_key: Optional[str] = Field(
+        default=None, description="Отдельный ключ для Batch API (опционально)"
+    )
+    embedding_model: str = Field(
+        default="models/gemini-embedding-001",
+        description="Модель для генерации эмбеддингов",
+    )
+    llm_model: str = Field(
+        default="models/gemini-2.0-flash", description="Модель LLM для RAG и чата"
+    )
+    dimension: int = Field(
+        default=768, ge=256, le=3072, description="Размерность векторов"
+    )
+    max_tokens: int = Field(
+        default=2048, ge=512, le=32000, description="Максимальная длина входа"
+    )
+
+
+class OpenAIProviderConfig(BaseModel):
+    """Конфигурация OpenAI-совместимого провайдера.
+
+    Attributes:
+        api_key: API ключ.
+        base_url: Base URL для API.
+        embedding_model: Модель для эмбеддингов.
+        llm_model: Модель для RAG и чата.
+        dimension: Размерность векторов.
+        max_tokens: Максимальная длина входа.
+    """
+
+    api_key: Optional[str] = Field(default=None, description="API ключ для OpenAI")
+    base_url: str = Field(
+        default="https://api.openai.com/v1", description="Base URL для OpenAI API"
+    )
+    embedding_model: str = Field(
+        default="text-embedding-3-small", description="Модель для эмбеддингов"
+    )
+    llm_model: str = Field(
+        default="gpt-4o-mini", description="Модель LLM для RAG и чата"
+    )
+    dimension: int = Field(
+        default=1536, ge=256, le=3072, description="Размерность векторов"
+    )
+    max_tokens: int = Field(
+        default=8191, ge=512, le=32000, description="Максимальная длина входа"
+    )
+
+
+class LocalProviderConfig(BaseModel):
+    """Конфигурация локальных моделей (MLX/PyTorch).
+
+    Attributes:
+        embedding_model: Ключ модели из LocalEmbedder.MODELS.
+        max_tokens: Максимальная длина embeddings (override дефолта модели).
+        whisper_model: Ключ модели Whisper.
+        device: Устройство для выполнения (auto/mlx/cuda/mps/cpu).
+    """
+
+    embedding_model: str = Field(
+        default="all-minilm", description="Модель для локальных эмбеддингов"
+    )
+    max_tokens: Optional[int] = Field(
+        default=None,
+        description="Максимальная длина токенов (override дефолта модели)",
+    )
+    whisper_model: str = Field(
+        default="base", description="Модель Whisper для транскрипции"
+    )
+    device: str = Field(
+        default="auto",
+        pattern="^(auto|mlx|cuda|mps|cpu)$",
+        description="Устройство для выполнения",
+    )
+
+
+class OllamaProviderConfig(BaseModel):
+    """Конфигурация Ollama провайдера.
+
+    Attributes:
+        base_url: URL Ollama сервера.
+        llm_model: Модель для RAG и чата.
+    """
+
+    base_url: str = Field(
+        default="http://localhost:11434/v1", description="URL Ollama сервера"
+    )
+    llm_model: str = Field(default="llama3.3:70b", description="Модель для RAG и чата")
+
+
+class DefaultsConfig(BaseModel):
+    """Выбор провайдеров по умолчанию.
+
+    Attributes:
+        embedding_provider: Провайдер для эмбеддингов (gemini/local/openai).
+        llm_provider: Провайдер для LLM (gemini/openai/ollama).
+        transcription_provider: Провайдер для транскрипции (gemini/whisper).
+        vision_provider: Провайдер для vision (gemini).
+    """
+
+    embedding_provider: str = Field(
+        default="gemini",
+        pattern="^(gemini|local|openai)$",
+        description="Провайдер для эмбеддингов",
+    )
+    llm_provider: str = Field(
+        default="gemini",
+        pattern="^(gemini|openai|ollama)$",
+        description="Провайдер для LLM",
+    )
+    transcription_provider: str = Field(
+        default="gemini",
+        pattern="^(gemini|whisper)$",
+        description="Провайдер для транскрипции",
+    )
+    vision_provider: str = Field(
+        default="gemini", pattern="^(gemini)$", description="Провайдер для vision"
+    )
+
+
 # === Main Configuration ===
 
 
@@ -334,6 +471,36 @@ class SemanticConfig(BaseSettings):
         description="Путь к файлу логов (None = только консоль)",
     )
 
+    # === Provider Configuration ===
+    defaults: DefaultsConfig = Field(
+        default_factory=DefaultsConfig,
+        description="Выбор провайдеров по умолчанию",
+    )
+
+    providers_gemini: GeminiProviderConfig = Field(
+        default_factory=GeminiProviderConfig,
+        description="Конфигурация Google Gemini провайдера",
+        alias="providers.gemini",
+    )
+
+    providers_openai: OpenAIProviderConfig = Field(
+        default_factory=OpenAIProviderConfig,
+        description="Конфигурация OpenAI провайдера",
+        alias="providers.openai",
+    )
+
+    providers_local: LocalProviderConfig = Field(
+        default_factory=LocalProviderConfig,
+        description="Конфигурация локальных моделей",
+        alias="providers.local",
+    )
+
+    providers_ollama: OllamaProviderConfig = Field(
+        default_factory=OllamaProviderConfig,
+        description="Конфигурация Ollama провайдера",
+        alias="providers.ollama",
+    )
+
     # === Validators ===
     @field_validator("db_path", mode="before")
     @classmethod
@@ -371,6 +538,36 @@ class SemanticConfig(BaseSettings):
         )
         return self
 
+    @model_validator(mode="after")
+    def sync_legacy_fields_with_providers(self) -> "SemanticConfig":
+        """Синхронизирует старые поля с новыми провайдерами для обратной совместимости.
+
+        Если установлены старые поля (gemini_api_key, embedding_model и т.д.),
+        копируем их значения в providers_gemini.
+        """
+        # Синхронизация Gemini
+        if self.gemini_api_key and not self.providers_gemini.api_key:
+            self.providers_gemini.api_key = self.gemini_api_key
+
+        if self.gemini_batch_key and not self.providers_gemini.batch_key:
+            self.providers_gemini.batch_key = self.gemini_batch_key
+
+        # Если старые поля переопределены, обновляем провайдер
+        if self.embedding_model != "models/gemini-embedding-001":
+            self.providers_gemini.embedding_model = self.embedding_model
+
+        if self.llm_model != "models/gemini-2.0-flash":
+            self.providers_gemini.llm_model = self.llm_model
+
+        if self.embedding_dimension != 768:
+            self.providers_gemini.dimension = self.embedding_dimension
+
+        # Обратная синхронизация: если провайдер имеет API key, копируем в старое поле
+        if self.providers_gemini.api_key and not self.gemini_api_key:
+            self.gemini_api_key = self.providers_gemini.api_key
+
+        return self
+
     model_config = SettingsConfigDict(
         # Префикс для env variables
         env_prefix="SEMANTIC_",
@@ -393,18 +590,69 @@ class SemanticConfig(BaseSettings):
         Сначала ищем semantic.toml, загружаем из него значения,
         затем env variables и переданные аргументы переопределяют их.
         """
+        # Извлекаем config_file из kwargs если передан
+        config_file = data.pop("config_file", None)
+
         # Ищем TOML файл
-        toml_path = find_config_file()
+        if config_file:
+            toml_path = Path(config_file)
+        else:
+            toml_path = find_config_file()
+
         toml_data: dict = {}
 
-        if toml_path:
+        if toml_path and toml_path.exists():
             toml_data = self._load_toml(toml_path)
             logger.debug("Loaded config from TOML", path=str(toml_path))
 
         # TOML значения имеют низший приоритет
         # kwargs (CLI args) и env variables переопределят их
         merged = {**toml_data, **data}
+
+        # === Phase 15.4: Сохраняем вложенные provider dict'ы для ручной установки ===
+        # Pydantic Settings пересоздаёт вложенные модели из env/defaults,
+        # поэтому устанавливаем их вручную ПОСЛЕ super().__init__()
+
+        provider_configs = {}
+        if "defaults" in merged and isinstance(merged["defaults"], dict):
+            provider_configs["defaults"] = DefaultsConfig(**merged["defaults"])
+            del merged["defaults"]  # Убираем чтобы super() не перезаписал
+
+        if "providers_gemini" in merged and isinstance(
+            merged["providers_gemini"], dict
+        ):
+            provider_configs["providers_gemini"] = GeminiProviderConfig(
+                **merged["providers_gemini"]
+            )
+            del merged["providers_gemini"]
+
+        if "providers_openai" in merged and isinstance(
+            merged["providers_openai"], dict
+        ):
+            provider_configs["providers_openai"] = OpenAIProviderConfig(
+                **merged["providers_openai"]
+            )
+            del merged["providers_openai"]
+
+        if "providers_local" in merged and isinstance(merged["providers_local"], dict):
+            provider_configs["providers_local"] = LocalProviderConfig(
+                **merged["providers_local"]
+            )
+            del merged["providers_local"]
+
+        if "providers_ollama" in merged and isinstance(
+            merged["providers_ollama"], dict
+        ):
+            provider_configs["providers_ollama"] = OllamaProviderConfig(
+                **merged["providers_ollama"]
+            )
+            del merged["providers_ollama"]
+
         super().__init__(**merged)
+
+        # Устанавливаем provider конфиги вручную (обходим Pydantic Settings)
+        for field_name, config_obj in provider_configs.items():
+            object.__setattr__(self, field_name, config_obj)
 
     @staticmethod
     def _load_toml(path: Path) -> dict:
@@ -509,6 +757,25 @@ class SemanticConfig(BaseSettings):
 
             if media_dict:
                 flat["media"] = media_dict
+
+        # === Phase 15.4: Поддержка новых секций [defaults] и [providers.*] ===
+
+        # [defaults] секция
+        if "defaults" in raw and isinstance(raw["defaults"], dict):
+            flat["defaults"] = raw["defaults"]
+
+        # [providers.*] секции
+        providers_mapping = {
+            "gemini": "providers_gemini",
+            "openai": "providers_openai",
+            "local": "providers_local",
+            "ollama": "providers_ollama",
+        }
+
+        if "providers" in raw and isinstance(raw["providers"], dict):
+            for provider_key, config_field in providers_mapping.items():
+                if provider_key in raw["providers"]:
+                    flat[config_field] = raw["providers"][provider_key]
 
         # Также поддерживаем плоские ключи (для простоты)
         for key in [

@@ -26,6 +26,10 @@ from rich.table import Table
 from semantic_core.cli.console import console
 from semantic_core.cli.app import get_cli_context
 from semantic_core.config import SemanticConfig, find_config_file
+from semantic_core.utils.dependencies import (
+    get_available_providers,
+    get_install_hint,
+)
 
 app = typer.Typer(
     help="🩺 Диагностика окружения Semantic Core.",
@@ -149,6 +153,27 @@ def doctor(
     sections.append(("Database", db_checks))
     all_checks.extend(db_checks)
 
+    # === Providers (Phase 15.5) ===
+    providers_checks = []
+    available_providers = get_available_providers()
+
+    for provider, is_available in available_providers.items():
+        provider_name = provider.replace("_", " ").title()
+        if is_available:
+            providers_checks.append((provider_name, "ok", "installed"))
+        else:
+            providers_checks.append((provider_name, "warning", "not installed"))
+
+    sections.append(("Providers", providers_checks))
+    all_checks.extend(providers_checks)
+
+    # Сохраняем install hints для рекомендаций
+    missing_providers = [
+        (provider, get_install_hint(provider))
+        for provider, is_available in available_providers.items()
+        if not is_available
+    ]
+
     # === API ===
     api_checks = []
 
@@ -207,7 +232,7 @@ def doctor(
     if cli_ctx.json_output:
         _output_json(all_checks)
     else:
-        _output_rich(sections, all_checks)
+        _output_rich(sections, all_checks, verbose, missing_providers)
 
 
 def _output_json(checks: list) -> None:
@@ -228,7 +253,9 @@ def _output_json(checks: list) -> None:
     console.print_json(json.dumps(data))
 
 
-def _output_rich(sections: list, all_checks: list) -> None:
+def _output_rich(
+    sections: list, all_checks: list, verbose: bool, missing_providers: list
+) -> None:
     """Вывод в Rich формате."""
     for section_name, checks in sections:
         console.print(f"[bold]{section_name}:[/bold]")
@@ -282,6 +309,14 @@ def _output_rich(sections: list, all_checks: list) -> None:
                 )
             if name == "sqlite-vec" and status == "error":
                 console.print("   • Установите sqlite-vec: pip install sqlite-vec")
+
+        # Phase 15.5: Показываем install hints для missing providers
+        if missing_providers and verbose:
+            console.print("\n[bold]📦 Установка дополнительных провайдеров:[/bold]")
+            for provider, hint in missing_providers:
+                provider_name = provider.replace("_", " ").title()
+                console.print(f"\n   [yellow]⚠️ {provider_name}:[/yellow]")
+                console.print(f"      {hint}")
 
 
 __all__ = ["app"]

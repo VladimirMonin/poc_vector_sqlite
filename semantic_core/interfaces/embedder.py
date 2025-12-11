@@ -48,3 +48,29 @@ class BaseEmbedder(ABC):
             RuntimeError: Если API вернул ошибку.
         """
         raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def dimension(self) -> int:
+        """Размерность выходного вектора.
+
+        Returns:
+            Размерность (768 для Gemini, 1536 для OpenAI, 384-1024 для локальных).
+
+        Note:
+            Используется SmartSplitter для проверки совместимости с VectorStore.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def max_tokens(self) -> int:
+        """Максимальное количество токенов на вход.
+
+        Returns:
+            Лимит токенов (2048 для Gemini, 8192 для OpenAI, 512+ для локальных).
+
+        Note:
+            Используется SmartSplitter для оптимального разбиения на чанки.
+        """
+        raise NotImplementedError

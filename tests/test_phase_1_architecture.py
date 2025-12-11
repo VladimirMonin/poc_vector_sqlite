@@ -241,6 +241,14 @@ class TestSOLIDPrinciples:
             def embed_query(self, text):
                 return np.zeros(768, dtype=np.float32)
 
+            @property
+            def dimension(self) -> int:
+                return 768
+
+            @property
+            def max_tokens(self) -> int:
+                return 2048
+
         class FakeSplitter(BaseSplitter):
             def split(self, document):
                 return [Chunk(content=document.content, chunk_index=0)]
@@ -269,7 +277,7 @@ class TestSOLIDPrinciples:
         """Проверка, что интерфейсы минимальны и сфокусированы."""
         from semantic_core.interfaces import BaseEmbedder, BaseVectorStore
 
-        # BaseEmbedder имеет только 2 метода
+        # BaseEmbedder имеет 2 метода + 2 свойства (dimension, max_tokens)
         embedder_methods = [
             m
             for m in dir(BaseEmbedder)
@@ -277,10 +285,14 @@ class TestSOLIDPrinciples:
         ]
         assert len(embedder_methods) == 2
 
-        # BaseVectorStore имеет 6 методов (save, search, delete, delete_by_metadata, search_chunks, bulk_update_vectors)
+        # Проверяем наличие свойств dimension и max_tokens
+        assert hasattr(BaseEmbedder, "dimension")
+        assert hasattr(BaseEmbedder, "max_tokens")
+
+        # BaseVectorStore имеет 8 методов (save, search, delete, delete_by_metadata, search_chunks, bulk_update_vectors, get_document_chunks_count, get_sibling_chunks)
         store_methods = [
             m
             for m in dir(BaseVectorStore)
             if not m.startswith("_") and callable(getattr(BaseVectorStore, m))
         ]
-        assert len(store_methods) == 6
+        assert len(store_methods) == 8

@@ -12,6 +12,7 @@ from typing import Optional
 import typer
 
 from semantic_core.cli.context import CLIContext
+from semantic_core.utils.dependencies import get_missing_providers, get_install_hint
 
 # Главное приложение
 app = typer.Typer(
@@ -98,6 +99,24 @@ def main_callback(
         verbose=verbose,
     )
 
+    # Phase 15.5: Проверка доступности провайдеров
+    # Показываем предупреждение только для help/--version и прочих meta-команд
+    # Для реальных команд будут ImportError с подсказками при попытке использования
+    missing = get_missing_providers()
+    if missing and ctx.invoked_subcommand not in ("init", "config", "doctor", None):
+        # Показываем warning только если verbose или log_level установлен
+        if verbose or log_level:
+            typer.secho(
+                f"⚠️  Optional dependencies not installed: {', '.join(missing)}",
+                fg=typer.colors.YELLOW,
+                err=True,
+            )
+            typer.secho(
+                f"💡 Run 'semantic doctor' for installation hints.",
+                fg=typer.colors.BLUE,
+                err=True,
+            )
+
     # Сохраняем в typer context для доступа из команд
     ctx.obj = _cli_context
 
@@ -137,6 +156,11 @@ from semantic_core.cli.commands.reanalyze import reanalyze as reanalyze_cmd
 app.command(name="reanalyze", help="Повторный анализ медиа-файлов с новыми промптами")(
     reanalyze_cmd
 )
+
+# Phase 16.1: Observatory Inspect
+from semantic_core.cli.commands.inspect import inspect as inspect_cmd
+
+app.command(name="inspect", help="🔬 X-Ray диагностика pipeline")(inspect_cmd)
 
 
 __all__ = ["app", "get_cli_context"]

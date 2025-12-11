@@ -93,7 +93,10 @@ class SemanticLogger:
         # Итоговое сообщение: emoji [context] message
         formatted_msg = f"{emoji} {context_prefix}{msg}"
 
-        self._logger.log(level, formatted_msg, extra=extra)
+        # Извлекаем exc_info из extra (это зарезервированный аргумент logging)
+        exc_info = extra.pop("exc_info", False)
+
+        self._logger.log(level, formatted_msg, extra=extra, exc_info=exc_info)
 
     def trace(self, msg: str, **context: Any) -> None:
         """Логирование на уровне TRACE (5).

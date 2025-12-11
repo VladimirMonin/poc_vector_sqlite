@@ -4,6 +4,7 @@
     init_cmd: semantic init — инициализация проекта.
     config_cmd: semantic config — управление конфигурацией.
     doctor_cmd: semantic doctor — диагностика.
+    inspect: semantic inspect — X-Ray диагностика pipeline.
     ingest_cmd: semantic ingest — индексация документов.
     search_cmd: semantic search — семантический поиск.
     docs_cmd: semantic docs — встроенная документация.
@@ -15,6 +16,7 @@
 from semantic_core.cli.commands import init_cmd
 from semantic_core.cli.commands import config_cmd
 from semantic_core.cli.commands import doctor_cmd
+from semantic_core.cli.commands import inspect
 from semantic_core.cli.commands.ingest import ingest as ingest_cmd
 from semantic_core.cli.commands.search import search as search_cmd
 from semantic_core.cli.commands.docs import docs_cmd

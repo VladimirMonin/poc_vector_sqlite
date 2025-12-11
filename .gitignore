@@ -22,3 +22,4 @@ tests/asests/*.avi
 tests/asests/*.webm
 semantic.db-wal
 semantic.db-shm
+tests/e2e/audit/snapshots/

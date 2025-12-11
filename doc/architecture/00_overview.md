@@ -100,8 +100,22 @@ Retrieval-Augmented Generation, LLM provider abstraction, интерактивн
 **[Phase 13: Total Visual Check](phase_13_audit/README.md)**  
 E2E аудит всех систем, FTS refactoring, context window, embedding cache integration
 
-**[Phase 14: Media Content Crisis](phase_14_media_crisis/README.md)** *(в разработке)*  
+**[Phase 14: Media Content Crisis](phase_14_media_crisis/README.md)**  
 Multi-chunk media architecture, multilingual analysis, SmartSplitter для OCR
+
+---
+
+### 🔌 Phase 15: Provider-Agnostic Architecture
+
+**[Phase 15: Provider-Agnostic Architecture](phase_15_multimodal_flexibility/README.md)**  
+Мультипровайдерная архитектура: Whisper, Local Embeddings, OpenAI, Ollama, Optional Dependencies
+
+---
+
+### 🔬 Phase 16: Debug Observatory
+
+**[Phase 16: Debug Observatory](phase_16_observatory/README.md)**  
+Provider-agnostic инспекция, CLI команда `semantic inspect`, критический FTS5 bugfix
 
 ---
 

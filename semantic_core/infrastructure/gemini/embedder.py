@@ -35,14 +35,20 @@ class GeminiEmbedder(BaseEmbedder):
 
     Attributes:
         model_name: Название модели (по умолчанию 'models/gemini-embedding-001').
-        dimension: Размерность векторов (768 для MRL).
+        _dimension: Размерность векторов (768 для MRL).
+        _max_tokens: Максимальное количество токенов на вход.
     """
+
+    # Константы модели
+    DEFAULT_DIMENSION = 768
+    DEFAULT_MAX_TOKENS = 2048
 
     def __init__(
         self,
         api_key: str,
         model_name: str = "models/gemini-embedding-001",
-        dimension: int = 768,
+        dimension: int = DEFAULT_DIMENSION,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
     ):
         """Инициализация адаптера Gemini.
 
@@ -50,10 +56,12 @@ class GeminiEmbedder(BaseEmbedder):
             api_key: API ключ Google Gemini.
             model_name: Модель для генерации.
             dimension: Размерность векторов (MRL).
+            max_tokens: Максимальное количество токенов на вход.
         """
         self.api_key = api_key
         self.model_name = model_name
-        self.dimension = dimension
+        self._dimension = dimension
+        self._max_tokens = max_tokens
 
         # Конфигурируем API
         genai.configure(api_key=self.api_key)
@@ -61,6 +69,7 @@ class GeminiEmbedder(BaseEmbedder):
             "Embedder initialized",
             model=model_name,
             dimension=dimension,
+            max_tokens=max_tokens,
         )
 
     @classmethod
@@ -74,11 +83,12 @@ class GeminiEmbedder(BaseEmbedder):
 
         Returns:
             Инициализированный GeminiEmbedder.
-
-        Raises:
-            ValueError: Если API ключ не настроен.
-
-        Example:
+        return cls(
+            api_key=config.require_api_key(),
+            model_name=config.embedding_model,
+            dimension=config.embedding_dimension,
+            max_tokens=cls.DEFAULT_MAX_TOKENS,
+        )xample:
             >>> from semantic_core.config import get_config
             >>> config = get_config()
             >>> embedder = GeminiEmbedder.from_config(config)
@@ -184,7 +194,7 @@ class GeminiEmbedder(BaseEmbedder):
                 model=self.model_name,
                 content=text,
                 task_type=task_type,
-                output_dimensionality=self.dimension,
+                output_dimensionality=self._dimension,
             )
 
             embedding = np.array(result["embedding"], dtype=np.float32)
@@ -197,7 +207,7 @@ class GeminiEmbedder(BaseEmbedder):
                 model=self.model_name,
                 operation="embedding",
                 task_type=task_type,
-                dimension=self.dimension,
+                dimension=self._dimension,
             )
 
             logger.trace(
@@ -252,4 +262,27 @@ class GeminiEmbedder(BaseEmbedder):
         Returns:
             Восстановленный вектор float32.
         """
+        return np.frombuffer(blob, dtype=np.float32)
+
+    @property
+    def dimension(self) -> int:
+        """Размерность выходного вектора.
+
+        Returns:
+            768 для gemini-embedding-001 (с поддержкой MRL).
+        """
+        return self._dimension
+
+    @property
+    def max_tokens(self) -> int:
+        """Максимальное количество токенов на вход.
+
+        Returns:
+            2048 токенов для gemini-embedding-001.
+
+        Note:
+            Gemini автоматически обрезает текст, превышающий лимит.
+            SmartSplitter использует это значение для оптимального разбиения.
+        """
+        return self._max_tokens
         return np.frombuffer(blob, dtype=np.float32)

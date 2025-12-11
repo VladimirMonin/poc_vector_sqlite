@@ -1,0 +1,89 @@
+@startuml phase15_embedding_sequence
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam defaultFontSize 12
+
+title Phase 15.0: Embedding with Model Metadata
+
+actor Client
+participant "SemanticCore" as Core
+participant "BaseEmbedder\n(Interface)" as Embedder
+participant "GeminiEmbedder\n(Implementation)" as Gemini
+participant "SmartSplitter" as Splitter
+database "VectorStore" as DB
+
+== Initialization ==
+Client -> Core: create(embedder, ...)
+Core -> Embedder: get max_tokens
+activate Embedder
+Embedder --> Core: 2048
+deactivate Embedder
+
+Core -> Splitter: configure(max_tokens=2048)
+note right
+  SmartSplitter adapts
+  to embedder's limits
+end note
+
+== Document Ingestion ==
+Client -> Core: ingest(document)
+activate Core
+
+Core -> Splitter: split(document)
+activate Splitter
+Splitter -> Embedder: max_tokens?
+activate Embedder
+Embedder --> Splitter: 2048
+deactivate Embedder
+
+note right of Splitter
+  Dynamic chunk sizing
+  based on model capacity
+end note
+
+Splitter --> Core: chunks (all < 2048 tokens)
+deactivate Splitter
+
+Core -> Embedder: embed_documents(chunks)
+activate Embedder
+
+Embedder -> Gemini: embed_content(texts)
+activate Gemini
+note right
+  output_dimensionality=768
+  (from dimension property)
+end note
+Gemini --> Embedder: vectors (768D)
+deactivate Gemini
+
+Embedder --> Core: vectors (768D)
+deactivate Embedder
+
+Core -> Embedder: get dimension
+activate Embedder
+Embedder --> Core: 768
+deactivate Embedder
+
+alt Dimension Validation
+    Core -> DB: validate_dimension(768)
+    DB --> Core: OK
+    Core -> DB: save(chunks, vectors)
+    DB --> Core: saved
+else Dimension Mismatch
+    Core -> DB: validate_dimension(1536)
+    DB --> Core: ERROR: Expected 768
+    Core --> Client: DimensionError
+end
+
+Core --> Client: success
+deactivate Core
+
+note over Client, DB
+  **Key Benefits:**
+  1. SmartSplitter knows model limits (no truncation)
+  2. Dimension validation prevents DB corruption
+  3. Metadata available for logging & monitoring
+end note
+
+@enduml

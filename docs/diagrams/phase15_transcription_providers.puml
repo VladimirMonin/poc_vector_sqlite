@@ -1,0 +1,132 @@
+@startuml phase15_transcription_providers
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceMessageAlign center
+skinparam defaultFontSize 12
+
+title Phase 15.0: Transcription - Provider Agnostic
+
+actor User
+participant "SemanticCore" as Core
+participant "ITranscriber\n(Interface)" as Interface
+
+box "Gemini Provider" #LightBlue
+    participant "GeminiAudioAnalyzer" as Gemini
+    participant "Gemini API" as GeminiAPI
+end box
+
+box "Whisper Provider (Phase 15.1)" #LightGreen
+    participant "WhisperTranscriber" as Whisper
+    participant "Whisper Model" as WhisperModel
+end box
+
+== Scenario 1: Using Gemini Audio ==
+
+User -> Core: create(transcriber=GeminiAudioAnalyzer())
+activate Core
+Core -> Gemini: set as transcriber
+deactivate Core
+
+User -> Core: transcribe_media("video.mp4")
+activate Core
+
+Core -> Interface: supported_formats?
+Interface -> Gemini: supported_formats
+Gemini --> Interface: ["mp3", "wav", "m4a"]
+Interface --> Core: formats list
+
+Core -> Interface: transcribe(audio_path, language="Russian")
+activate Interface
+Interface -> Gemini: transcribe(audio_path, "Russian")
+activate Gemini
+
+Gemini -> GeminiAPI: upload & analyze
+activate GeminiAPI
+GeminiAPI --> Gemini: {text, segments[]}
+deactivate GeminiAPI
+
+Gemini -> Gemini: parse to TranscriptionResult
+Gemini --> Interface: TranscriptionResult
+deactivate Gemini
+
+Interface --> Core: TranscriptionResult
+deactivate Interface
+
+Core --> User: chunks with transcription
+deactivate Core
+
+== Scenario 2: Switching to Whisper (Phase 15.1) ==
+
+User -> Core: create(transcriber=WhisperTranscriber(model="medium"))
+note right
+  **Same code structure,
+  different provider!**
+end note
+activate Core
+Core -> Whisper: set as transcriber
+deactivate Core
+
+User -> Core: transcribe_media("video.mp4")
+activate Core
+
+Core -> Interface: supported_formats?
+Interface -> Whisper: supported_formats
+Whisper --> Interface: ["mp3", "wav", "flac", "m4a"]
+Interface --> Core: formats list
+
+Core -> Interface: transcribe(audio_path, language="ru")
+activate Interface
+Interface -> Whisper: transcribe(audio_path, "ru")
+activate Whisper
+
+Whisper -> WhisperModel: load_model("medium")
+activate WhisperModel
+WhisperModel --> Whisper: model loaded
+deactivate WhisperModel
+
+Whisper -> WhisperModel: transcribe(audio, language="ru")
+activate WhisperModel
+note right
+  **Local processing
+  (no API calls)**
+end note
+WhisperModel --> Whisper: {text, segments[], language}
+deactivate WhisperModel
+
+Whisper -> Whisper: parse to TranscriptionResult
+Whisper --> Interface: TranscriptionResult
+deactivate Whisper
+
+Interface --> Core: TranscriptionResult
+deactivate Interface
+
+Core --> User: chunks with transcription
+deactivate Core
+
+note over User, WhisperModel
+  **Key Insight:**
+  SemanticCore code is IDENTICAL
+  for both Gemini and Whisper.
+  
+  ITranscriber interface hides
+  all provider-specific details.
+  
+  Same TranscriptionResult DTO
+  regardless of provider.
+end note
+
+== DTO Structure (Both Providers) ==
+
+note over Interface
+  **TranscriptionResult:**
+  - full_text: str
+  - segments: list[TranscriptionSegment]
+  - language: str|None
+  
+  **TranscriptionSegment:**
+  - text: str
+  - start_time: float (seconds)
+  - end_time: float (seconds)
+end note
+
+@enduml

@@ -237,6 +237,14 @@ def mock_embedder():
         def embed_documents(self, texts: list[str]) -> list[list[float]]:
             return [self.embed_query(text) for text in texts]
 
+        @property
+        def dimension(self) -> int:
+            return self.dim
+
+        @property
+        def max_tokens(self) -> int:
+            return 2048
+
     return MockEmbedder()
 
 

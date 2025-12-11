@@ -122,7 +122,7 @@ class CLIContext:
         self._logging_configured = True
 
     def _build_core(self, config: SemanticConfig) -> "SemanticCore":
-        """Сборка SemanticCore из конфига.
+        """Сборка SemanticCore из конфига через ComponentFactory.
 
         Args:
             config: Загруженная конфигурация.
@@ -131,7 +131,7 @@ class CLIContext:
             Настроенный SemanticCore.
         """
         from semantic_core.pipeline import SemanticCore
-        from semantic_core.infrastructure.gemini import GeminiEmbedder
+        from semantic_core.core.factory import ComponentFactory
         from semantic_core.infrastructure.storage.peewee import (
             PeeweeVectorStore,
             init_peewee_database,
@@ -139,22 +139,24 @@ class CLIContext:
         from semantic_core.processing.splitters import SmartSplitter
         from semantic_core.processing.context import HierarchicalContextStrategy
 
-        # Database
-        db = init_peewee_database(config.db_path, config.embedding_dimension)
-
-        # Embedder (требует API key)
-        api_key = config.require_api_key()
-        embedder = GeminiEmbedder(
-            api_key=api_key,
-            model_name=config.embedding_model,
-            dimension=config.embedding_dimension,
-        )
+        # Database (dimension берётся из выбранного embedder провайдера)
+        embedder = ComponentFactory.create_embedder(config)
+        db = init_peewee_database(config.db_path, embedder.dimension)
 
         # Store
-        store = PeeweeVectorStore(database=db)
+        store = PeeweeVectorStore(database=db, dimension=embedder.dimension)
+
+        # Parser для SmartSplitter
+        from semantic_core.processing.parsers.markdown_parser import MarkdownNodeParser
+
+        parser = MarkdownNodeParser()
 
         # Splitter
-        splitter = SmartSplitter()
+        splitter = SmartSplitter(
+            parser=parser,
+            chunk_size=config.chunk_size,
+            code_chunk_size=config.code_chunk_size,
+        )
 
         # Context Strategy
         context_strategy = HierarchicalContextStrategy()
