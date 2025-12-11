@@ -327,8 +327,18 @@ class ComponentFactory:
         from semantic_core.processing.context import HierarchicalContextStrategy
 
         parser = MarkdownNodeParser()
-        splitter = SmartSplitter(parser=parser)
+        splitter = SmartSplitter(
+            parser=parser,
+            chunk_size=config.chunk_size,
+            code_chunk_size=config.code_chunk_size,
+        )
         context_strategy = HierarchicalContextStrategy()
+
+        logger.debug(
+            "Splitter configured",
+            chunk_size=config.chunk_size,
+            code_chunk_size=config.code_chunk_size,
+        )
 
         # Собираем SemanticCore
         # NOTE: SemanticCore НЕ использует LLM напрямую.
@@ -338,8 +348,8 @@ class ComponentFactory:
             store=store,
             splitter=splitter,
             context_strategy=context_strategy,
-            vision_analyzer=vision,
-            transcriber=transcriber,
+            image_analyzer=vision,  # vision analyzer для изображений
+            # audio_analyzer и video_analyzer создаются lazy в SemanticCore
         )
 
         logger.info(
@@ -358,6 +368,8 @@ class ComponentFactory:
 
 def create_core(
     db_path: Optional[Path] = None,
+    chunk_size: Optional[int] = None,
+    code_chunk_size: Optional[int] = None,
     embedding_provider: Optional[str] = None,
     llm_provider: Optional[str] = None,
     transcription_provider: Optional[str] = None,
@@ -370,6 +382,10 @@ def create_core(
 
     Args:
         db_path: Путь к БД (опционально).
+        chunk_size: Размер текстового чанка в символах (default: 1800).
+            Для моделей с большим context window (Qwen3 32K)
+            рекомендуется 12000-24000 символов.
+        code_chunk_size: Размер чанка кода в символах (default: 2000).
         embedding_provider: Провайдер для эмбеддингов (gemini/local/openai).
         llm_provider: Провайдер для LLM (gemini/openai/ollama).
         transcription_provider: Провайдер для транскрипции (gemini/whisper).
@@ -390,11 +406,22 @@ def create_core(
         ...     llm_provider="ollama",
         ...     db_path="custom.db"
         ... )
+        >>>
+        >>> # С увеличенным chunk_size для Qwen3
+        >>> core = create_core(
+        ...     embedding_provider="local",
+        ...     chunk_size=24000,
+        ...     code_chunk_size=28000,
+        ... )
     """
     # Формируем override для конфига
     overrides = {}
     if db_path:
         overrides["db_path"] = db_path
+    if chunk_size is not None:
+        overrides["chunk_size"] = chunk_size
+    if code_chunk_size is not None:
+        overrides["code_chunk_size"] = code_chunk_size
 
     # Провайдеры
     defaults_overrides = {}

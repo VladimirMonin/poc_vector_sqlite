@@ -10,6 +10,9 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
+# Skip all tests if openai is not installed
+pytest.importorskip("openai", reason="openai package not installed")
+
 from semantic_core.infrastructure.openai import OpenAILLMProvider
 from semantic_core.interfaces.llm import BaseLLMProvider, GenerationResult
 

@@ -38,9 +38,15 @@ def main():
 
     store = PeeweeVectorStore(db, dimension=768)
 
+    # SmartSplitter требует parser и правильные имена параметров
+    from semantic_core.processing.parsers import MarkdownNodeParser
+    parser = MarkdownNodeParser()
+
     splitter = SmartSplitter(
-        max_chunk_size=500,
-        preserve_code_blocks=True,
+        parser=parser,
+        chunk_size=500,        # Размер текстового чанка в символах
+        code_chunk_size=1000,  # Размер чанка кода в символах
+        preserve_code=True,    # Изолировать блоки кода
     )
 
     context_strategy = HierarchicalContextStrategy()
