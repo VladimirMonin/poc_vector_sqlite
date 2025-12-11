@@ -3,6 +3,7 @@
 > "Рентгеновский аппарат" для SemanticCore — визуализация каждого шага pipeline
 
 **Коммиты:**
+
 - `591f972` — Phase 16.0 feat: Реализован Debug Observatory (Inspector Core)
 - `aced5f8` — bugfix: Исправлена sanitization FTS5 запросов со спецсимволами
 - `9cc8a70` — Phase 16.0 feat: Add local-vision-mlx support with Qwen3-VL-4B
@@ -19,6 +20,7 @@
 При разработке SemanticCore возникла задача: **как понять почему у всех результатов поиска similarity ~0.55?**
 
 Нужно было увидеть:
+
 - Что именно отправляется в Gemini?
 - Какие embeddings возвращаются?
 - Как работает гибридный поиск (vector + FTS)?
@@ -26,6 +28,7 @@
 
 **Попытка решения №1 (Phase 13):**
 Создали `PipelineInspector` в тестах (`tests/e2e/audit/`):
+
 - ✅ Работал, но только для Gemini провайдеров (hardcoded)
 - ❌ Нельзя было использовать из CLI
 - ❌ Артефакты сохранялись только в тестах
@@ -66,6 +69,7 @@ class PipelineInspector:
 ```
 
 ❌ **Проблемы:**
+
 - Работает только с Gemini
 - Нельзя использовать с локальными моделями (MLX)
 - Нет CLI команды
@@ -102,6 +106,7 @@ class ProviderInspector:
 ```
 
 ✅ **Преимущества:**
+
 - Работает с **любыми** провайдерами (Gemini, MLX, OpenAI)
 - Доступен из CLI: `semantic inspect docs/example.md`
 - Артефакты сохраняются в структурированном виде
@@ -204,6 +209,7 @@ def _extract_provider_metadata(self, provider) -> ProviderMetadata:
 ```
 
 **Преимущества:**
+
 - ✅ Работает с любыми провайдерами (не только Gemini)
 - ✅ Не требует изменения кода провайдеров
 - ✅ Graceful degradation (если атрибут отсутствует → None)
@@ -241,6 +247,7 @@ class InspectionSnapshot:
 **Зачем нужно `file_content`?**
 
 Критически важно сохранять копию входного файла в snapshot! Это позволяет:
+
 - Воспроизвести инспекцию позже (даже если оригинал изменился)
 - Сравнивать конфигурации на одном и том же контенте
 - Создавать golden-file тесты
@@ -327,12 +334,16 @@ reporter.display_snapshot(snapshot)
 ### Chunk #1
 **Content Preview:**
 ```
+
 # Introduction to Python
+
 ```
 
 **Embedding:**
 ```
+
 [0.123, -0.456, 0.789, ...]
+
 ```
 ```
 
@@ -386,6 +397,7 @@ def _sanitize_fts_query(query: str) -> str:
 ```
 
 **Последствия:**
+
 ```python
 # Запросы с круглыми скобками или вопросами ломались:
 "What is Python?"        → fts5: syntax error near "?"
@@ -417,6 +429,7 @@ def _sanitize_fts_query(query: str) -> str:
 ```
 
 **Тесты:**
+
 - ✅ 22 новых unit-теста для `_sanitize_fts_query`
 - ✅ Все существующие FTS тесты проходят
 
@@ -486,12 +499,14 @@ semantic inspect audio.mp3 --config alt_config.toml
 ### Unit Tests
 
 **22 теста для FTS sanitization:**
+
 ```bash
 pytest tests/unit/infrastructure/storage/test_fts_sanitization.py -v
 # ✅ 22 passed
 ```
 
 **19 тестов Observatory:**
+
 ```bash
 pytest tests/unit/core/test_observatory.py -v  
 # (будут созданы в следующих коммитах)
@@ -500,6 +515,7 @@ pytest tests/unit/core/test_observatory.py -v
 ### E2E Tests
 
 **4 теста с реальным Gemini API:**
+
 ```bash
 pytest tests/e2e/audit/test_inspector_gemini.py -v
 
@@ -512,6 +528,7 @@ pytest tests/e2e/audit/test_inspector_gemini.py -v
 ### Regression Tests
 
 **Все существующие FTS тесты:**
+
 ```bash
 pytest tests/test_phase_2_storage.py::TestFTSSearch -v
 # ✅ 2 passed
@@ -536,6 +553,7 @@ pytest tests/integration/search/test_fts_chunk_level.py -v
 ### 📦 Файлы
 
 **Новые модули:**
+
 - `semantic_core/core/observatory/`
   - `inspector.py` (336 lines)
   - `snapshot.py` (192 lines)
@@ -544,10 +562,12 @@ pytest tests/integration/search/test_fts_chunk_level.py -v
 - `semantic_core/cli/commands/inspect.py` (280 lines)
 
 **Обновлённые модули:**
+
 - `semantic_core/infrastructure/storage/peewee/adapter.py` — улучшена sanitization
 - `semantic_core/core/factory.py` — фиксы в create_semantic_core()
 
 **Тесты:**
+
 - `tests/unit/infrastructure/storage/test_fts_sanitization.py` — 22 теста
 - `tests/e2e/audit/test_inspector_gemini.py` — 4 E2E теста
 - `tests/unit/core/test_factory.py` — unskipped test

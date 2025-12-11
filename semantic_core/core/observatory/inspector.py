@@ -50,14 +50,17 @@ class ProviderInspector:
             artifacts_root: Корневая папка для сохранения artifacts (опционально)
         """
         self.core = core
-        
+
         # Создаём SnapshotManager с artifacts_root
         if artifacts_root:
             self.snapshot_manager = SnapshotManager(artifacts_root=Path(artifacts_root))
         else:
             self.snapshot_manager = SnapshotManager()
 
-        logger.trace("provider_inspector_initialized", artifacts_root=str(artifacts_root) if artifacts_root else None)
+        logger.trace(
+            "provider_inspector_initialized",
+            artifacts_root=str(artifacts_root) if artifacts_root else None,
+        )
 
     def ingest_with_inspection(
         self,
@@ -81,7 +84,7 @@ class ProviderInspector:
         # Загружаем документ если передан path
         if path and not document:
             from semantic_core.domain import Document
-            
+
             file_path = Path(path)
             content = file_path.read_text(encoding="utf-8")
             document = Document(

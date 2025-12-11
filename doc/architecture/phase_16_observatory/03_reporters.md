@@ -16,6 +16,7 @@
 - ✅ **DiffReporter** — для сравнения конфигураций
 
 **Единый интерфейс:**
+
 ```python
 class BaseReporter(ABC):
     @abstractmethod

@@ -253,7 +253,9 @@ def _output_json(checks: list) -> None:
     console.print_json(json.dumps(data))
 
 
-def _output_rich(sections: list, all_checks: list, verbose: bool, missing_providers: list) -> None:
+def _output_rich(
+    sections: list, all_checks: list, verbose: bool, missing_providers: list
+) -> None:
     """Вывод в Rich формате."""
     for section_name, checks in sections:
         console.print(f"[bold]{section_name}:[/bold]")

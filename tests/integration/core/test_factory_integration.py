@@ -79,7 +79,9 @@ class TestComponentFactoryIntegration:
 
             # Если получилось создать — проверяем тип
             if transcriber is not None:
-                from semantic_core.infrastructure.local.whisper import WhisperTranscriber
+                from semantic_core.infrastructure.local.whisper import (
+                    WhisperTranscriber,
+                )
 
                 assert isinstance(transcriber, WhisperTranscriber)
             else:

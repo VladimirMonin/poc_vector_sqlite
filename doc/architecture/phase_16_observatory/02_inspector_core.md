@@ -9,6 +9,7 @@
 ## 🎯 Задача
 
 Создать систему инспекции pipeline которая:
+
 - ✅ Работает с **любыми** провайдерами (Gemini, MLX, OpenAI)
 - ✅ **Не требует** изменения кода провайдеров
 - ✅ Извлекает метаданные через **duck typing**
@@ -122,6 +123,7 @@ def _extract_provider_metadata(self, provider) -> Optional[ProviderMetadata]:
 **Преимущества duck typing:**
 
 ✅ **Работает с любыми провайдерами:**
+
 ```python
 # GeminiEmbedder
 embedder_meta = inspector._extract_provider_metadata(gemini_embedder)
@@ -133,12 +135,14 @@ embedder_meta = inspector._extract_provider_metadata(mlx_embedder)
 ```
 
 ✅ **Graceful degradation:**
+
 ```python
 # Если провайдер не имеет атрибута model → model_name=None
 # Но inspector всё равно работает!
 ```
 
 ✅ **Не требует изменения провайдеров:**
+
 ```python
 # Не нужно добавлять методы get_metadata() в каждый провайдер
 # Просто извлекаем публичные атрибуты
@@ -225,31 +229,37 @@ def ingest_with_inspection(self, path: str) -> InspectionSnapshot:
 **Ключевые детали:**
 
 **1. Копия входного файла:**
+
 ```python
 file_content = file_path.read_text(encoding="utf-8")
 # Сохраняем в snapshot.file_content
 ```
 
 **Зачем?** Чтобы snapshot был **самодостаточным**:
+
 - Можно воспроизвести инспекцию позже
 - Можно сравнивать конфигурации на одном контенте
 - Golden-file тесты работают даже если файл изменился
 
 **2. Embedding preview:**
+
 ```python
 embedding_preview=embedding[:20].tolist()  # Первые 20 значений
 ```
 
 **Зачем?** Полный embedding 768D занимает много места в JSON. Preview достаточно для:
+
 - Проверки что embedding создан
 - Быстрого сравнения (первые 20 значений отличаются → весь вектор отличается)
 
 **3. Embedding hash:**
+
 ```python
 embedding_hash=hashlib.md5(embedding_blob).hexdigest()[:8]
 ```
 
 **Зачем?** Для быстрого сравнения embeddings между снимками:
+
 - Одинаковый hash → embeddings идентичны
 - Разный hash → провайдеры дали разные результаты
 
@@ -329,6 +339,7 @@ tests/e2e/audit/snapshots/
 ```
 
 **Соглашения:**
+
 - `session_YYYY-MM-DD_HH-MM-SS/` — уникальная папка для каждой инспекции
 - `{file_prefix}_inspection.json` — основной snapshot
 - Дополнительные артефакты создаются CLI/reporters
@@ -360,6 +371,7 @@ def create_session_folder(
 ```
 
 **Пример:**
+
 ```python
 manager = SnapshotManager(artifacts_root=Path("./snapshots"))
 
@@ -419,6 +431,7 @@ def save_snapshot(
 **Ключевые детали:**
 
 **1. Serialization через dataclasses.asdict():**
+
 ```python
 def _snapshot_to_dict(self, snapshot: InspectionSnapshot) -> dict:
     """Конвертирует dataclass в dict для JSON."""
@@ -441,6 +454,7 @@ def _snapshot_to_dict(self, snapshot: InspectionSnapshot) -> dict:
 ```
 
 **2. Опциональное сжатие:**
+
 ```python
 # Без сжатия: example_md_inspection.json (150KB)
 save_snapshot(snapshot, session_path, "example_md", compress=False)
@@ -450,6 +464,7 @@ save_snapshot(snapshot, session_path, "example_md", compress=True)
 ```
 
 **Когда использовать сжатие?**
+
 - ✅ Большие snapshots (много чанков, длинный file_content)
 - ✅ Долгосрочное хранение (экономия места)
 - ❌ Частый доступ (распаковка медленнее)
@@ -528,6 +543,7 @@ class ProviderMetadata:
 ```
 
 **Пример:**
+
 ```python
 ProviderMetadata(
     provider_type="GeminiEmbedder",
@@ -554,6 +570,7 @@ class ChunkInspection:
 ```
 
 **Пример:**
+
 ```python
 ChunkInspection(
     chunk_id=1,
@@ -579,6 +596,7 @@ class SearchInspection:
 ```
 
 **Пример:**
+
 ```python
 SearchInspection(
     query="What is Python?",

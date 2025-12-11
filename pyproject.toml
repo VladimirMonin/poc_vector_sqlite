@@ -10,7 +10,7 @@ requires-python = ">=3.13,<3.15"
 dependencies = [
     "peewee (>=3.18.3,<4.0.0)",
     "sqlite-vec (>=0.1.6,<0.2.0)",
-    "numpy (>=1.24.0,<2.0.0)",
+    "numpy (>=2.3.5,<3.0.0)",
     "pydantic-settings (>=2.12.0,<3.0.0)",
     "markdown-it-py (>=3.0.0,<4.0.0)",
     "audioop-lts (>=0.2.2,<0.3.0)",
@@ -51,12 +51,6 @@ local-whisper-mlx = [
     "librosa (>=0.10.0,<0.11.0)",
     "soundfile (>=0.12.0,<0.13.0)"
 ]
-local-vision-mlx = [
-    "mlx-vlm>=0.3.9,<0.4.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
-    "transformers==4.57.3; platform_machine == 'arm64' and sys_platform == 'darwin'",
-    "torchvision>=0.24.0,<0.25.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
-    "tokenizers>=0.22.0,<0.23.0; platform_machine == 'arm64' and sys_platform == 'darwin'"
-]
 
 # === Local AI (Cross-platform) ===
 local-embeddings = [
@@ -75,13 +69,13 @@ all-google = [
     "poc-vector-sqlite[google,media]"
 ]
 all-local-mlx = [
-    "poc-vector-sqlite[local-embeddings-mlx,local-whisper-mlx,local-vision-mlx,media]"
+    "poc-vector-sqlite[local-embeddings-mlx,local-whisper-mlx,media]"
 ]
 all-local = [
     "poc-vector-sqlite[local-embeddings,local-whisper,media]"
 ]
 all = [
-    "poc-vector-sqlite[google,openai,media,local-embeddings-mlx,local-whisper-mlx,local-vision-mlx]"
+    "poc-vector-sqlite[google,openai,media,local-embeddings-mlx,local-whisper-mlx]"
 ]
 
 

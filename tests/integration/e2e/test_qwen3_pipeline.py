@@ -46,7 +46,7 @@ class TestQwen3E2EPipeline:
     def test_qwen3_config_propagation(self, tmp_path):
         """
         КРИТИЧЕСКИЙ E2E: semantic.toml -> ComponentFactory -> embedder.dimension -> PeeweeVectorStore
-        
+
         Этот тест словил бы ВСЕ 8 багов:
         1. mlx-embeddings версия 0.1.0 не существует
         2. Qwen3 требует mlx-lm backend (не mlx-embeddings)
@@ -99,7 +99,7 @@ embedding_model = "qwen3-embedding"
     def test_qwen3_inspector_artifacts(self, tmp_path):
         """
         E2E: semantic inspect с Qwen3 -> сохранение артефактов.
-        
+
         Словили бы баг #8: SnapshotManager API.
         """
         # Setup
@@ -164,7 +164,7 @@ embedding_model = "qwen3-embedding"
     def test_qwen3_vs_gemini_dimension_mismatch(self, tmp_path):
         """
         E2E: Проверка что БД пересоздаётся при смене embedder.
-        
+
         Gemini 768D -> Qwen3 1024D должно работать.
         Словили бы баг #6: chunks_vec не пересоздавался.
         """
@@ -218,9 +218,7 @@ embedding_model = "qwen3-embedding"
 """
         )
 
-        config_qwen = SemanticConfig(
-            config_file=str(config_path), db_path=str(db_path)
-        )
+        config_qwen = SemanticConfig(config_file=str(config_path), db_path=str(db_path))
         embedder_qwen = ComponentFactory.create_embedder(config_qwen)
         assert embedder_qwen.dimension == 1024
 
@@ -232,6 +230,6 @@ embedding_model = "qwen3-embedding"
         result = db2.execute_sql(
             "SELECT sql FROM sqlite_master WHERE name='chunks_vec'"
         ).fetchone()
-        assert (
-            "FLOAT[1024]" in result[0]
-        ), "chunks_vec должен пересоздаться с новым dimension!"
+        assert "FLOAT[1024]" in result[0], (
+            "chunks_vec должен пересоздаться с новым dimension!"
+        )

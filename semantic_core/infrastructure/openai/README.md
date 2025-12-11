@@ -137,6 +137,7 @@ except RuntimeError as e:
 ```
 
 Провайдер автоматически:
+
 - Повторяет запросы при временных ошибках (max_retries)
 - Логирует все ошибки через semantic logger
 - Передаёт специфичные исключения OpenAI
@@ -165,6 +166,7 @@ pytest tests/unit/infrastructure/llm/ -v
 ## 📚 Примеры
 
 См. полные примеры в `examples/openai_llm_examples.py`:
+
 - Базовая генерация
 - Системные промпты
 - Streaming

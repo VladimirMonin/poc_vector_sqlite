@@ -44,7 +44,9 @@ class MarkdownReporter:
 
         # Provider metadata
         if snapshot.embedder_metadata:
-            lines.extend(self._format_provider_metadata("Embedder", snapshot.embedder_metadata))
+            lines.extend(
+                self._format_provider_metadata("Embedder", snapshot.embedder_metadata)
+            )
 
         # Processing steps
         lines.extend(self._format_processing_steps(snapshot))
@@ -83,13 +85,20 @@ class MarkdownReporter:
         if not snapshot.steps:
             return []
 
-        lines = ["## ⚡ Processing Steps", "", "| Step | Duration | Details |", "|------|----------|---------|"]
+        lines = [
+            "## ⚡ Processing Steps",
+            "",
+            "| Step | Duration | Details |",
+            "|------|----------|---------|",
+        ]
 
         for step in snapshot.steps:
             step_name = step["step_name"].replace("_", " ").title()
             duration = f"{step['duration_ms']:.2f}ms"
             details = ", ".join(
-                f"{k}={v}" for k, v in step.items() if k not in ["step_name", "duration_ms"]
+                f"{k}={v}"
+                for k, v in step.items()
+                if k not in ["step_name", "duration_ms"]
             )
             lines.append(f"| {step_name} | {duration} | {details} |")
 
@@ -107,7 +116,9 @@ class MarkdownReporter:
                 "image_ref": "🖼️",
             }.get(chunk.chunk_type.lower(), "📄")
 
-            lines.append(f"### {type_emoji} Chunk #{chunk.chunk_id} [{chunk.chunk_type}]")
+            lines.append(
+                f"### {type_emoji} Chunk #{chunk.chunk_id} [{chunk.chunk_type}]"
+            )
             lines.append("")
             lines.append(f"**Size:** {chunk.size} chars")
 

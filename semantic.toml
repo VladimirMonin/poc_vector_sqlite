@@ -4,10 +4,10 @@
 # === Default Providers (Phase 15.4) ===
 # Выберите провайдеров по умолчанию для каждого компонента
 [defaults]
-embedding_provider = "gemini"       # gemini | local | openai
+embedding_provider = "local"        # gemini | local | openai  ← ЛОКАЛЬНЫЕ (Qwen3)
 llm_provider = "gemini"             # gemini | openai | ollama
 transcription_provider = "gemini"   # gemini | whisper
-vision_provider = "gemini"          # gemini
+vision_provider = "gemini"          # gemini  ← ОБЛАЧНЫЙ (Flash 2.5)
 
 [database]
 path = "semantic.db"
@@ -38,10 +38,10 @@ max_tokens = 2048
 
 # === Local Models Provider (Phase 15.4) ===
 # Локальные модели через MLX (Apple Silicon) или PyTorch
-# [providers.local]
-# embedding_model = "all-minilm"  # all-minilm | qwen3-embedding | bge-small
-# whisper_model = "base"          # tiny | base | small | medium | large
-# device = "auto"                 # auto | mlx | cuda | mps | cpu
+[providers.local]
+embedding_model = "qwen3-embedding"  # all-minilm | qwen3-embedding | bge-small  ← QWEN3!
+whisper_model = "base"               # tiny | base | small | medium | large
+device = "auto"                      # auto | mlx | cuda | mps | cpu
 
 # === Ollama Provider (Phase 15.4) ===
 # Локальный LLM сервер (llama3.3, mistral, и др.)

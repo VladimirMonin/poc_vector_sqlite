@@ -23,18 +23,21 @@ Phase 15.2 предоставляет **два** локальных embedder п�
 ### LocalEmbedder (MLX)
 
 **Используй если:**
+
 - ✅ У тебя Apple Silicon (M1/M2/M3)
 - ✅ Нужна максимальная скорость на Mac
 - ✅ Хочешь минимум зависимостей
 - ✅ Работаешь с русским/китайским (Qwen3-Embedding)
 
 **Не используй если:**
+
 - ❌ Linux или Windows
 - ❌ Intel Mac
 
 ### SentenceTransformerEmbedder
 
 **Используй если:**
+
 - ✅ Кросс-платформенность важна
 - ✅ Есть NVIDIA GPU (CUDA)
 - ✅ Нужен широкий выбор моделей (HuggingFace)
@@ -57,6 +60,7 @@ print(vector.shape)  # (1024,)
 ```
 
 **Установка:**
+
 ```bash
 # Только на macOS с Apple Silicon
 pip install semantic-core[local-embeddings-mlx]
@@ -78,6 +82,7 @@ print(vector.shape)  # (768,)
 ```
 
 **Установка:**
+
 ```bash
 # Любая платформа
 pip install semantic-core[local-embeddings]
@@ -130,7 +135,7 @@ core = SemanticCore(
 | `paraphrase-multilingual-mpnet-base-v2` | 768 | 128 | ⭐⭐⭐⭐ |
 | `sentence-transformers/LaBSE` | 768 | 256 | ⭐⭐⭐⭐⭐ |
 
-Плюс любые другие с https://huggingface.co/models?library=sentence-transformers
+Плюс любые другие с <https://huggingface.co/models?library=sentence-transformers>
 
 ---
 
@@ -152,11 +157,13 @@ pytest tests/integration/local/ -v -m integration
 ## 💡 Рекомендации
 
 **Для production на Apple Silicon:**
+
 ```python
 LocalEmbedder("qwen3-embedding")  # Лучшее качество + длинный контекст
 ```
 
 **Для production кросс-платформа:**
+
 ```python
 SentenceTransformerEmbedder(
     "paraphrase-multilingual-mpnet-base-v2",
@@ -165,6 +172,7 @@ SentenceTransformerEmbedder(
 ```
 
 **Для быстрого POC:**
+
 ```python
 # MLX (если Mac M1/M2/M3)
 LocalEmbedder("all-minilm")
@@ -178,6 +186,6 @@ SentenceTransformerEmbedder("all-MiniLM-L6-v2")
 ## 🔗 Ссылки
 
 - **MLX Embeddings README:** `embeddings/README.md`
-- **SentenceTransformers Docs:** https://www.sbert.net/
+- **SentenceTransformers Docs:** <https://www.sbert.net/>
 - **Phase 15.2 Plan:** `doc/ideas/phase_15/phase_15.2_local_embeddings.md`
 - **BaseEmbedder Interface:** `semantic_core/interfaces/embedder.py`

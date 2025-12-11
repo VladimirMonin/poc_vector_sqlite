@@ -288,7 +288,9 @@ class TestLocalEmbedderErrorHandling:
         mock_load_model.return_value = (mock_model, mock_tokenizer)
 
         # Mock ошибки при генерации
-        mock_tokenizer.batch_encode_plus.side_effect = RuntimeError("Tokenization failed")
+        mock_tokenizer.batch_encode_plus.side_effect = RuntimeError(
+            "Tokenization failed"
+        )
 
         embedder = LocalEmbedder("all-minilm")
 

@@ -12,6 +12,7 @@
 Добавить поддержку локальных Vision-Language моделей (VLM) на Apple Silicon без установки тяжёлых зависимостей PyTorch.
 
 **Требования:**
+
 1. Использовать MLX Framework (нативный для Apple Silicon)
 2. Избегать установки PyTorch (~500 MB)
 3. Поддержка Qwen3-VL-4B-Instruct-4bit (~3.3 GB)
@@ -42,6 +43,7 @@ mlx-vlm 0.3.9
 > torchvision 0.24+ поддерживает standalone режим БЕЗ PyTorch. Можно установить `torchvision --no-deps` (2 MB вместо 500 MB).
 
 **Итого:**
+
 - transformers: 12 MB
 - torchvision: 2 MB
 - **Экономия**: 500 MB (96.8%)
@@ -65,6 +67,7 @@ local-vision-mlx = [
 ```
 
 **Почему отдельная группа?**
+
 - `local-embeddings-mlx` — только эмбеддинги (mlx-lm, mlx-embeddings)
 - `local-whisper-mlx` — только аудио транскрипция
 - `local-vision-mlx` — Vision-Language модели с зависимостями HuggingFace
@@ -72,6 +75,7 @@ local-vision-mlx = [
 ### 2. Конфликт numpy: opencv-python vs numpy 2.x
 
 **Проблема:**
+
 ```
 opencv-python 4.12.0.88 requires numpy<2.3.0
 poc-vector-sqlite core requires numpy>=2.3.5
@@ -258,6 +262,7 @@ assert len(output_text.split()) > 5
 **Особенность:** Модель ~3.3GB загружается в память. На MacBook Air 8GB использует swap.
 
 **Результат:**
+
 - ✅ Модель загружается
 - ✅ Генерирует описание на русском
 - ⚠️ Скорость 3.7-15 токенов/сек (из-за swap, норма для 8GB)
@@ -288,6 +293,7 @@ inspector.save_snapshot(snapshot, "test_inspection")
 ```
 
 **Артефакты:**
+
 - `test_inspection.json` — полный snapshot
 - `similarities.csv` — таблица результатов
 - `input_test_document.md` — копия входного файла
@@ -312,6 +318,7 @@ inspector = ProviderInspector(config, session_name="multimodal_session")
 ```
 
 **Артефакты:**
+
 - JSON с отдельными media chunks
 - Копия изображения в artifacts/
 
@@ -349,6 +356,7 @@ pip install -e ".[local-vision-mlx]"
 ```
 
 **Размер:**
+
 - transformers: 12 MB
 - torchvision: 2 MB (БЕЗ torch!)
 - mlx-vlm: 1.5 MB
@@ -356,6 +364,7 @@ pip install -e ".[local-vision-mlx]"
 - **Итого:** ~18 MB
 
 **Сравнение с PyTorch:**
+
 - torch + torchvision: 520+ MB
 - **Экономия:** 502 MB (96.5%)
 
@@ -371,6 +380,7 @@ test_qwen3_multimodal_document_inspection PASSED [100%] (2s)
 ```
 
 **VLM генерация на MacBook Air 8GB:**
+
 - Загрузка модели: ~3 сек (из кэша)
 - Генерация 200 токенов: ~20 сек
 - Скорость: 3.7-15 токенов/сек (зависит от swap usage)
@@ -399,6 +409,7 @@ local-embeddings = ["sentence-transformers", "torch"]
 ```
 
 **Почему?**
+
 - Пользователь выбирает что ему нужно
 - Избегаем конфликтов зависимостей
 - Меньше установленных пакетов = быстрее CI
@@ -406,6 +417,7 @@ local-embeddings = ["sentence-transformers", "torch"]
 ### 2. HuggingFace Transformers ≠ PyTorch
 
 `transformers` можно использовать БЕЗ PyTorch для:
+
 - Загрузки токенизаторов
 - Конфигурации моделей
 - Процессоров изображений
@@ -430,12 +442,14 @@ modified = replace(original, max_tokens=4000)  # Новый объект!
 ### 4. mlx-vlm API изменился в 0.3.9
 
 **До 0.3.9:**
+
 ```python
 output = generate(...)  # str
 print(output)
 ```
 
 **После 0.3.9:**
+
 ```python
 output = generate(...)  # GenerationResult
 print(output.text)  # str
@@ -444,6 +458,7 @@ print(output.prompt_tps)  # float
 ```
 
 **Backward compatibility:**
+
 ```python
 output_text = output.text if hasattr(output, "text") else str(output)
 ```
@@ -471,11 +486,13 @@ gc.collect()
 ## 📚 Следующие шаги
 
 **Phase 16.1** — CLI Inspect Command:
+
 - `semantic inspect <file>` для создания snapshot
 - Вывод через Rich console
 - Опции: `--session`, `--provider`, `--output`
 
 **Phase 16.2** — Multi-Provider Snapshots:
+
 - Сравнение Gemini vs Local embeddings
 - Анализ dimension mismatch (768D vs 1024D)
 - Метрики качества поиска
@@ -492,6 +509,7 @@ gc.collect()
 ✅ Исправлены баги: SemanticConfig.config_file, GenerationResult API
 
 **Проект теперь поддерживает:**
+
 - ☁️ Cloud: Gemini, OpenAI
 - 🍎 Local (Apple Silicon): MLX embeddings + Whisper + Vision
 - 🖥️ Local (Cross-platform): sentence-transformers + Whisper
