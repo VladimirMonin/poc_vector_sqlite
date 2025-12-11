@@ -44,6 +44,8 @@ semantic search "как работает гибридный поиск"
 | [RAG Architecture](concepts/08_rag_architecture.md) | Retrieval-Augmented Generation | 🟡 intermediate |
 | [Observability](concepts/09_observability.md) | Логирование, TRACE уровень, секреты | 🟢 beginner |
 | [Plugin System](concepts/10_plugin_system.md) | Интерфейсы, DI, расширяемость | 🔴 advanced |
+| [Multi-Provider](concepts/11_multi_provider.md) | Gemini, OpenAI, Local, Ollama | 🟡 intermediate |
+| [Debug Observatory](concepts/12_debug_observatory.md) | Инспекция pipeline, артефакты | 🟡 intermediate |
 
 ---
 
