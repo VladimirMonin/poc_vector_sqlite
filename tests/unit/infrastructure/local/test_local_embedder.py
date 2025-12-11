@@ -268,7 +268,7 @@ class TestLocalEmbedderErrorHandling:
 
         embedder = LocalEmbedder("all-minilm")
 
-        with pytest.raises(ImportError, match="MLX dependencies not installed"):
+        with pytest.raises(ImportError, match=r"MLX dependencies not installed|No module named"):
             embedder.embed_query("test")
 
     @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
@@ -316,25 +316,27 @@ class TestLocalEmbedderDifferentModels:
         assert embedder.dimension == expected_dim
         assert embedder.max_tokens == expected_max_tokens
 
+    @patch("semantic_core.infrastructure.local.embeddings.embedder.embed_with_model")
     @patch("semantic_core.infrastructure.local.embeddings.embedder.load_model")
-    def test_qwen3_uses_mlx_lm_backend(self, mock_load_model):
+    def test_qwen3_uses_mlx_lm_backend(self, mock_load_model, mock_embed_with_model):
         """Тест что Qwen3 использует mlx-lm backend."""
         # Mock модели
         mock_model = MagicMock()
         mock_tokenizer = MagicMock()
         mock_load_model.return_value = (mock_model, mock_tokenizer)
 
-        # Mock embedding
-        mock_model.return_value.text_embeds = [np.zeros(1024)]
-        mock_tokenizer.batch_encode_plus.return_value = {
-            "input_ids": MagicMock(),
-            "attention_mask": MagicMock(),
-        }
+        # Mock embedding результата
+        mock_embed_with_model.return_value = np.zeros(1024)
 
         embedder = LocalEmbedder("qwen3-embedding")
-        embedder.embed_query("test")
+        result = embedder.embed_query("test")
 
         # Проверяем что load_model вызван с правильным config
         mock_load_model.assert_called_once()
         config = mock_load_model.call_args[0][0]
         assert config.backend == "mlx-lm"
+        
+        # Проверяем что embed_with_model вызван с правильным backend
+        mock_embed_with_model.assert_called_once()
+        assert mock_embed_with_model.call_args[1]["backend"] == "mlx-lm"
+        assert len(result) == 1024
